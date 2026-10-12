@@ -94,6 +94,7 @@ Give each row about a minute. Open the `url`, read the description and the top o
 **Edge cases:**
 - **It serves an API, but GraphQL- or gRPC-only:** `other`, with `graphql` or `grpc` in the `note` column. (Only REST is enabled today.)
 - **A database or server with an HTTP API alongside other protocols:** `serves_api`.
+- **An app with no API at all** (you install it and use its web or desktop interface, nothing else): `other`. It may have docs worth improving, but not API docs.
 - **An app whose only API is in code** (classes and methods you call from plugins or extensions, like the PHP API of the MODX CMS): `other`, with `library API` in `note`. It's a candidate for the future library/SDK docs type, not for REST.
 - **An official REST API that's part of the project itself, even an undocumented one:** `serves_api`. If REST is only available through third-party add-ons, use `other`.
 - **Label by what the project mainly is,** not by what DocScout predicted.

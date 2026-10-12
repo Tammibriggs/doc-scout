@@ -49,6 +49,14 @@ def _cmd_set(cfg: Config, args: argparse.Namespace) -> int:
         print('Nothing to change. For example: docscout set --languages "python, go" --sizes small,medium', file=sys.stderr)
         return 2
     _save_and_show(cfg, setup_wizard.answers_from_config(cfg), args.config or user_config_path())
+    llm = cfg["llm"]
+    if llm_overrides(args) and llm["provider"] == "ollama":
+        installed = setup_wizard.list_ollama_models(llm["base_url"])
+        if installed is None:
+            print(f"\nNote: Ollama isn't running at {llm['base_url']}, so the model couldn't be checked.")
+        elif llm["model"] not in installed:
+            print(f"\nNote: {llm['model']} isn't downloaded yet. Run: ollama pull {llm['model']}")
+            print(f"Downloaded models: {', '.join(installed) or 'none'}")
     return 0
 
 

@@ -283,3 +283,14 @@ def test_llm_question_shows_whether_ollama_is_ready(tmp_path):
     assert any("Status: Ollama found, but gemma4:e2b isn't downloaded yet" in line for line in said)
     answers, said, _ = run_wizard(cfg, asks=["1"], secrets=[""], models=None)
     assert any("Until then, reports use code-based results only." in note for note in answers.notes)
+
+
+def test_set_model_warns_when_it_is_not_downloaded(tmp_path, monkeypatch, capsys):
+    from docscout import cli
+
+    monkeypatch.setattr(setup_wizard, "list_ollama_models", lambda url: ["gemma4:e2b"])
+    path = tmp_path / "config.toml"
+    assert cli.main(["--config", str(path), "set", "--model", "tiny:1b"]) == 0
+    out = capsys.readouterr().out
+    assert "tiny:1b isn't downloaded yet. Run: ollama pull tiny:1b" in out
+    assert tomllib.loads(path.read_text())["llm"]["model"] == "tiny:1b"

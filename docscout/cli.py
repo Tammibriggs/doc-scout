@@ -1,8 +1,9 @@
 """Command-line entry points.
 
-``init`` and ``profile`` set up and show what the user wants. Stage M0 commands:
-``discover`` (draw a sample to label), ``eval`` (measure accuracy on the labeled sample)
-and ``bench-llm`` (measure LLM speed and memory).
+- Setup: ``init``, ``set``, ``profile``.
+- Daily use: ``run`` (find projects and write a report), ``done`` / ``ignore`` (hide a
+  project from future reports), ``score`` (analyze one spec file or repo).
+- Stage M0 checks: ``discover``, ``eval``, ``bench-llm``.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ import sys
 from pathlib import Path
 
 from docscout import __version__
-from docscout.config import Config, load_config, log_dir, user_config_path
+from docscout.config import Config, data_dir, load_config, log_dir, user_config_path
 from docscout.errors import ConfigError
 
 log = logging.getLogger("docscout")
@@ -123,6 +124,131 @@ def _cmd_discover(cfg: Config, args: argparse.Namespace) -> int:
     return 0 if sample.passed else 1
 
 
+def store_path() -> Path:
+    return data_dir() / "docscout.db"
+
+
+def _github(cfg: Config):
+    from docscout.github import GitHub
+
+    if not cfg.github_token:
+        print("No GitHub token found, so GitHub allows only 60 requests an hour. Run `docscout init` to add one.", file=sys.stderr)
+    return GitHub(cfg.github_token)
+
+
+def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
+    from docscout import pipeline
+    from docscout.db import Store
+    from docscout.github import AuthError
+    from docscout.health import utcnow
+
+    sources = args.sources.split(",") if args.sources else list(cfg["discovery"]["sources"])
+    if not cfg.github_token and "code_search" in sources:
+        sources.remove("code_search")
+    limit = args.limit or int(cfg["discovery"]["daily_repo_budget"])
+    store = Store(store_path())
+    try:
+        with _github(cfg) as gh:
+            print(f"Checking up to {limit} repos...", file=sys.stderr)
+            result = pipeline.run(gh, cfg, store, utcnow(), limit=limit, sources=sources, progress=lambda m: print("  " + m, file=sys.stderr))
+    except AuthError:
+        print("GitHub rejected the token (it may have expired). Run `docscout init` to add a new one.", file=sys.stderr)
+        return 1
+    finally:
+        store.close()
+    s = result.summary
+    print(f"\nChecked {s.evaluated} repos: {s.passed} passed the health checks, {s.with_gaps} have docs gaps.")
+    if s.stopped_early:
+        print(f"Stopped early: {s.stopped_early}")
+    if result.report_path:
+        print(f"Report with {len(result.findings)} new projects: {result.report_path}")
+    else:
+        print("Nothing new scored high enough for a report this time.")
+    return 0
+
+
+def _cmd_mark(cfg: Config, args: argparse.Namespace) -> int:
+    from docscout.db import Store
+    from docscout.health import utcnow
+    from docscout.sources import github_full_name
+
+    name = github_full_name(args.repo) or args.repo.strip().strip("/")
+    if name.count("/") != 1:
+        print(f"Expected OWNER/REPO or a GitHub URL, got {args.repo!r}", file=sys.stderr)
+        return 2
+    store = Store(store_path())
+    try:
+        store.set_status(name, args.status, utcnow(), getattr(args, "reason", None))
+    finally:
+        store.close()
+    word = "done" if args.status == "done" else "ignored"
+    print(f"Marked {name} as {word}; it won't appear in future reports.")
+    return 0
+
+
+def _cmd_score(cfg: Config, args: argparse.Namespace) -> int:
+    from docscout.apitypes.openapi import score_spec
+    from docscout.apitypes.rest_prose import analyze_docs
+
+    target = Path(args.target)
+    if target.is_file():
+        content = target.read_bytes()
+        report = score_spec(content, str(target))
+        if report is not None:
+            print(f"{target}: {report.version}, {report.operations} operations, {'generated' if report.generated else 'hand-written'}")
+            print(f"Gap score: {report.gap:.0f}/100 (higher = worse docs)")
+            for check, points in report.points.items():
+                print(f"  +{points:g} {check}")
+            _print_findings(report.findings)
+            return 0
+        prose = analyze_docs([(str(target), content.decode("utf-8", "replace"))])
+        if prose.endpoints:
+            print(f"{target}: {len(prose.endpoints)} endpoints, {prose.completeness:.0%} complete")
+            _print_findings(prose.findings())
+            return 0
+        print(f"{target}: not an OpenAPI/Swagger spec (with at least 3 operations), and no endpoints found in it.")
+        return 1
+    return _score_repo(cfg, args.target)
+
+
+def _print_findings(findings) -> None:
+    for f in findings:
+        examples = f" (e.g. {', '.join(f.examples)}{f', +{f.more} more' if f.more else ''})" if f.examples else ""
+        print(f"  - {f.text}{examples}")
+
+
+def _score_repo(cfg: Config, target: str) -> int:
+    from docscout import apitypes
+    from docscout.db import StoredFinding
+    from docscout.discover import evaluate
+    from docscout.health import utcnow
+    from docscout.pipeline import analyze
+    from docscout.report import render_item
+    from docscout.sources import Candidate, github_full_name
+
+    name = github_full_name(target) or target.strip().strip("/")
+    if name.count("/") != 1:
+        print(f"Expected a spec file, OWNER/REPO or a GitHub URL, got {target!r}", file=sys.stderr)
+        return 2
+    types = apitypes.enabled_types(cfg["api_types"])
+    now = utcnow()
+    with _github(cfg) as gh:
+        ev = evaluate(gh, Candidate(name, "manual", {"full_name": name}), cfg, now, types)
+        print(f"{name}: {ev.classification.project_type} ({ev.classification.api_type} {ev.classification.api_confidence:.2f})")
+        for reason in ev.classification.reasons:
+            print(f"  - {reason}")
+        if ev.rejected:
+            print(f"Not reported: {ev.rejected}")
+            return 0
+        result = analyze(gh, ev, cfg, {t.key: t for t in types})
+    if result is None:
+        print("Not reported: not enough evidence of an API with docs gaps.")
+        return 0
+    print()
+    print("\n\n".join(render_item(1, StoredFinding(name, result.score.total, result.details, 0), now)))
+    return 0
+
+
 def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
     from docscout.evaluate import TARGET_PRECISION, evaluate_csv, format_report
 
@@ -210,6 +336,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("profile", help="show what DocScout is looking for, in plain words")
     p.set_defaults(func=_cmd_profile)
+
+    p = sub.add_parser("run", help="find projects with API docs gaps and write a report")
+    p.add_argument("--limit", type=int, help="repos to check this time (default: [discovery] daily_repo_budget)")
+    p.add_argument("--sources", help="comma-separated sources (default: [discovery] sources)")
+    p.add_argument("--no-llm", action="store_true", help="skip LLM reviews (the LLM is added in stage M2)")
+    _add_profile_flags(p)
+    p.set_defaults(func=_cmd_run)
+
+    p = sub.add_parser("done", help="mark a project as done; it won't be reported again")
+    p.add_argument("repo", help="OWNER/REPO or a GitHub URL")
+    p.set_defaults(func=_cmd_mark, status="done")
+
+    p = sub.add_parser("ignore", help="hide a project from future reports")
+    p.add_argument("repo", help="OWNER/REPO or a GitHub URL")
+    p.add_argument("--reason", help="why, e.g. \"not a REST API\" (kept for tuning DocScout)")
+    p.set_defaults(func=_cmd_mark, status="ignored")
+
+    p = sub.add_parser("score", help="analyze one OpenAPI spec file, Markdown file or repo (OWNER/REPO)")
+    p.add_argument("target")
+    _add_profile_flags(p)
+    p.set_defaults(func=_cmd_score)
 
     p = sub.add_parser("discover", help="draw a sample of repos to label (stage M0)")
     _add_profile_flags(p)

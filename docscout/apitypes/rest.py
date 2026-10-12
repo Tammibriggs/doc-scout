@@ -38,7 +38,7 @@ MAX_DOCS_FILES = 3
 MAX_DOCS_BYTES = 512 * 1024
 
 GAP_ELSEWHERE = 40  # no endpoints in the repo, but docs probably exist elsewhere
-GAP_NONE = 75  # nothing found anywhere; reported only when the repo is very likely an API
+GAP_NONE = 60  # nothing found anywhere; below a measured gap, since it rests on the weakest evidence
 CAP_CHECK_MANUALLY = 50
 CAP_COMPLETE_PROSE = 35
 NONE_MIN_CONFIDENCE = 0.8

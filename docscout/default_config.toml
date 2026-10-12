@@ -72,7 +72,12 @@ num_ctx = 4096
 timeout_seconds = 300
 readme_chars = 1500
 
+[scoring]
+language_bonus = 5              # added to the score of repos in one of your languages
+
 [report]
+min_score = 25                  # items scoring lower aren't reported
+max_items = 10                  # new items per report
 dir = "~/Documents/DocScout/reports"
 still_open_count = 5
 dry_pool_warning_days = 7

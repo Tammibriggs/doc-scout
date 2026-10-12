@@ -5,13 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-# kind -> heading shown in reports
+# kind -> heading shown in reports; {api} is the API type's label, e.g. "REST"
 KIND_LABELS = {
-    "spec": "Spec with gaps",
-    "prose": "Docs only in prose",
-    "elsewhere": "Docs probably elsewhere",
-    "none": "No API docs found",
+    "spec": "{api} API spec with gaps",
+    "prose": "{api} API docs only in prose",
+    "elsewhere": "{api} API docs probably elsewhere",
+    "none": "No {api} API docs found",
 }
+
+
+def kind_label(kind: str, api_label: str) -> str:
+    return KIND_LABELS.get(kind, kind).format(api=api_label).strip()
 
 
 @dataclass

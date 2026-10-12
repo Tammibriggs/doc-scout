@@ -134,4 +134,4 @@ def test_no_endpoints_but_docs_elsewhere():
 def test_nothing_found_is_reported_only_when_very_likely_an_api():
     assert RestApi().analyze(ctx(FakeGitHub(), [], "# App", confidence=0.6)) is None
     gap = RestApi().analyze(ctx(FakeGitHub(), [], "# App", confidence=0.85))
-    assert gap.kind == "none" and gap.score == 75 and gap.unverified
+    assert gap.kind == "none" and gap.score == 60 and gap.unverified

@@ -83,6 +83,20 @@ def language_policy(profile: dict[str, Any], api_types: list[ApiType]) -> Langua
     return LanguagePolicy(languages, required)
 
 
+def one_line(values: dict[str, Any], api_types: list[ApiType]) -> str:
+    """e.g. "REST API docs · any language, Python ranked higher · small, medium, large projects"."""
+    policy = language_policy(values["profile"], api_types)
+    names = ", ".join(lang.name for lang in policy.languages)
+    if not names:
+        languages = "any language"
+    elif policy.required:
+        languages = f"only {names}"
+    else:
+        languages = f"any language, {names} ranked higher"
+    sizes = ", ".join(values["profile"]["project_sizes"])
+    return f"{', '.join(t.label for t in api_types)} API docs · {languages} · {sizes} projects"
+
+
 def describe(values: dict[str, Any], api_types: list[ApiType], *, has_token: bool, config_path: str | None) -> str:
     """The profile in plain sentences, for ``docscout profile`` and the end of ``init``."""
     profile = values["profile"]

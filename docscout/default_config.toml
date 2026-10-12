@@ -1,0 +1,78 @@
+# DocScout default configuration.
+# Your own config.toml only needs the keys you change; everything else keeps these defaults.
+config_version = 1
+
+# ── Your profile: what you want DocScout to find ─────────────────────────────────
+# `docscout init` asks about these and saves your answers; `docscout profile` shows them.
+# Everything after this section is advanced tuning most people never need to change.
+[profile]
+api_types = ["rest"]            # REST today; GraphQL, gRPC, event APIs and library/SDK docs are planned
+languages = []                  # languages you know, e.g. ["Python", "Go"]; empty means any
+language_filter = "auto"        # auto | require | prefer. auto = required for library/SDK docs, preferred otherwise
+project_sizes = ["small", "medium", "large"]   # small 20–200★, medium 200–1,000★, large 1,000–5,000★, huge 5,000★+
+
+# ── Advanced ──────────────────────────────────────────────────────────────────────
+[api_types]
+# Per-API-type search settings. Which types are used comes from [profile] api_types.
+# Each new type gets its own [api_types.<key>] section and its own labeled-sample check.
+
+[api_types.rest]
+repo_queries = [
+    'topic:self-hosted "rest api" in:readme',
+    "topic:openapi",
+    "topic:openapi3",
+    "topic:swagger",
+    "topic:rest-api",
+    "topic:api-server",
+]
+definition_filenames = ["openapi.yaml", "openapi.json", "swagger.yaml", "swagger.json"]   # used by code_search
+issue_keywords = ["openapi", "swagger", "endpoint"]   # added to [discovery] help_requested_keywords
+
+[discovery]
+daily_repo_budget = 60          # repos analyzed per day; `run --limit N` overrides it for one run
+slices_per_run = 4
+recheck_after_days = 90
+sources = ["awesome_selfhosted", "repo_search", "help_requested"]   # add "code_search" to enable it
+seed_max_age_days = 7
+# Search star bands come from [profile] project_sizes.
+code_search_size_bands = ["<5000", "5000..20000", "20000..100000", ">100000"]
+# help_requested: open, unassigned issues where maintainers ask for API docs help.
+issue_label_families = ['documentation,docs', '"help wanted","good first issue"']
+help_requested_keywords = ["api"]   # generic title keywords; each API type adds its own
+issue_label_denylist = ["bounty", "tier:", "points"]
+issue_title_denylist = ["dependency dashboard"]
+issue_lookback_days = 60        # first run only; later runs search since the last run
+
+[health]
+# Accepted star ranges come from [profile] project_sizes.
+pushed_within_days = 60
+min_human_committers_90d = 2
+min_outsider_merged_prs_180d = 1
+
+[health.help_requested]
+# Looser activity check for repos where a maintainer labeled a docs issue "help wanted" or
+# "good first issue": the explicit ask stands in for a history of merged outside PRs.
+# The other health checks (stars, license, recent pushes, spam) still apply.
+min_human_committers_90d = 1
+min_outsider_merged_prs_180d = 0
+
+[classify]
+prefilter_below = 0.25          # skip repos whose metadata alone says "not an API" (saves API calls)
+llm_band = [0.4, 0.7]           # repos in this confidence band always get an LLM second opinion
+llm_raise_cap = 0.8             # the LLM may raise confidence up to this value, never higher
+drop_below = 0.4                # repos below this confidence are not reported
+
+[llm]
+provider = "ollama"             # ollama | openai_compatible | none
+model = "gemma4:e2b"
+base_url = "http://localhost:11434"
+api_key_env = "DOCSCOUT_LLM_API_KEY"
+max_candidates = 5              # reset after `docscout bench-llm`
+num_ctx = 4096
+timeout_seconds = 300
+readme_chars = 1500
+
+[report]
+dir = "~/Documents/DocScout/reports"
+still_open_count = 5
+dry_pool_warning_days = 7

@@ -1,0 +1,85 @@
+openapi: 3.1.0
+info:
+  title: Uptime
+  version: "1.0"
+  description: Uptime monitors your websites and APIs, and alerts you when they go down or slow down.
+servers:
+  - url: https://uptime.example.com/api
+tags:
+  - name: checks
+    description: Create and inspect uptime checks.
+components:
+  securitySchemes:
+    token:
+      type: http
+      scheme: bearer
+      description: Send your API token as a Bearer token.
+  parameters:
+    CheckId:
+      name: id
+      in: path
+      required: true
+      description: The check's ID.
+      schema: {type: string}
+  schemas:
+    Check:
+      type: object
+      properties:
+        id: {type: string}
+        url: {type: string}
+      example: {id: "c1", url: "https://example.com"}
+  responses:
+    NotFound:
+      description: No check with that ID.
+paths:
+  /checks:
+    get:
+      tags: [checks]
+      summary: List checks
+      responses:
+        "200":
+          description: All checks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Check"}
+        "401": {description: Missing or invalid token.}
+    post:
+      tags: [checks]
+      summary: Create a check
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Check"}
+      responses:
+        "201":
+          description: The new check.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Check"}
+        "400": {description: Invalid URL.}
+  /checks/{id}:
+    parameters:
+      - $ref: "#/components/parameters/CheckId"
+    get:
+      tags: [checks]
+      summary: Get one check
+      responses:
+        "200":
+          description: The check.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Check"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [checks]
+      summary: Delete a check
+      responses:
+        "204": {description: Deleted.}
+        "404": {$ref: "#/components/responses/NotFound"}
+      x-codeSamples: []
+      requestBody:
+        content:
+          application/json:
+            example: {}

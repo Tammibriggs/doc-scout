@@ -22,6 +22,11 @@ class OwnedFile:
     size: int
 
 
+def is_owned_path(path: str) -> bool:
+    """False for files under vendor, test, fixture, example and similar folders."""
+    return not _NOT_OWNED_DIRS.search(path.rpartition("/")[0])
+
+
 def find_owned_files(tree: list[dict[str, Any]], name_pattern: re.Pattern[str], max_bytes: int = MAX_DEFINITION_BYTES) -> list[OwnedFile]:
     """Files whose name matches ``name_pattern`` and that the repo plausibly owns.
 

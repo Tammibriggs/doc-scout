@@ -1,0 +1,18 @@
+{
+  "swagger": "2.0",
+  "info": {"title": "Pets", "version": "1"},
+  "host": "pets.example.com",
+  "securityDefinitions": {"key": {"type": "apiKey", "name": "X-Key", "in": "header"}},
+  "paths": {
+    "/pets": {
+      "get": {"summary": "List pets", "parameters": [{"name": "limit", "in": "query", "type": "integer", "description": "Max results"}],
+              "responses": {"200": {"description": "ok", "schema": {"type": "array", "items": {"type": "object"}}, "examples": {"application/json": []}}, "default": {"description": "error"}}},
+      "post": {"responses": {"200": {"description": "ok"}}}
+    },
+    "/pets/{id}": {
+      "get": {"description": "Get a pet", "parameters": [{"name": "id", "in": "path", "required": true, "type": "string"}],
+              "responses": {"200": {"description": "ok", "schema": {"$ref": "#/definitions/Pet"}}, "404": {"description": "missing"}}}
+    }
+  },
+  "definitions": {"Pet": {"type": "object", "properties": {"self": {"$ref": "#/definitions/Pet"}}}}
+}

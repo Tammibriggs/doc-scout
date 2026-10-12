@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: Uptime
+  version: "1.0"
+paths:
+  /checks:
+    get:
+      responses:
+        "200":
+          description: ok
+    post:
+      parameters:
+        - name: dry_run
+          in: query
+          schema: {type: boolean}
+      responses:
+        "201":
+          description: created
+  /checks/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: ok
+    delete:
+      responses:
+        "204":
+          description: deleted

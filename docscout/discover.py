@@ -48,6 +48,10 @@ class Evaluated:
     health: float | None = None
     definition_paths: list[str] = field(default_factory=list)
     language_match: bool | None = None  # None: no languages in the profile
+    # Kept for docs analysis so it doesn't fetch them again (not written to the sample CSV).
+    tree: list[dict[str, Any]] | None = None
+    readme: str | None = None
+    head_sha: str | None = None
 
 
 def maintainers_asked_for_help(cand: Candidate) -> bool:
@@ -119,7 +123,10 @@ def evaluate(
             return result
 
     since = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    stats = pr_stats(gh.list_closed_pulls(cand.full_name), gh.list_commits(cand.full_name, since), now)
+    pulls = gh.list_closed_pulls(cand.full_name)
+    commits = gh.list_commits(cand.full_name, since)
+    stats = pr_stats(pulls, commits, now)
+    result.head_sha = commits[0].get("sha") if commits else None
     result.stats = stats
     reason = gate_activity(stats, activity_thresholds(cfg, cand))
     if reason:
@@ -131,6 +138,7 @@ def evaluate(
     result.classification = classify(meta, now=now, api_types=types, prior=cand.prior, tree=tree, readme=readme, issues=cand.issues)
     result.health = health_score(stats, has_contributing(tree))
     result.definition_paths = [f"{t.key}: {f.path}" for t in types for f in t.find_definitions(tree)[:3]]
+    result.tree, result.readme = tree, readme
     return result
 
 

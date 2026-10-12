@@ -242,6 +242,10 @@ class GitHub:
         """Bytes of code per language, e.g. {"Python": 120000, "TypeScript": 340000}."""
         return self.get_json(f"/repos/{full_name}/languages", retry_not_found=True)
 
+    def list_owner_repos(self, owner: str) -> list[dict]:
+        """The owner's most recently pushed public repos (works for users and organizations)."""
+        return self.get_json(f"/users/{owner}/repos", params={"sort": "pushed", "per_page": 100})
+
     def list_closed_pulls(self, full_name: str) -> list[dict]:
         return self.get_json(
             f"/repos/{full_name}/pulls",

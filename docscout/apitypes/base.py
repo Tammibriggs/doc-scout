@@ -12,11 +12,29 @@ type's ``[api_types.<key>]`` config section, so users can tune them without code
 from __future__ import annotations
 
 import re
-from typing import Any, ClassVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, ClassVar
 
+from docscout.analyze.gaps import Gap
 from docscout.analyze.tree import OwnedFile, find_owned_files
 from docscout.evidence import Evidence, Signals, service_role
 from docscout.llm.base import Review
+
+if TYPE_CHECKING:
+    from docscout.github import GitHub
+
+
+@dataclass
+class DocsContext:
+    """What an API type gets when it analyzes a repo's docs (after the repo passed the gate)."""
+
+    gh: GitHub
+    full_name: str
+    repo: dict[str, Any]
+    tree: list[dict[str, Any]]
+    readme: str | None
+    head_sha: str | None  # latest commit on the default branch, for permanent links
+    type_confidence: float
 
 
 class ApiType:
@@ -61,6 +79,10 @@ class ApiType:
 
     def evidence(self, signals: Signals) -> Evidence:
         """Evidence the repo exposes this kind of API."""
+        raise NotImplementedError
+
+    def analyze(self, ctx: DocsContext) -> Gap | None:
+        """How bad this repo's docs for this API are. None: not enough evidence to say."""
         raise NotImplementedError
 
     # ------------------------------------------------------------ LLM

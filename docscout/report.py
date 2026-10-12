@@ -81,6 +81,17 @@ def render_item(index: int, finding: StoredFinding, now: datetime) -> list[str]:
     if gap.unverified:
         lines.append("*Unverified: based on finding no docs, not on reading them.*")
 
+    checks = d.get("checks") or {}
+    if checks:
+        parts = []
+        if checks.get("claimed"):
+            parts += [f"⚠️ {text(c, 140)}" for c in checks["claimed"]]
+        elif checks.get("claim_checked"):
+            parts.append("✅ not claimed")
+        parts += [f"⚠️ {text(r, 220)}" for r in checks.get("requirements") or []]
+        parts.append(f"local setup: {text(checks.get('local_setup', 'unclear'))}")
+        lines.append("**Before you start:** " + " · ".join(parts))
+
     issues = d.get("issues") or []
     if issues:
         parts = []

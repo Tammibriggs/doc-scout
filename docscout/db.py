@@ -158,6 +158,12 @@ class Store:
                 (run_id, full_name.lower(), api_type, kind, gap, score, effort, json.dumps(details), _iso(now)),
             )
 
+    def update_details(self, run_id: int, full_name: str, details: dict[str, Any]) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE findings SET details=? WHERE run_id=? AND repo_key=?", (json.dumps(details), run_id, full_name.lower())
+            )
+
     def run_findings(self, run_id: int, min_score: float, limit: int) -> list[StoredFinding]:
         rows = self.conn.execute(
             """SELECT r.full_name, f.score, f.details, f.run_id FROM findings f JOIN repos r ON r.key = f.repo_key

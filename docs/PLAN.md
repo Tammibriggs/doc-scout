@@ -11,7 +11,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | Stage | Must ship | If time allows | Dates |
 |---|---|---|---|
 | **M0. Prove discovery** | ✅ Code (commits `3d3e49e`…); ⏳ **your accuracy check** (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
-| **M1. Useful manual report** | OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run --no-llm`, `ignore`, `done`, `score` | Claim check (open PRs, "I'll take this"); CLA, DCO and AI-policy badges; local-setup badge | Tue 13 – Thu 15 Oct |
+| **M1. Useful manual report** | ✅ Done on branch `m1-report` (Mon 12 Oct, ahead of schedule): OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run`, `ignore`, `done`, `score`. ⏳ Exit check: you'd act on at least 3 of the top 10 in a real report | ✅ Also done: claim check (open docs PRs, "I'll take this"); CLA, DCO and AI-policy notes; local-setup note | Tue 13 – Thu 15 Oct |
 | **M3. Daily runs on Linux** | `run --if-due`, file lock, offline check and resume, a cursor through the search slices, `notify-send`, a 401 alert, `schedule install/uninstall/status` for systemd | Quiet-day rules; "pool running dry" warning | Fri 16 Oct |
 | **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap; when the LLM is unavailable, "LLM review skipped" plus the fix | Measuring the LLM against your labels | Sat 17 Oct |
 | Unattended test | Runs Fri 16 → Mon 19 in the background: no manual starts, survives a reboot and going offline | | Fri 16 – Mon 19 Oct |
@@ -196,8 +196,22 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   - `$ref` is resolved only within the file.
   - **Generated specs** (a `DO NOT EDIT` header, or CI that regenerates the file) keep their score, but the suggestion becomes "edit the code annotations".
 - **C. Docs only in prose.** Each endpoint in the README or docs is checked for: a description (25), a request example (20), a response example (25), status or error codes (15) and auth (15). If the docs are at least 80% complete, the gap is set to 35 and the suggestion becomes "turn them into an OpenAPI spec".
-- **D. No docs found.** Gap = 75, only when type confidence is at least 0.8 and no docs were found elsewhere. Always marked *unverified*.
-- **Docs elsewhere or generated at runtime.** Detected from the homepage, a docs link in the README, a sibling `*docs*` repo, or a Swagger UI, ReDoc or `/docs` mention. The gap is capped at 50 and the item is marked "check manually" until M4.
+- **D. No docs found.** Gap = **60**, only when type confidence is at least 0.8 and no docs were found elsewhere. Always marked *unverified*. It was 75, but that tied it with measured spec gaps in the first test report, and it rests on the weakest evidence.
+- **Docs elsewhere or generated at runtime.** Detected from:
+  - the homepage;
+  - a docs link in the README, which only counts if its address mentions the project or its owner (so `laravel.com/docs` doesn't), one entry per site;
+  - a sibling `*docs*` or `*website*` repo;
+  - a Swagger UI, ReDoc or `openapi.json` mention, or `/docs` on a local address (`localhost:8000/docs`).
+
+  Prose gaps with these signs are capped at 50 and marked "check manually" until M4. With no endpoints in the repo at all, the gap is **40** ("docs probably elsewhere").
+- **Generated-spec limitation:** detection reads the file's header and folder names only. Specs generated without a marker (e.g. JSON from some code generators) show as hand-written.
+
+**Live findings from 12 Oct, already fixed:**
+- **"specification" is no longer a tool word,** since it misclassified zot, an OCI registry with a Swagger spec.
+- **Many topics count as spam only on new repos.**
+- **Spam is re-checked once full repo details are fetched.**
+- **Curated repos outside your star range are dropped without an API call.**
+- **The daily budget counts repos that actually used the GitHub API.**
 
 ```
 score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted +10, good first issue +5, docs label +5; max +15)
@@ -325,11 +339,11 @@ hacktoberfest/
     github.py ✅  health.py ✅  classify.py ✅  evidence.py ✅  discover.py ✅  evaluate.py ✅  bench.py ✅
     apitypes/ base.py ✅ rest.py ✅          # + spec scoring for REST (M1); graphql.py, grpc.py, … (later)
     sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
-    analyze/ tree.py ✅  prose.py · elsewhere.py · checks.py (M1)
+    analyze/ tree.py ✅  gaps.py ✅  elsewhere.py ✅  checks.py ✅      apitypes/ openapi.py ✅  rest_prose.py ✅
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅
-    db.py · scoring.py · report.py · sanitize.py (M1)    lock.py · netcheck.py · notify.py · scheduler/linux.py (M3)
+    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅    lock.py · netcheck.py · notify.py · scheduler/linux.py (M3)
     scheduler/macos.py · scheduler/windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 81 tests · fixtures/labeled_repos.csv (after M0 check)
+  tests/ ✅ 119 tests · fixtures/specs, fixtures/readmes ✅ · fixtures/labeled_repos.csv (after M0 check)
 ```
 
 ## 17. Risks

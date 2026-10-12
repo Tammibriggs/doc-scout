@@ -57,6 +57,41 @@ The same flags work on `discover` for a single run without saving, for example `
 
 Settings are saved in `config.toml` and secrets in `secrets.env`, both in your config folder (`~/.config/docscout/` on Linux). `secrets.env` is readable only by you. You can also set the token or the LLM API key with the `GITHUB_TOKEN` or `DOCSCOUT_LLM_API_KEY` environment variables, which take precedence.
 
+## Find projects to contribute to
+
+```bash
+.venv/bin/docscout run              # checks up to 60 repos (about 10 minutes) and writes a report
+.venv/bin/docscout run --limit 10   # a quicker, smaller run
+```
+
+**The report** goes to `~/Documents/DocScout/reports/` (set `[report] dir` to change it):
+- every run writes a new dated file, such as `2026-10-14.md`, then `2026-10-14_2.md` for a second run that day, and `latest.md` is always a copy of the newest;
+- a run that finds nothing new writes no file.
+
+**Each item shows:**
+- **the gap:** for an OpenAPI spec, which operations lack descriptions, examples, success schemas or error responses, with a permanent link to the file; for prose docs, which endpoints lack a description, request and response examples, status codes or auth;
+- **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
+- **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
+- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally;
+- **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet.
+
+**Once you've dealt with a project,** hide it from future reports:
+
+```bash
+.venv/bin/docscout done owner/repo                     # you contributed
+.venv/bin/docscout ignore owner/repo --reason "..."    # not for you; the reason helps tune DocScout
+```
+
+Repos are only checked again after 90 days (`[discovery] recheck_after_days`), and reported ones stay listed under "Still open from earlier" until you mark them.
+
+**To look at one spec, docs file or repo:**
+
+```bash
+.venv/bin/docscout score path/to/openapi.yaml   # gap score with the reason for each point
+.venv/bin/docscout score docs/API.md            # endpoint completeness of a Markdown file
+.venv/bin/docscout score owner/repo             # the full check, as it would appear in a report
+```
+
 ## Stage M0: check the tool finds the right projects
 
 ```bash

@@ -241,6 +241,12 @@ def _score_repo(cfg: Config, target: str) -> int:
             print(f"Not reported: {ev.rejected}")
             return 0
         result = analyze(gh, ev, cfg, {t.key: t for t in types})
+        if result is not None and cfg["checks"]["claim_and_policy"]:
+            from docscout.analyze.checks import Checks, paid_checks
+
+            d = result.details
+            checks = paid_checks(gh, name, Checks(**d["checks"]), d["check_paths"], d["issues"], d["head_sha"])
+            d["checks"] = checks.as_dict()
     if result is None:
         print("Not reported: not enough evidence of an API with docs gaps.")
         return 0

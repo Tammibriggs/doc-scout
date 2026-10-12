@@ -246,6 +246,12 @@ class GitHub:
         """The owner's most recently pushed public repos (works for users and organizations)."""
         return self.get_json(f"/users/{owner}/repos", params={"sort": "pushed", "per_page": 100})
 
+    def list_open_pulls(self, full_name: str) -> list[dict]:
+        return self.get_json(f"/repos/{full_name}/pulls", params={"state": "open", "per_page": 100}, retry_not_found=True)
+
+    def list_issue_comments(self, full_name: str, number: int) -> list[dict]:
+        return self.get_json(f"/repos/{full_name}/issues/{number}/comments", params={"per_page": 100})
+
     def list_closed_pulls(self, full_name: str) -> list[dict]:
         return self.get_json(
             f"/repos/{full_name}/pulls",

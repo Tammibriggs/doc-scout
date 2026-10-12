@@ -19,6 +19,7 @@ from typing import Any
 import httpx
 
 from docscout import apitypes
+from docscout.analyze.checks import Checks, free_checks, paid_checks
 from docscout.analyze.gaps import Gap, effort_label
 from docscout.apitypes import ApiType
 from docscout.apitypes.base import DocsContext
@@ -98,7 +99,20 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
         "head_sha": ev.head_sha,
         "reasons": ev.classification.reasons,
     }
+    checks, paths = free_checks(ev.tree or [], ev.readme)
+    details["checks"] = checks.as_dict()
+    details["check_paths"] = paths
     return Analysis(gap, score, details)
+
+
+def before_you_start(gh: GitHub, run_id: int, store: Store, findings: list[StoredFinding]) -> None:
+    """Claim and requirement checks for reported items (about 2-3 API calls each)."""
+    for finding in findings:
+        d = finding.details
+        checks = Checks(**d.get("checks", {}))
+        paid_checks(gh, finding.full_name, checks, d.get("check_paths", {}), d.get("issues", []), d.get("head_sha"))
+        d["checks"] = checks.as_dict()
+        store.update_details(run_id, finding.full_name, d)
 
 
 @dataclass
@@ -207,6 +221,12 @@ def run(
     summary.seconds = clock() - started
     report_cfg = cfg["report"]
     findings = store.run_findings(run_id, float(report_cfg["min_score"]), int(report_cfg["max_items"]))
+    if findings and cfg["checks"]["claim_and_policy"] and auth_error is None:
+        try:
+            before_you_start(gh, run_id, store, findings)
+        except Exception as exc:  # optional extras: never lose the report over them
+            log.warning("skipped some before-you-start checks: %s", exc)
+        findings = store.run_findings(run_id, float(report_cfg["min_score"]), int(report_cfg["max_items"]))
     still_open = store.still_open(run_id, int(report_cfg["still_open_count"]))
     report_path = None
     if findings:

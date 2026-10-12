@@ -218,7 +218,7 @@ def ask_interactively(
             notes.append(f"The LLM model isn't downloaded yet. Run: ollama pull {llm['model']}")
         else:
             notes.append(f"Ollama model {llm['model']} is installed.")
-        notes.append(model_change_hint(llm["model"], installed, available_memory()))
+        notes.append(model_change_hint(llm["model"]))
     elif llm["provider"] == "openai_compatible":
         if switched:
             if "llm.base_url" not in fixed:
@@ -243,27 +243,15 @@ def ask_interactively(
     return Answers(api_types, languages, current.language_filter, current.project_sizes, llm, github_token, llm_api_key, notes)
 
 
-def available_memory() -> int | None:
-    """Bytes of memory available to new programs (Linux only; None elsewhere)."""
-    from docscout.bench import _mem_available
-
-    return _mem_available()
-
-
-def model_change_hint(model: str, installed: list[str] | None, available: int | None) -> str:
-    lines = [
-        f"Using the local model {model}. To switch to another model:",
-        "  1. Download it: ollama pull NAME (browse models at https://ollama.com/library)",
-        "  2. Select it: docscout set --model NAME",
-        "  Pick a model whose download size is at least 1 GB smaller than your available memory.",
-        '  Check available memory with `free -h` ("available" column) on Linux, Activity Monitor on macOS,',
-        "  or Task Manager on Windows; close other apps first.",
-    ]
-    if available is not None:
-        lines.append(f"  Right now you have {available / 1024**3:.1f} GB available.")
-    if installed:
-        lines.append(f"  Already downloaded: {', '.join(installed)}")
-    return "\n".join(lines)
+def model_change_hint(model: str) -> str:
+    return "\n".join(
+        [
+            f"Using the local model {model}. To switch to another model:",
+            "  1. Download it: ollama pull NAME (browse models at https://ollama.com/library)",
+            "  2. Select it: docscout set --model NAME",
+            "  Choose a model that runs smoothly on your system.",
+        ]
+    )
 
 
 def _one(choices: list[str], text: str) -> str:

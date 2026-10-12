@@ -296,11 +296,9 @@ def test_set_model_warns_when_it_is_not_downloaded(tmp_path, monkeypatch, capsys
     assert tomllib.loads(path.read_text())["llm"]["model"] == "tiny:1b"
 
 
-def test_choosing_local_llm_explains_how_to_change_the_model(tmp_path, monkeypatch):
-    monkeypatch.setattr(setup_wizard, "available_memory", lambda: 3 * 1024**3)
+def test_choosing_local_llm_explains_how_to_change_the_model(tmp_path):
     cfg = make_cfg(tmp_path)
-    answers, _, _ = run_wizard(cfg, asks=["1"], secrets=[""], models=["gemma4:e2b", "gemma4:e4b"])
+    answers, _, _ = run_wizard(cfg, asks=["1"], secrets=[""])
     hint = next(n for n in answers.notes if n.startswith("Using the local model gemma4:e2b"))
     assert "ollama pull NAME" in hint and "docscout set --model NAME" in hint
-    assert "Right now you have 3.0 GB available." in hint
-    assert "Already downloaded: gemma4:e2b, gemma4:e4b" in hint
+    assert hint.endswith("Choose a model that runs smoothly on your system.")

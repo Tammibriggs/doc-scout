@@ -201,3 +201,19 @@ def test_pushed_date_is_shown_relative_to_the_run(cfg, store, now, monkeypatch):
     result = pipeline.run(RunGitHub(), cfg, store, now, limit=10, sources=["repo_search"])
     assert GOOD_REPO["pushed_at"] == iso(3)
     assert "pushed 3 days ago" in result.report_path.read_text()
+
+
+def test_rejections_that_cost_api_calls_count_toward_the_limit(cfg, store, now, monkeypatch):
+    class Solo(RunGitHub):
+        def list_commits(self, name, since):
+            return [{"author": {"login": "only-me"}, "commit": {"author": {"email": "me@x"}}, "sha": "a" * 40}]
+
+    def source(name, gh, cfg, rng, today, api_types, policy=None):
+        yield Candidate("org/huge", name, {"full_name": "org/huge", "stargazers_count": 90000})  # free
+        yield Candidate("org/solo", name, dict(GOOD_REPO, full_name="org/solo"))  # costs calls, then rejected
+        yield Candidate("org/never", name, dict(GOOD_REPO, full_name="org/never"))
+
+    monkeypatch.setattr(pipeline, "source_candidates", source)
+    result = pipeline.run(Solo(), cfg, store, now, limit=1, sources=["repo_search"])
+    assert result.summary.evaluated == 2 and result.summary.analyzed == 1
+    assert store.repo("org/never") is None

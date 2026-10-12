@@ -32,7 +32,12 @@ __all__ = ["RestApi", "find_endpoints", "mentions_rest_api"]
 
 _REST_DESCRIPTION = re.compile(r"\b(rest(ful)?\s+api|http\s+api|rest\s+server)\b", re.IGNORECASE)
 _REST_ISSUE = re.compile(r"\b(openapi|swagger|endpoints?|rest(ful)?)\b", re.IGNORECASE)
-_RUNTIME_SPEC = re.compile(r"swagger[ -]?ui|redoc|openapi\.json|/api-docs\b|/swagger\b|/docs\b", re.IGNORECASE)
+# "/docs" counts only on a local address or port (localhost:8000/docs), where frameworks serve
+# generated API docs; on a website (laravel.com/docs) it's just a docs page.
+_RUNTIME_SPEC = re.compile(
+    r"swagger[ -]?ui|redoc|openapi\.json|/api-docs\b|/swagger\b|(localhost|127\.0\.0\.1|0\.0\.0\.0|:\d{2,5})/docs\b",
+    re.IGNORECASE,
+)
 _DOCS_FILE = re.compile(r"(api|endpoint|rest)[^/]*\.(md|mdx|markdown)$|(^|/)api/[^/]+\.(md|mdx|markdown)$", re.IGNORECASE)
 MAX_DOCS_FILES = 3
 MAX_DOCS_BYTES = 512 * 1024

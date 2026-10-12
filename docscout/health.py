@@ -27,6 +27,16 @@ def _is_bot_login(login: str | None) -> bool:
     return login.endswith("[bot]") or login in BOT_NAMES
 
 
+def star_range_reason(stars: int, ranges: list) -> str | None:
+    """Why ``stars`` is outside the profile's project sizes, or None if it's inside."""
+    if any(low <= stars and (high is None or stars <= high) for low, high in ranges):
+        return None
+    lowest = min(low for low, _ in ranges)
+    if stars < lowest:
+        return f"fewer than {lowest} stars"
+    return f"{stars} stars is outside your project sizes"
+
+
 def gate_metadata(repo: dict[str, Any], cfg: dict[str, Any], now: datetime) -> str | None:
     """Reason the repo fails the cheap metadata checks, or None if it passes."""
     if repo.get("archived"):
@@ -35,13 +45,9 @@ def gate_metadata(repo: dict[str, Any], cfg: dict[str, Any], now: datetime) -> s
         return "fork"
     if not repo.get("license"):
         return "no license"
-    stars = repo.get("stargazers_count") or 0
-    ranges = cfg["star_ranges"]
-    if not any(low <= stars and (high is None or stars <= high) for low, high in ranges):
-        lowest = min(low for low, _ in ranges)
-        if stars < lowest:
-            return f"fewer than {lowest} stars"
-        return f"{stars} stars is outside your project sizes"
+    reason = star_range_reason(repo.get("stargazers_count") or 0, cfg["star_ranges"])
+    if reason:
+        return reason
     pushed = parse_time(repo.get("pushed_at"))
     if pushed is None or now - pushed > timedelta(days=cfg["pushed_within_days"]):
         return f"no push in {cfg['pushed_within_days']} days"

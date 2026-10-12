@@ -16,7 +16,7 @@ TOOL_WORDS = {
     "generator", "generators", "codegen", "validator", "validation", "linter", "lint", "mock", "mocking",
     "mocks", "testing", "tester", "fuzzer", "fuzzing", "parser", "converter", "plugin", "plugins",
     "framework", "mcp", "middleware", "toolkit", "boilerplate", "template", "starter", "scaffold",
-    "extension", "specification", "schema", "schemas", "compiler",
+    "extension", "compiler",
 }  # fmt: skip
 LIB_WORDS = {"library", "lib", "sdk", "client", "bindings", "wrapper", "package", "module", "crate", "gem"}
 APP_WORDS = {

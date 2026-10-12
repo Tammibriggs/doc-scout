@@ -185,3 +185,23 @@ def test_ctrl_c_keeps_what_was_gathered(cfg, now, monkeypatch):
     sample = draw_sample(FakeGitHub(), cfg, ["repo_search"], 10, rng=random.Random(1), now=now)
     assert [e.candidate.full_name for e in sample.passed] == ["org/one"]
     assert sample.stopped_early == "interrupted (Ctrl+C)"
+
+
+def test_curated_repo_outside_the_star_range_costs_no_api_calls(cfg, now):
+    gh = FakeGitHub()
+    seed = {"full_name": "org/huge", "description": "Self-hosted tracker", "stargazers_count": 29455}
+    ev = evaluate(gh, Candidate("org/huge", "awesome_selfhosted", seed, prior=0.2), cfg, now)
+    assert ev.rejected == "29455 stars is outside your project sizes"
+    assert gh.used == []
+
+
+def test_spam_visible_only_in_full_metadata_is_still_caught(cfg, now):
+    class SpamGitHub(FakeGitHub):
+        def get_repo(self, name):
+            self.used.append("repo")
+            return dict(GOOD_REPO, full_name=name, created_at=iso(10), topics=[f"t{i}" for i in range(18)])
+
+    gh = SpamGitHub()
+    ev = evaluate(gh, Candidate("org/new", "help_requested", {"full_name": "org/new"}), cfg, now)
+    assert ev.rejected.startswith("spam: new repo with 18 topics")
+    assert gh.used == ["repo"]

@@ -41,9 +41,11 @@ def test_old_repo_with_alternative_wording_is_not_spam(now):
     assert classify(m, now=now).project_type == "serves_api"
 
 
-def test_keyword_stuffing_is_spam(now):
-    m = meta("x", "thing", [f"topic{i}" for i in range(20)])
+def test_keyword_stuffing_is_spam_only_on_new_repos(now):
+    m = meta("x", "thing", [f"topic{i}" for i in range(20)], created_days_ago=20)
     assert classify(m, now=now).project_type == "spam"
+    established = meta("modelina", "Generate payload models from AsyncAPI documents", [f"topic{i}" for i in range(17)])
+    assert classify(established, now=now).project_type != "spam"
 
 
 def test_curated_prior_lifts_plain_description(now):

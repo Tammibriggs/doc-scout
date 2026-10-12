@@ -35,12 +35,13 @@ class Classification:
 
 
 def is_spam(meta: dict[str, Any], now: datetime) -> str | None:
-    topics = meta.get("topics") or []
-    if len(topics) > 15:
-        return f"{len(topics)} topics (keyword stuffing)"
+    """Only new repos are judged: established projects often use many topics (GitHub allows 20)."""
     created = parse_time(meta.get("created_at"))
     if created is None or now - created > timedelta(days=60):
         return None
+    topics = meta.get("topics") or []
+    if len(topics) > 15:
+        return f"new repo with {len(topics)} topics (keyword stuffing)"
     signals = build_signals(meta)
     hits = len(signals.tokens & PROMO_WORDS) + (1 if YEAR.search(signals.text) else 0) + (1 if "0%" in signals.text else 0)
     if hits >= 2:

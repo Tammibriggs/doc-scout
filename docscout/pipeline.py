@@ -33,7 +33,6 @@ from docscout.scoring import Score, opportunity_score
 log = logging.getLogger(__name__)
 
 SOURCE_ORDER = ("help_requested", "awesome_selfhosted", "repo_search", "code_search")
-FREE_REJECTIONS = ("spam", "prefilter")  # decided from search data alone, no API calls
 
 
 def interleave(streams: Iterable[Iterator[Any]]) -> Iterator[Any]:
@@ -156,7 +155,7 @@ def run(
                 summary.analyzed += 1
                 store.save_repo(cand.full_name, now, source=cand.source, rejected=f"error: {exc}")
                 continue
-            if not (ev.rejected or "").startswith(FREE_REJECTIONS):
+            if ev.used_api:
                 summary.analyzed += 1
             store.save_repo(
                 cand.full_name,

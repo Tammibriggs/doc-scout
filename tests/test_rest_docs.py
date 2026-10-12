@@ -73,11 +73,14 @@ def test_findings_count_missing_pieces_across_files():
 
 
 def test_docs_elsewhere_signals():
-    text = "See the [documentation](https://docs.example.com/api) and ![build](https://img.shields.io/x.svg) [code](https://github.com/org/app)"
-    assert doc_links(text, "org/app") == ["docs.example.com/api"]
+    text = (
+        "See the [documentation](https://docs.myapp.example/api) and ![build](https://img.shields.io/x.svg) "
+        "[code](https://github.com/org/app) and [framework docs](https://framework.org/docs)"
+    )
+    assert doc_links(text, "org/myapp") == ["docs.myapp.example"]
     owner = [{"full_name": "org/app"}, {"full_name": "org/app-docs"}, {"full_name": "org/website"}, {"full_name": "org/cli"}]
     assert sibling_repos(owner, "org/app") == ["org/app-docs", "org/website"]
-    reasons = docs_elsewhere({"homepage": "https://app.example.com"}, text, owner, "org/app")
+    reasons = docs_elsewhere({"homepage": "https://app.example.com"}, text, owner, "org/myapp")
     assert reasons[0] == "Project website: app.example.com"
     assert "Separate docs repo: org/app-docs" in reasons
 
@@ -135,3 +138,26 @@ def test_nothing_found_is_reported_only_when_very_likely_an_api():
     assert RestApi().analyze(ctx(FakeGitHub(), [], "# App", confidence=0.6)) is None
     gap = RestApi().analyze(ctx(FakeGitHub(), [], "# App", confidence=0.85))
     assert gap.kind == "none" and gap.score == 60 and gap.unverified
+
+
+def test_framework_docs_links_and_docs_hosts_are_not_mistaken_for_project_docs():
+    text = (
+        "Install via [Laravel docs](https://laravel.com/docs/installation). "
+        "Full guide at [our docs](https://docs.2fauth.app/getting-started) and https://docs.2fauth.app."
+    )
+    assert doc_links(text, "Bubka/2FAuth") == ["docs.2fauth.app"]
+    gap = RestApi().analyze(ctx(FakeGitHub(), [], text, confidence=0.9))
+    assert not any("Swagger UI" in r for r in gap.check_manually)
+    fastapi = RestApi().analyze(ctx(FakeGitHub(), [], "Open http://localhost:8000/docs for the API.", confidence=0.9))
+    assert any("Swagger UI" in r for r in fastapi.check_manually)
+
+
+def test_implementing_a_specification_does_not_make_a_project_a_tool(now):
+    from conftest import iso
+
+    from docscout.classify import classify
+
+    meta = {"full_name": "project-zot/zot", "created_at": iso(900), "topics": [],
+            "description": "A production-ready vendor-neutral OCI image registry, based on the OCI Distribution Specification"}  # fmt: skip
+    c = classify(meta, now=now, api_types=[RestApi()])
+    assert c.project_type != "api_tooling" and not any("tool words" in r for r in c.reasons)

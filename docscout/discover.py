@@ -27,7 +27,7 @@ from docscout.apitypes import ApiType
 from docscout.classify import Classification, classify
 from docscout.config import Config, data_dir
 from docscout.github import AuthError, GitHub, GitHubError, NotFound, RateLimited
-from docscout.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats
+from docscout.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats, star_range_reason
 from docscout.profile import LanguagePolicy, language_policy
 from docscout.sources import Candidate, awesome_selfhosted, code_search, help_requested, repo_search
 
@@ -48,6 +48,7 @@ class Evaluated:
     health: float | None = None
     definition_paths: list[str] = field(default_factory=list)
     language_match: bool | None = None  # None: no languages in the profile
+    used_api: bool = False  # False if it was rejected from search or curated data alone
     # Kept for docs analysis so it doesn't fetch them again (not written to the sample CSV).
     tree: list[dict[str, Any]] | None = None
     readme: str | None = None
@@ -104,6 +105,13 @@ def evaluate(
         return result
 
     if not all(key in meta for key in _FULL_REPO_KEYS):
+        # Sources like the curated list already know the stars: drop out-of-range repos for free.
+        if meta.get("stargazers_count") is not None:
+            reason = star_range_reason(meta["stargazers_count"], cfg["health"]["star_ranges"])
+            if reason:
+                result.rejected = reason
+                return result
+        result.used_api = True
         try:
             meta = gh.get_repo(cand.full_name)
         except NotFound:
@@ -111,18 +119,23 @@ def evaluate(
             return result
         result.repo = meta
         result.classification = classify(meta, now=now, api_types=types, prior=cand.prior, issues=cand.issues)
+        if result.classification.project_type == "spam":
+            result.rejected = f"spam: {result.classification.reasons[0]}"
+            return result
     reason = gate_metadata(meta, cfg["health"], now)
     if reason:
         result.rejected = reason
         return result
 
     if policy.languages:
+        result.used_api = result.used_api or policy.required
         result.language_match = language_matches(gh, cand.full_name, meta, policy)
         if policy.required and not result.language_match:
             result.rejected = f"language: {meta.get('language') or 'unknown'} is not one of yours"
             return result
 
     since = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    result.used_api = True
     pulls = gh.list_closed_pulls(cand.full_name)
     commits = gh.list_commits(cand.full_name, since)
     stats = pr_stats(pulls, commits, now)

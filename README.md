@@ -29,6 +29,13 @@ python3 -m venv .venv
 
 Everything else starts with a default. `init` tests the token with GitHub and doesn't save a rejected one. It also checks that the Ollama model is installed. `docscout profile` shows your settings in plain words.
 
+**No Ollama, or the model isn't downloaded yet?** Everything except the LLM step still works:
+- `init` shows the status next to the local option;
+- `bench-llm` and the daily report say exactly what to run, for example `ollama pull gemma4:e2b`;
+- reports fall back to code-based results.
+
+Install Ollama from [ollama.com](https://ollama.com), or switch with `docscout set --llm openai_compatible` or `--llm none`.
+
 ### Changing other settings
 
 `docscout set` changes settings without asking any questions:

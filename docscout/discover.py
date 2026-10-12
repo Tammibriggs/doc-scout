@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import csv
 import logging
+
+import httpx
 import random
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
@@ -24,7 +26,7 @@ from docscout.analyze.tree import has_contributing
 from docscout.apitypes import ApiType
 from docscout.classify import Classification, classify
 from docscout.config import Config, data_dir
-from docscout.github import AuthError, GitHub, NotFound, RateLimited
+from docscout.github import AuthError, GitHub, GitHubError, NotFound, RateLimited
 from docscout.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats
 from docscout.profile import LanguagePolicy, language_policy
 from docscout.sources import Candidate, awesome_selfhosted, code_search, help_requested, repo_search
@@ -216,7 +218,9 @@ def draw_sample(
 ) -> Sample:
     """Up to ``total`` gate-passing repos, split evenly across sources.
 
-    A rate limit or auth failure stops sampling but keeps everything gathered so far.
+    A failed request skips that one repo (recorded as rejected with the error). A rate
+    limit, an auth failure, Ctrl+C or an unexpected error stops sampling but keeps
+    everything gathered so far.
     """
     api_types = apitypes.enabled_types(cfg["api_types"])
     policy = language_policy(cfg["profile"], api_types)
@@ -232,7 +236,13 @@ def draw_sample(
                 if key in seen:
                     continue
                 seen.add(key)
-                ev = evaluate(gh, cand, cfg, now, api_types, policy)
+                try:
+                    ev = evaluate(gh, cand, cfg, now, api_types, policy)
+                except (RateLimited, AuthError):
+                    raise
+                except (GitHubError, httpx.HTTPError) as exc:
+                    log.warning("skipping %s: %s", cand.full_name, exc)
+                    ev = Evaluated(cand, cand.meta, Classification("other", 0.0), rejected=f"error: {exc}")
                 summary.tried += 1
                 if ev.rejected:
                     sample.rejected.append(ev)
@@ -246,6 +256,11 @@ def draw_sample(
                     break
     except (RateLimited, AuthError) as exc:
         sample.stopped_early = str(exc)
+    except KeyboardInterrupt:
+        sample.stopped_early = "interrupted (Ctrl+C)"
+    except Exception as exc:  # keep the partial sample; the error is reported, not hidden
+        log.exception("sampling stopped by an unexpected error")
+        sample.stopped_early = f"unexpected error: {exc!r}"
     return sample
 
 

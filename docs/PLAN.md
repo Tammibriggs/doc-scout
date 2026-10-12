@@ -2,24 +2,25 @@
 
 DocScout finds open-source projects that **(a)** serve an API, **(b)** have documentation gaps you can fix, and **(c)** are likely to accept your pull request. Once installed, it runs every day without being started by hand and gives you a short ranked list. Each item lists the exact gaps, links to start from, and warnings about anything that could get the PR rejected. It starts with REST APIs, and other API types plug in as modules.
 
-**Deadline: Saturday 31 October 2026** (assumed: end of October; correct this if it's earlier). Today is Monday 12 October, so 19 days remain.
+**Deadline: Monday 19 October 2026**, one week from 12 October.
 
 ## 1. Status and timeline
 
-**Build stages (milestones).** Each stage is usable on its own.
+**Build stages (milestones).** Each stage is usable on its own. With one week, M3 (daily runs) comes **before** M2 (LLM), so the unattended test runs for 3 days instead of 1. Each stage lists what must ship by the deadline and what ships only if there's time.
 
-| Stage | What it delivers | Status | Dates |
+| Stage | Must ship | If time allows | Dates |
 |---|---|---|---|
-| **M0. Prove discovery** | Discovery sources, health gate, classifier, `discover`, `eval`, `bench-llm`; also `init`, `set`, `profile`, API types and languages (pulled forward) | ✅ Code done (commit `3d3e49e`). ⏳ **Accuracy check waiting on you** (section 2) | Mon 12 – Tue 13 Oct |
-| **M1. Useful manual report** | Spec gap scorer, prose-docs completeness, "docs elsewhere" flag, scoring, claim and requirement checks, safe Markdown report, SQLite, `run`, `ignore`, `done`, `score` | Next | Wed 14 – Sun 18 Oct |
-| **M2. LLM layer** | First steps for the top candidates; second opinion on unclear project types; confidence rules | Planned | Mon 19 – Wed 21 Oct |
-| **M3. Unattended on Linux** | `run --if-due`, lock, offline handling and resume, quiet days, failure alerts, `notify-send`, systemd install | Planned | Thu 22 – Sat 24 Oct |
-| 7-day unattended check | M3's exit check runs in the background. Meanwhile: fixes, README, demo, and you use the reports to make real contributions | Planned | Sat 24 – Fri 30 Oct |
-| **Deadline** | | | **Sat 31 Oct** |
-| **M4. Read external docs** | Safe fetcher for docs websites, so fewer items need "check manually" | **After the deadline** | November |
-| **M5. macOS and Windows support** | launchd and Task Scheduler setup, notifications and file lock on both, CI on 3 operating systems, `pipx` packaging, a fresh-install test on real machines | **After the deadline** | November |
+| **M0. Prove discovery** | ✅ Code (commits `3d3e49e`…); ⏳ **your accuracy check** (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
+| **M1. Useful manual report** | OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run --no-llm`, `ignore`, `done`, `score` | Claim check (open PRs, "I'll take this"); CLA, DCO and AI-policy badges; local-setup badge | Tue 13 – Thu 15 Oct |
+| **M3. Daily runs on Linux** | `run --if-due`, file lock, offline check and resume, a cursor through the search slices, `notify-send`, a 401 alert, `schedule install/uninstall/status` for systemd | Quiet-day rules; "pool running dry" warning | Fri 16 Oct |
+| **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap; when the LLM is unavailable, "LLM review skipped" plus the fix | Measuring the LLM against your labels | Sat 17 Oct |
+| Unattended test | Runs Fri 16 → Mon 19 in the background: no manual starts, survives a reboot and going offline | | Fri 16 – Mon 19 Oct |
+| Polish | README, demo report, a real contribution made with it | | Sun 18 Oct |
+| **Deadline** | | | **Mon 19 Oct** |
+| **M4. Read external docs** | | **After the deadline** | |
+| **M5. macOS and Windows support** | launchd and Task Scheduler setup, notifications and file lock on both, CI on 3 operating systems, `pipx` packaging, a fresh-install test on real machines | **After the deadline** | |
 
-**If the schedule slips:** shorten the 7-day unattended check to 3 days before cutting anything from M1. M1 is the stage that makes the tool useful.
+**If the schedule slips:** the "if time allows" items go first, then M2 shrinks to first steps only. M1's must-ship items stay, because without them the tool can't tell you what to fix.
 
 **macOS and Windows are planned, not dropped.** Everything built so far is already plain cross-platform Python:
 - user folders come from `platformdirs`;
@@ -328,17 +329,18 @@ hacktoberfest/
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅
     db.py · scoring.py · report.py · sanitize.py (M1)    lock.py · netcheck.py · notify.py · scheduler/linux.py (M3)
     scheduler/macos.py · scheduler/windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 74 tests · fixtures/labeled_repos.csv (after M0 check)
+  tests/ ✅ 81 tests · fixtures/labeled_repos.csv (after M0 check)
 ```
 
 ## 17. Risks
 
 | Risk | Mitigation |
 |---|---|
-| **Deadline** | Strict stage order; M4 and M5 after the deadline; shorten the unattended check before cutting M1 |
+| **Deadline (one week)** | M3 before M2; "if time allows" items cut first; M4 and M5 after the deadline |
 | Discovery accuracy is low (**confirmed** for topic search) | Curated seed, per-source accuracy check in M0, classifier, health gate |
 | Noisy help requests (**confirmed**) | Outreach-label or outside-author rule, deny lists, health gate |
-| The local LLM is too slow on 7.6 GB of RAM (2 GB free when checked) | `bench-llm` before M2; hosted fallback; the report works without the LLM |
+| The local LLM is too slow on 7.6 GB of RAM (1.6 GB free on 12 Oct; the model is 4.6 GB) | `bench-llm` with apps closed; hosted or `none` as fallback; every LLM setup problem is reported with its fix, and the report works without the LLM ✅ |
+| A temporary GitHub error ends a long run (**seen** on 12 Oct: one 404 crashed `discover`) | One retry on short-lived 404s; a failing repo is skipped and recorded; Ctrl+C keeps partial results ✅ |
 | A PR edits a generated spec | Generated-spec check redirects the suggestion to code annotations |
 | Wasted effort (already claimed, CLA, AI policy) | Claim check and requirement badges on the top 10 |
 | Prompt injection pushes a repo up the ranking | Confidence raise capped at 0.8; code-only gates; sanitized output |
@@ -351,7 +353,7 @@ hacktoberfest/
 - **M0:**
   - `discover --sample 60`, you label, then `eval` shows at least 70% overall and the accuracy per source;
   - `bench-llm` reports seconds per review and peak memory.
-  - ✅ 74 tests pass.
+  - ✅ 81 tests pass.
 - **M1:**
   - `docscout score` on fixtures: a bare spec scores high with reasons, a vendored spec is skipped, a `DO NOT EDIT` spec suggests editing annotations;
   - `run --no-llm --limit 10` shows a score breakdown, permalink and badges for every item, with no one-person repos, API tools or bounty farms;
@@ -367,7 +369,7 @@ hacktoberfest/
   - Ctrl+C resumes; `kill -9` doesn't leave runs blocked;
   - an invalid token sends an alert;
   - a quiet day writes no file;
-  - 7 days with no manual starts.
+  - 3 days (Fri 16 – Mon 19) with no manual starts; 7 days after the deadline.
 - **M5:** a fresh `pipx` install on a Mac and a Windows machine works, including on battery and after sleep; CI is green on 3 operating systems.
 
 ## 19. Later (after M5)

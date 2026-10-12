@@ -180,10 +180,21 @@ def ask_interactively(
 
     # LLM
     llm = dict(current.llm)
+    local_url = llm["base_url"] if llm["provider"] == "ollama" else DEFAULT_OLLAMA_URL
+    local_model = llm["model"] if llm["provider"] == "ollama" else DEFAULT_OLLAMA_MODEL
+    if "llm.model" in fixed:
+        local_model = llm["model"]
+    installed = ollama_models(local_url)
     if "llm" in steps:
         providers = ["ollama", "openai_compatible", "none"]
+        if installed is None:
+            local_status = "Ollama isn't installed or running on this machine"
+        elif local_model not in installed:
+            local_status = f"Ollama found, but {local_model} isn't downloaded yet"
+        else:
+            local_status = "ready on this machine"
         header("llm", "Which LLM should review projects and suggest first steps?")
-        say(f"   1) Local, with Ollama ({DEFAULT_OLLAMA_MODEL}): free and private, but slow on small machines")
+        say(f"   1) Local, with Ollama ({local_model}): free and private, but slow on small machines. Status: {local_status}")
         say("   2) Hosted: an OpenAI-compatible API such as OpenRouter (needs an API key)")
         say("   3) None: code-based results only")
         default = str(providers.index(current.llm["provider"]) + 1)
@@ -195,11 +206,16 @@ def ask_interactively(
             llm["base_url"] = DEFAULT_OLLAMA_URL
             if "llm.model" not in fixed:
                 llm["model"] = DEFAULT_OLLAMA_MODEL
-        installed = ollama_models(llm["base_url"])
+        if llm["base_url"] != local_url:
+            installed = ollama_models(llm["base_url"])
         if installed is None:
-            notes.append(f"Ollama isn't running at {llm['base_url']}. Install it from https://ollama.com, or choose a hosted model.")
+            notes.append(
+                f"Ollama isn't running at {llm['base_url']}. Install it from https://ollama.com and run "
+                f"`ollama pull {llm['model']}`, or switch with `docscout set --llm none`. "
+                "Until then, reports use code-based results only."
+            )
         elif llm["model"] not in installed:
-            notes.append(f"The LLM model isn't installed yet. Run: ollama pull {llm['model']}")
+            notes.append(f"The LLM model isn't downloaded yet. Run: ollama pull {llm['model']}")
         else:
             notes.append(f"Ollama model {llm['model']} is installed.")
     elif llm["provider"] == "openai_compatible":

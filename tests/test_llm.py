@@ -101,3 +101,47 @@ def test_openai_compat_falls_back_to_json_mode():
     client = OpenAICompatClient(base_url="https://llm.example/v1", model="m", api_key="k", transport=httpx.MockTransport(handler))
     assert client.review(RepoContext(full_name="a/b")).confidence == 0.9
     assert seen == ["json_schema", "json_object"]
+
+
+def test_ollama_not_running_or_model_missing_explains_the_fix():
+    from docscout.llm.base import LLMUnavailable, review_with_retry
+
+    def refused(req):
+        raise httpx.ConnectError("Connection refused")
+
+    client = OllamaClient(base_url="http://localhost:11434", model="gemma4:e2b", transport=httpx.MockTransport(refused))
+    with pytest.raises(LLMUnavailable, match="Ollama isn't running at http://localhost:11434.*ollama serve"):
+        client.review(RepoContext(full_name="a/b"))
+
+    calls = []
+
+    def missing(req):
+        calls.append(1)
+        return httpx.Response(404, json={"error": "model 'gemma4:e2b' not found"})
+
+    client = OllamaClient(base_url="http://localhost:11434", model="gemma4:e2b", transport=httpx.MockTransport(missing))
+    with pytest.raises(LLMUnavailable, match="Run: ollama pull gemma4:e2b"):
+        review_with_retry(client, RepoContext(full_name="a/b"))
+    assert len(calls) == 1  # a setup problem is never retried
+
+
+def test_benchmark_stops_at_the_first_setup_problem():
+    from docscout import bench
+    from docscout.llm.base import LLMUnavailable
+
+    class Missing:
+        name = "fake"
+        calls = 0
+
+        def review(self, ctx, readme_chars=1500):
+            Missing.calls += 1
+            raise LLMUnavailable("The model m isn't installed. Run: ollama pull m")
+
+        def unload(self):
+            pass
+
+    result = bench.run(Missing(), runs=3)
+    assert Missing.calls == 1
+    text = bench.format_result(result, "fake")
+    assert "can't be used yet: The model m isn't installed" in text
+    assert "works without it" in text

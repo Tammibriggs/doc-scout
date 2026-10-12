@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from docscout.llm.base import LLMClient, LLMError, RepoContext, Review, apply_review
+from docscout.llm.base import LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review
 
-__all__ = ["LLMClient", "LLMError", "RepoContext", "Review", "apply_review", "make_client"]
+__all__ = ["LLMClient", "LLMError", "LLMUnavailable", "RepoContext", "Review", "apply_review", "make_client"]
 
 
 def make_client(llm_cfg: dict[str, Any], api_key: str | None = None) -> LLMClient | None:

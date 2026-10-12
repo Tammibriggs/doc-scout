@@ -273,3 +273,13 @@ def test_no_path_asks_more_than_three(tmp_path, monkeypatch):
     cfg = make_cfg(tmp_path)
     assert setup_wizard.plan_questions(cfg) == ["api_type", "llm", "token"]
     assert len(setup_wizard.plan_questions(cfg)) <= setup_wizard.MAX_QUESTIONS
+
+
+def test_llm_question_shows_whether_ollama_is_ready(tmp_path):
+    cfg = make_cfg(tmp_path)
+    _, said, _ = run_wizard(cfg, asks=["1"], secrets=[""], models=None)
+    assert any("Status: Ollama isn't installed or running on this machine" in line for line in said)
+    _, said, _ = run_wizard(cfg, asks=["1"], secrets=[""], models=["llama3:8b"])
+    assert any("Status: Ollama found, but gemma4:e2b isn't downloaded yet" in line for line in said)
+    answers, said, _ = run_wizard(cfg, asks=["1"], secrets=[""], models=None)
+    assert any("Until then, reports use code-based results only." in note for note in answers.notes)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import httpx
 
-from docscout.llm.base import REVIEW_SCHEMA, LLMError, RepoContext, Review, build_messages, parse_review
+from docscout.llm.base import REVIEW_SCHEMA, LLMError, LLMUnavailable, RepoContext, Review, build_messages, parse_review
 
 
 class OllamaClient:
@@ -25,6 +25,7 @@ class OllamaClient:
     ) -> None:
         self.name = f"ollama:{model}"
         self.model = model
+        self.base_url = base_url.rstrip("/")
         self.num_ctx = num_ctx
         self._send_think = True
         self._client = httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout, transport=transport)
@@ -32,6 +33,11 @@ class OllamaClient:
     def _chat(self, payload: dict) -> httpx.Response:
         try:
             return self._client.post("/api/chat", json=payload)
+        except httpx.ConnectError as exc:
+            raise LLMUnavailable(
+                f"Ollama isn't running at {self.base_url}. Start it with `ollama serve`, install it from "
+                "https://ollama.com, or switch with `docscout set --llm openai_compatible` (or `--llm none`)."
+            ) from exc
         except httpx.HTTPError as exc:
             raise LLMError(f"cannot reach Ollama: {exc}") from exc
 
@@ -52,6 +58,8 @@ class OllamaClient:
             self._send_think = False
             payload.pop("think")
             resp = self._chat(payload)
+        if resp.status_code == 404 and "not found" in resp.text.lower():
+            raise LLMUnavailable(f"The model {self.model} isn't installed. Run: ollama pull {self.model}")
         if resp.status_code >= 400:
             raise LLMError(f"Ollama error {resp.status_code}: {resp.text[:200]}")
         content = (resp.json().get("message") or {}).get("content", "")

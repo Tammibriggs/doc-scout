@@ -150,3 +150,38 @@ def test_issue_from_outsider_without_outreach_label_keeps_the_strict_gate(cfg, n
     cand = Candidate("org/app", "help_requested", GOOD_REPO, issues=[issue])
     ev = evaluate(FakeGitHub(outsiders=0, committers=("only-me",)), cand, cfg, now)
     assert ev.rejected and "committers" in ev.rejected
+
+
+def test_a_failing_repo_is_skipped_and_sampling_continues(cfg, now, monkeypatch):
+    import docscout.discover as discover
+    from docscout.github import NotFound
+
+    class FlakyGitHub(FakeGitHub):
+        def list_closed_pulls(self, name):
+            if name == "org/broken":
+                raise NotFound(404, "Not Found")
+            return super().list_closed_pulls(name)
+
+    def fake_source(name, gh, cfg, rng, today, api_types, policy=None):
+        yield Candidate("org/broken", name, dict(GOOD_REPO))
+        yield Candidate("org/fine", name, dict(GOOD_REPO))
+
+    monkeypatch.setattr(discover, "source_candidates", fake_source)
+    sample = draw_sample(FlakyGitHub(), cfg, ["repo_search"], 10, rng=random.Random(1), now=now)
+    assert [e.candidate.full_name for e in sample.passed] == ["org/fine"]
+    assert sample.rejected[0].rejected.startswith("error: GitHub API error 404")
+    assert sample.summaries[0].rejections == {"error": 1}
+    assert sample.stopped_early is None
+
+
+def test_ctrl_c_keeps_what_was_gathered(cfg, now, monkeypatch):
+    import docscout.discover as discover
+
+    def fake_source(name, gh, cfg, rng, today, api_types, policy=None):
+        yield Candidate("org/one", name, dict(GOOD_REPO))
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(discover, "source_candidates", fake_source)
+    sample = draw_sample(FakeGitHub(), cfg, ["repo_search"], 10, rng=random.Random(1), now=now)
+    assert [e.candidate.full_name for e in sample.passed] == ["org/one"]
+    assert sample.stopped_early == "interrupted (Ctrl+C)"

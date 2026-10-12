@@ -11,7 +11,7 @@ import json
 
 import httpx
 
-from docscout.llm.base import REVIEW_SCHEMA, LLMError, RepoContext, Review, build_messages, parse_review
+from docscout.llm.base import REVIEW_SCHEMA, LLMError, LLMUnavailable, RepoContext, Review, build_messages, parse_review
 
 
 class OpenAICompatClient:
@@ -33,6 +33,8 @@ class OpenAICompatClient:
     def _post(self, payload: dict) -> httpx.Response:
         try:
             return self._client.post("/chat/completions", json=payload)
+        except httpx.ConnectError as exc:
+            raise LLMUnavailable(f"Can't connect to the LLM provider at {self._client.base_url}. Check the address (--base-url) and your connection.") from exc
         except httpx.HTTPError as exc:
             raise LLMError(f"cannot reach LLM provider: {exc}") from exc
 
@@ -56,7 +58,9 @@ class OpenAICompatClient:
             ]
             resp = self._post(payload)
         if resp.status_code in (401, 403):
-            raise LLMError(f"LLM provider rejected the API key ({resp.status_code})")
+            raise LLMUnavailable(f"The LLM provider rejected the API key ({resp.status_code}). Run `docscout init` again or set DOCSCOUT_LLM_API_KEY.")
+        if resp.status_code == 404:
+            raise LLMUnavailable(f"The LLM provider doesn't know the model {self.model!r} (404). Check the name with `docscout set --model NAME`.")
         if resp.status_code >= 400:
             raise LLMError(f"LLM provider error {resp.status_code}: {resp.text[:200]}")
         try:

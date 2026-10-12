@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from docscout.llm.base import LLMClient, LLMError, RepoContext, Review, review_with_retry
+from docscout.llm.base import LLMClient, LLMError, LLMUnavailable, RepoContext, Review, review_with_retry
 
 SAMPLES = [
     RepoContext(
@@ -56,6 +56,7 @@ class BenchResult:
     errors: list[str] = field(default_factory=list)
     model_bytes: int | None = None
     min_available_bytes: int | None = None
+    unavailable: str | None = None  # setup problem that stopped the benchmark, with its fix
 
     @property
     def avg_seconds(self) -> float | None:
@@ -96,6 +97,9 @@ def run(client: LLMClient, runs: int = 3, readme_chars: int = 1500) -> BenchResu
             start = time.monotonic()
             try:
                 review = review_with_retry(client, ctx, readme_chars)
+            except LLMUnavailable as exc:
+                result.unavailable = str(exc)
+                break
             except LLMError as exc:
                 result.errors.append(f"{ctx.full_name}: {exc}")
                 continue
@@ -116,6 +120,10 @@ def run(client: LLMClient, runs: int = 3, readme_chars: int = 1500) -> BenchResu
 def format_result(result: BenchResult, client_name: str) -> str:
     gb = 1024**3
     lines = [f"LLM benchmark ({client_name})"]
+    if result.unavailable:
+        lines.append(f"  The LLM can't be used yet: {result.unavailable}")
+        lines.append("  Everything else in DocScout works without it; reports then use code-based results only.")
+        return "\n".join(lines)
     if result.seconds:
         lines.append(
             f"  reviews: {len(result.seconds)}, average {result.avg_seconds:.1f}s, "

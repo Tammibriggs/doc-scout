@@ -24,6 +24,12 @@ class LLMError(Exception):
     pass
 
 
+class LLMUnavailable(LLMError):
+    """The LLM can't be used at all (not installed, not running, bad key), as opposed to
+    one bad answer. Callers stop using the LLM for the rest of the run and show the
+    message, which says how to fix it; reports fall back to code-based results."""
+
+
 class Review(BaseModel):
     project_type: ProjectType
     api_style: ApiStyle
@@ -143,8 +149,11 @@ class LLMClient(Protocol):
 
 
 def review_with_retry(client: LLMClient, ctx: RepoContext, readme_chars: int = 1500) -> Review:
-    """One retry on a malformed answer; the caller falls back to code-only results on LLMError."""
+    """One retry on a malformed answer; the caller falls back to code-only results on LLMError.
+    LLMUnavailable is never retried: nothing will change until the setup is fixed."""
     try:
         return client.review(ctx, readme_chars)
+    except LLMUnavailable:
+        raise
     except LLMError:
         return client.review(ctx, readme_chars)

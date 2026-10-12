@@ -125,7 +125,14 @@ class GitHub:
         params: dict[str, Any] | None = None,
         resource: str = "core",
         headers: dict[str, str] | None = None,
+        retry_not_found: bool = False,
     ) -> httpx.Response:
+        """Send a request, waiting out rate limits and retrying server errors.
+
+        ``retry_not_found`` retries one 404, for requests about a repo that was just
+        fetched successfully: GitHub occasionally returns a short-lived 404 there.
+        """
+        not_found_retried = False
         for attempt in range(5):
             self._wait_for_pace(resource)
             try:
@@ -152,14 +159,21 @@ class GitHub:
                 self._sleep(2**attempt)
                 continue
             if resp.status_code == 404:
+                if retry_not_found and not not_found_retried:
+                    not_found_retried = True
+                    log.info("GitHub returned 404 for %s; retrying once", path)
+                    self._sleep(2)
+                    continue
                 raise NotFound(404, _message(resp))
             if resp.status_code >= 400:
                 raise GitHubError(resp.status_code, _message(resp))
             return resp
         raise GitHubError(resp.status_code, "gave up after repeated failures")
 
-    def get_json(self, path: str, *, params: dict[str, Any] | None = None, resource: str = "core") -> Any:
-        return self.request("GET", path, params=params, resource=resource).json()
+    def get_json(
+        self, path: str, *, params: dict[str, Any] | None = None, resource: str = "core", retry_not_found: bool = False
+    ) -> Any:
+        return self.request("GET", path, params=params, resource=resource, retry_not_found=retry_not_found).json()
 
     # ------------------------------------------------------------------ endpoints
 
@@ -196,7 +210,7 @@ class GitHub:
 
     def get_tree(self, full_name: str, ref: str) -> tuple[list[dict], bool]:
         """All files in the repo at ``ref``. The flag is True if GitHub truncated the listing."""
-        data = self.get_json(f"/repos/{full_name}/git/trees/{ref}", params={"recursive": "1"})
+        data = self.get_json(f"/repos/{full_name}/git/trees/{ref}", params={"recursive": "1"}, retry_not_found=True)
         return data.get("tree", []), bool(data.get("truncated"))
 
     def get_readme(self, full_name: str, max_bytes: int = 512 * 1024) -> str | None:
@@ -226,17 +240,18 @@ class GitHub:
 
     def get_languages(self, full_name: str) -> dict[str, int]:
         """Bytes of code per language, e.g. {"Python": 120000, "TypeScript": 340000}."""
-        return self.get_json(f"/repos/{full_name}/languages")
+        return self.get_json(f"/repos/{full_name}/languages", retry_not_found=True)
 
     def list_closed_pulls(self, full_name: str) -> list[dict]:
         return self.get_json(
             f"/repos/{full_name}/pulls",
             params={"state": "closed", "sort": "updated", "direction": "desc", "per_page": 100},
+            retry_not_found=True,
         )
 
     def list_commits(self, full_name: str, since_iso: str) -> list[dict]:
         try:
-            return self.get_json(f"/repos/{full_name}/commits", params={"since": since_iso, "per_page": 100})
+            return self.get_json(f"/repos/{full_name}/commits", params={"since": since_iso, "per_page": 100}, retry_not_found=True)
         except GitHubError as exc:
             if exc.status == 409:  # empty repository
                 return []

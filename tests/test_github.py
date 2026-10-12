@@ -91,3 +91,30 @@ def test_code_search_requires_token():
     gh, _ = client(lambda req: httpx.Response(200, json={}), token=None)
     with pytest.raises(AuthError):
         gh.search_code("filename:openapi.yaml")
+
+
+def test_short_lived_404_after_repo_fetch_is_retried_once():
+    # Seen live: /pulls returned 404 once for a repo that had just been fetched fine.
+    responses = iter([httpx.Response(404, json={"message": "Not Found"}), httpx.Response(200, json=[{"number": 1}])])
+    gh, clock = client(lambda req: next(responses))
+    assert gh.list_closed_pulls("a/b") == [{"number": 1}]
+    assert 2 in clock.slept
+
+
+def test_lasting_404_still_raises_and_plain_lookups_are_not_retried():
+    from docscout.github import NotFound
+
+    calls = []
+
+    def handler(req):
+        calls.append(req.url.path)
+        return httpx.Response(404, json={"message": "Not Found"})
+
+    gh, _ = client(handler)
+    with pytest.raises(NotFound):
+        gh.list_commits("a/b", "2026-01-01T00:00:00Z")
+    assert len(calls) == 2
+    calls.clear()
+    with pytest.raises(NotFound):
+        gh.get_repo("a/gone")
+    assert len(calls) == 1

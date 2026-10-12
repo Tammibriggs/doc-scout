@@ -53,11 +53,12 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 ## Stage M0: check the tool finds the right projects
 
 ```bash
-# 0. Set up (once; at most 3 questions)
+# 0. Set up (once; at most 3 questions). Paste your GitHub token when asked.
 .venv/bin/docscout init
 
-# 1. Draw about 60 repos that pass the health checks, split across the discovery sources (~300-400 API calls)
-.venv/bin/docscout discover --sample 60 --csv sample.csv
+# 1. Draw about 60 repos that pass the health checks, split across the discovery sources
+#    (~300-400 API calls, about 5-15 minutes; --seed makes the sample reproducible)
+.venv/bin/docscout discover --sample 60 --csv sample.csv --seed 1
 
 # 2. Open sample.csv and fill the "label" column for each row with one of:
 #    serves_api | api_tooling | library | spam | other
@@ -73,13 +74,26 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 
 ### Labeling guide
 
+Give each row about a minute. Open the `url`, read the description and the top of the README, then fill in `label`:
+
 | Label | Meaning | Examples |
 |---|---|---|
-| `serves_api` | An app or service that exposes its own REST/HTTP API | a self-hosted tracker, a CMS, a monitoring server |
-| `api_tooling` | A tool for working with APIs, or a framework | code generators, validators, mock servers, web frameworks |
+| `serves_api` | An app or service that exposes its own REST/HTTP API, even if it's poorly documented | a self-hosted tracker, a CMS, a monitoring server, a backend with `/api/...` routes |
+| `api_tooling` | A tool for working with APIs, or a framework for building them | code generators, validators, mock servers, test tools, web frameworks, MCP servers that wrap other APIs |
 | `library` | Code you import | SDKs, API clients, wrappers |
 | `spam` | Promotional or keyword-stuffed repos | "Free … API 2026, 0% fee" |
-| `other` | Anything else | CLIs, games, dotfiles |
+| `other` | Anything else | CLIs, desktop apps with no HTTP API, games, dotfiles |
+
+**Edge cases:**
+- **It serves an API, but GraphQL- or gRPC-only:** `other`, with `graphql` or `grpc` in the `note` column. (Only REST is enabled today.)
+- **A database or server with an HTTP API alongside other protocols:** `serves_api`.
+- **Can't tell after 2 minutes:** pick your best guess and write `unsure` in `note`.
+- **It looks like a good place to contribute:** say so in `note`. It doesn't affect scoring, but helps later.
+
+**Save carefully:**
+- Leave every other column untouched.
+- Keep it as CSV (comma-separated, UTF-8). In LibreOffice Calc: *File → Save As → Text CSV → Keep current format*.
+- `eval` ignores rows with an empty label, so you can stop part-way and come back later.
 
 ## How it finds projects
 

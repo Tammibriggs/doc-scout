@@ -2,7 +2,9 @@
 
 Finds open-source projects that serve an API, have documentation gaps you can fix, and are likely to accept your pull request. It starts with REST APIs, and is built so other API types (GraphQL, gRPC, AsyncAPI, ...) can be added as modules. Everything it checks is language- and framework-agnostic.
 
-> **Status: stage M0 (prove discovery).** This stage checks that DocScout finds the right projects before anything else is built on top. The daily report, scheduling and cross-platform setup come in later stages.
+**How it works:** code searches GitHub, checks each project's health and measures its docs gaps. Then **an open-weight model (Gemma 4, running locally with Ollama) reviews every project that passes**. It decides whether the project really has an API worth documenting, explains why its docs matter, and suggests where to start. Only projects it has reviewed are reported.
+
+> **Status:** works on Linux, including daily runs without starting it yourself. macOS and Windows come later.
 
 ## Install
 
@@ -24,17 +26,17 @@ python3 -m venv .venv
 | Question | When it's asked |
 |---|---|
 | What do you want to document? | Only when there's more than one API type. REST is the only one today, so this is skipped |
-| Which LLM? Local Ollama, hosted, or none | Always, unless you pass `--llm`. Choosing hosted adds a model name and an API key |
+| Which model reviews projects? Local (Ollama, Gemma) or hosted (an open-weight model through an OpenAI-compatible API such as OpenRouter or Groq) | Always, unless you pass `--llm`. Choosing hosted adds a model name and an API key |
 | GitHub token | Only if none is set yet. Without one, GitHub allows 60 requests an hour, enough for about 10 repos. [Create one](https://github.com/settings/personal-access-tokens/new) with **Public repositories (read-only)** access |
 
 Everything else starts with a default. `init` tests the token with GitHub and doesn't save a rejected one. It also checks that the Ollama model is installed. `docscout profile` shows your settings in plain words.
 
-**No Ollama, or the model isn't downloaded yet?** Everything except the LLM step still works:
+**No Ollama, or the model isn't downloaded yet?**
 - `init` shows the status next to the local option;
-- `bench-llm` and the daily report say exactly what to run, for example `ollama pull gemma4:e2b`;
-- reports fall back to code-based results.
+- `bench-llm` and the daily run say exactly what to run, for example `ollama pull gemma4:e2b`;
+- DocScout still searches and checks projects, but they wait for a review and nothing is reported until the model is available.
 
-Install Ollama from [ollama.com](https://ollama.com), or switch with `docscout set --llm openai_compatible` or `--llm none`.
+Install Ollama from [ollama.com](https://ollama.com), or use a hosted model with `docscout set --llm openai_compatible`.
 
 ### Changing other settings
 
@@ -49,9 +51,15 @@ Install Ollama from [ollama.com](https://ollama.com), or switch with `docscout s
 | Languages you know | any | `--languages "python, go"`. Short names like `py`, `ts`, `golang` and `c#` work. `any` clears the list |
 | Exclude other languages | no. For REST, other languages are kept and yours rank higher, since most fixes are YAML or Markdown edits. Library/SDK docs, once added, always require your language | `--only-these-languages` |
 | Project sizes | small, medium, large | `--sizes small,medium`. The sizes are small (20–200★), medium (200–1,000★), large (1,000–5,000★) and huge (5,000★ and up) |
-| LLM provider | local Ollama | `--llm ollama`, `--llm openai_compatible` or `--llm none` |
-| LLM model | `gemma4:e2b` | `--model NAME` |
-| Hosted LLM address | OpenRouter | `--base-url https://api.groq.com/openai/v1` (any OpenAI-compatible API) |
+| Model provider | local Ollama | `--llm ollama` or `--llm openai_compatible` |
+| Model | `gemma4:e2b` | `--model NAME` |
+| Hosted model address | OpenRouter | `--base-url https://api.groq.com/openai/v1` (any OpenAI-compatible API) |
+| Notifications for the daily run | on | `--start-notification off`, `--finish-notification off` |
+
+Three model settings live in the `[llm]` section of `config.toml`:
+- `reviews_per_run`: 13 a day, about 10 minutes at 45 s each. `docscout bench-llm` measures your speed.
+- `think`: `off`, `borderline` (only where the code is unsure) or `on`. Slower.
+- `min_free_memory_gb`: 2.5. A local model waits until this much memory is free, so your computer doesn't start swapping.
 
 The same flags work on `discover` for a single run without saving, for example `docscout discover --languages rust --only-these-languages`. `init` also accepts them; any setting given as a flag skips its question.
 
@@ -60,7 +68,7 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 ## Find projects to contribute to
 
 ```bash
-.venv/bin/docscout run              # checks up to 60 repos (about 10 minutes) and writes a report
+.venv/bin/docscout run              # checks up to 60 repos, Gemma reviews up to 13 (about 20 minutes), writes a report
 .venv/bin/docscout run --limit 10   # a quicker, smaller run
 ```
 
@@ -69,11 +77,21 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 - a run that finds nothing new writes no file.
 
 **Each item shows:**
+- **Gemma's review:** what the project is (for example "an app or service with its own REST API"), the quote it based that on, and how it changed the code's confidence (for example 0.50 → 0.80). It can raise confidence to at most 0.8, so a README written to fool it can't push a project to the top;
+- **why its docs matter** and **up to 3 first steps**, from Gemma;
 - **the gap:** for an OpenAPI spec, which operations lack descriptions, examples, success schemas or error responses, with a permanent link to the file; for prose docs, which endpoints lack a description, request and response examples, status codes or auth;
 - **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
 - **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
 - **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally;
-- **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet.
+- **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet, so it reports these only when maintainers asked for help.
+
+**Once you've picked a project,** let Gemma draft your first message to the maintainers:
+
+```bash
+.venv/bin/docscout draft owner/repo
+```
+
+It writes a short message asking whether a docs PR would be welcome, naming the gaps DocScout found. It replies on the open "help wanted" or docs issue if there is one, otherwise it drafts a new issue. It checks again that nobody has started on it. Edit it so it sounds like you, then post it yourself: DocScout never posts anything.
 
 **Once you've dealt with a project,** hide it from future reports:
 
@@ -89,7 +107,7 @@ Repos are only checked again after 90 days (`[discovery] recheck_after_days`), a
 ```bash
 .venv/bin/docscout score path/to/openapi.yaml   # gap score with the reason for each point
 .venv/bin/docscout score docs/API.md            # endpoint completeness of a Markdown file
-.venv/bin/docscout score owner/repo             # the full check, as it would appear in a report
+.venv/bin/docscout score owner/repo             # the full check with Gemma's review, as it would appear in a report
 ```
 
 ## Run it every day by itself (Linux)
@@ -105,7 +123,8 @@ After that you never start it yourself:
 - **After a restart,** the first check is 2 minutes after you log in.
 - **When you're offline,** it waits, and starts within 15 minutes of the connection coming back. If the connection drops during a run, the run pauses and continues later, without checking anything twice.
 - **If the computer shuts down mid-run,** the next check continues the run, and anything already found still goes into the report.
-- **Problems that need you** (no GitHub token, an expired token, three failed runs in a row, broken settings) always get a notification, at most once a day each.
+- **When memory is low,** Gemma waits instead of slowing your computer down. The projects found are held, and a later check reviews them once enough memory is free. You get a notification saying how many are waiting.
+- **Problems that need you** (no GitHub token, an expired token, three failed runs in a row, broken settings, Gemma unable to review for 2 days) always get a notification, at most once a day each.
 - **A week without anything new** gets one notification suggesting a wider search.
 - It runs at low priority, so the computer stays responsive.
 
@@ -154,6 +173,15 @@ On macOS and Windows, daily runs come in a later version (stage M5). Until then,
 ```
 
 The first run fetches each repo's details and caches them in your data folder; later runs make no API calls. It prints the new accuracy and every prediction that changed ("now right", "now wrong" or "still wrong").
+
+**To measure Gemma's review** on the same labeled repos (close other apps first; about 45 s per repo on a small laptop):
+
+```bash
+.venv/bin/docscout eval tests/fixtures/labeled_repos.csv --llm                   # thinking off
+.venv/bin/docscout eval tests/fixtures/labeled_repos.csv --llm --think borderline   # thinking on where the code is unsure
+```
+
+It prints precision and recall with and without Gemma, what Gemma changed, the time per review, and the memory Gemma used, with a suggested `min_free_memory_gb`. Reviews are cached, so the second command only reviews the borderline repos again. Ctrl+C stops it, and the same command continues.
 
 ### Labeling guide
 

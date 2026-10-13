@@ -6,6 +6,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+class SourceUnavailable(Exception):
+    """A source can't provide candidates this run; the other sources carry on."""
+
+
 _GITHUB_REPO_URL = re.compile(r"^https?://(?:www\.)?github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9._-]+?)(?:\.git)?/?(?:[#?/].*)?$")
 
 

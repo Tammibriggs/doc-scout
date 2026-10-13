@@ -119,6 +119,8 @@ def _cmd_discover(cfg: Config, args: argparse.Namespace) -> int:
     print(f"GitHub API calls: {calls}")
     if sample.stopped_early:
         print(f"Stopped early: {sample.stopped_early}", file=sys.stderr)
+    for note in sample.notes:
+        print(f"Note: {note}", file=sys.stderr)
     print(f"\nNext: open {out}, fill the 'label' column with one of: {', '.join(LABELS)}")
     print(f"Then run: docscout eval {out}")
     return 0 if sample.passed else 1
@@ -160,6 +162,8 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     print(f"\nChecked {s.evaluated} repos: {s.passed} passed the health checks, {s.with_gaps} have docs gaps.")
     if s.stopped_early:
         print(f"Stopped early: {s.stopped_early}")
+    for note in s.notes:
+        print(f"Note: {note}")
     if result.report_path:
         print(f"Report with {len(result.findings)} new projects: {result.report_path}")
     else:

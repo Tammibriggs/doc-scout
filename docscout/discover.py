@@ -224,6 +224,7 @@ class Sample:
     rejected: list[Evaluated] = field(default_factory=list)
     summaries: list[SourceSummary] = field(default_factory=list)
     stopped_early: str | None = None  # why sampling stopped before reaching the target
+    notes: list[str] = field(default_factory=list)  # e.g. a source that was skipped
 
 
 def draw_sample(
@@ -252,7 +253,9 @@ def draw_sample(
         for name in sources:
             summary = SourceSummary(name)
             sample.summaries.append(summary)
-            for cand in source_candidates(name, gh, cfg, rng, now.date(), api_types, policy):
+            from docscout.pipeline import guarded  # late import: pipeline imports this module
+
+            for cand in guarded(name, source_candidates(name, gh, cfg, rng, now.date(), api_types, policy), sample.notes):
                 key = cand.full_name.lower()
                 if key in seen:
                     continue

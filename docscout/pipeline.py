@@ -26,14 +26,28 @@ from docscout.apitypes.base import DocsContext
 from docscout.config import Config
 from docscout.db import Store, StoredFinding
 from docscout.discover import Evaluated, evaluate, source_candidates
+from docscout.config import data_dir
 from docscout.github import AuthError, GitHub, GitHubError, RateLimited
 from docscout.profile import language_policy, one_line
 from docscout.report import RunSummary, render, write
 from docscout.scoring import Score, opportunity_score
+from docscout.sources import SourceUnavailable, awesome_selfhosted
 
 log = logging.getLogger(__name__)
 
 SOURCE_ORDER = ("help_requested", "awesome_selfhosted", "repo_search", "code_search")
+
+
+def guarded(name: str, stream: Iterator[Any], notes: list[str]) -> Iterator[Any]:
+    """A source that fails is skipped for this run (with a note); the others carry on.
+    Rate limits and an expired token still stop the run, since they affect every source."""
+    try:
+        yield from stream
+    except (RateLimited, AuthError):
+        raise
+    except (SourceUnavailable, GitHubError, httpx.HTTPError) as exc:
+        log.warning("skipping the %s source this run: %s", name, exc)
+        notes.append(f"Skipped the {name} source this run: {exc}")
 
 
 def interleave(streams: Iterable[Iterator[Any]]) -> Iterator[Any]:
@@ -144,10 +158,9 @@ def run(
     rng = rng or random.Random(now.strftime("%Y-%m-%d"))
     recheck = int(cfg["discovery"]["recheck_after_days"])
     ordered = [s for s in SOURCE_ORDER if s in sources] + [s for s in sources if s not in SOURCE_ORDER]
-    streams = [source_candidates(name, gh, cfg, rng, now.date(), types, policy) for name in ordered]
-
     run_id = store.start_run(now)
     summary = RunSummary()
+    streams = [guarded(name, source_candidates(name, gh, cfg, rng, now.date(), types, policy), summary.notes) for name in ordered]
     started = clock()
     status = "ok"
     auth_error: AuthError | None = None
@@ -220,6 +233,10 @@ def run(
 
     summary.api_calls = dict(gh.calls)
     summary.seconds = clock() - started
+    if awesome_selfhosted.SOURCE in ordered:
+        note = awesome_selfhosted.staleness_note(data_dir() / "awesome_selfhosted.json", now)
+        if note:
+            summary.notes.append(note)
     report_cfg = cfg["report"]
     findings = store.run_findings(run_id, float(report_cfg["min_score"]), int(report_cfg["max_items"]))
     if findings and cfg["checks"]["claim_and_policy"] and auth_error is None:

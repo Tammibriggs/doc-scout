@@ -88,3 +88,63 @@ def test_issue_filter():
     assert not help_requested.issue_counts(issue("NONE", ["docs"], login="renovate[bot]", user_type="Bot"), **DENY)
     assert not help_requested.issue_counts(issue("NONE", ["docs"], title="Dependency Dashboard"), **DENY)
     assert not help_requested.issue_counts(issue("NONE", ["help wanted", "tier:trivial"]), **DENY)
+
+
+# ---------------------------------------------------------------------- when the curated list goes away or stale
+
+
+class SeedGitHub:
+    def __init__(self, archive=None, error=None, info=None):
+        self.archive, self.error, self.info = archive, error, info or {"pushed_at": "2026-10-11T00:00:00Z", "archived": False}
+
+    def get_repo(self, name):
+        if self.error:
+            raise self.error
+        return self.info
+
+    def download_tarball(self, name):
+        return self.archive
+
+
+GITEA = {"root/software/gitea.yml": "name: Gitea\nsource_code_url: https://github.com/go-gitea/gitea\n"}
+
+
+def test_curated_list_falls_back_to_the_last_copy_and_otherwise_steps_aside(tmp_path):
+    import pytest
+
+    from docscout.github import NotFound
+    from docscout.sources import SourceUnavailable
+
+    cache = tmp_path / "seed.json"
+    fresh = awesome_selfhosted.load_seed(SeedGitHub(make_tarball(GITEA)), cache, max_age_days=7)
+    assert [c.full_name for c in fresh] == ["go-gitea/gitea"]
+
+    # Cache too old and the list is gone: the old copy is used.
+    gone = SeedGitHub(error=NotFound(404, "Not Found"))
+    assert [c.full_name for c in awesome_selfhosted.load_seed(gone, cache, max_age_days=0)] == ["go-gitea/gitea"]
+
+    # No copy at all: the source steps aside instead of failing the run.
+    with pytest.raises(SourceUnavailable, match="couldn't download the curated list"):
+        awesome_selfhosted.load_seed(gone, tmp_path / "none.json", max_age_days=7)
+
+
+def test_curated_list_staleness_is_reported(tmp_path, now):
+    cache = tmp_path / "seed.json"
+    awesome_selfhosted.load_seed(SeedGitHub(make_tarball(GITEA)), cache, max_age_days=7)
+    assert awesome_selfhosted.staleness_note(cache, now) is None
+
+    old = SeedGitHub(make_tarball(GITEA), info={"pushed_at": "2025-12-01T00:00:00Z", "archived": False})
+    awesome_selfhosted.load_seed(old, cache, max_age_days=0)
+    assert "hasn't been updated since 01 Dec 2025" in awesome_selfhosted.staleness_note(cache, now)
+
+    archived = SeedGitHub(make_tarball(GITEA), info={"pushed_at": "2026-10-01T00:00:00Z", "archived": True})
+    awesome_selfhosted.load_seed(archived, cache, max_age_days=0)
+    assert "is archived" in awesome_selfhosted.staleness_note(cache, now)
+
+
+def test_cache_from_an_older_version_still_loads(tmp_path):
+    import json
+
+    cache = tmp_path / "seed.json"
+    cache.write_text(json.dumps([{"full_name": "a/b", "meta": {"full_name": "a/b"}}]))
+    assert [c.full_name for c in awesome_selfhosted.load_seed(SeedGitHub(), cache, max_age_days=7)] == ["a/b"]

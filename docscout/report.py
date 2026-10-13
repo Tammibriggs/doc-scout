@@ -27,6 +27,7 @@ class RunSummary:
     api_calls: dict[str, int] = field(default_factory=dict)
     seconds: float = 0.0
     stopped_early: str | None = None
+    notes: list[str] = field(default_factory=list)  # e.g. a source that was skipped or is going stale
 
 
 def _days_ago(value: str | None, now: datetime) -> str:
@@ -150,6 +151,8 @@ def _footer(summary: RunSummary) -> str:
     )
     if summary.stopped_early:
         footer += f"\n\n*Stopped early: {text(summary.stopped_early, 200)}*"
+    for note in summary.notes:
+        footer += f"\n\n*Note: {text(note, 300)}*"
     return footer
 
 

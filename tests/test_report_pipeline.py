@@ -277,3 +277,21 @@ def test_a_failing_source_is_skipped_and_noted(cfg, store, now, monkeypatch):
     result = pipeline.run(RunGitHub(), cfg, store, now, limit=10, sources=["awesome_selfhosted", "repo_search"])
     assert result.status == "ok" and [f.full_name for f in result.findings] == ["org/spec-app"]
     assert "Skipped the awesome\\_selfhosted source this run" in result.report_path.read_text()
+
+
+def test_docs_that_may_live_elsewhere_are_reported_only_when_maintainers_asked(cfg, store, now, monkeypatch):
+    class WithWebsite(RunGitHub):
+        def get_tree(self, name, ref):
+            return [{"path": "Dockerfile", "type": "blob", "size": 5}], False
+
+        def get_readme(self, name):
+            return "# App\nSelf-hosted app with a REST API. Full docs at [our docs](https://docs.withsite.example)."
+
+    def source(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):
+        for full_name, issues in (("org/withsite", []), ("org/withsite-help", [{"number": 3, "title": "Document the API", "outreach": ["help wanted"], "labels": ["docs"], "html_url": "https://github.com/org/withsite-help/issues/3"}])):
+            yield Candidate(full_name, name, dict(GOOD_REPO, full_name=full_name, homepage="https://withsite.example"), issues=issues)
+
+    monkeypatch.setattr(pipeline, "source_candidates", source)
+    result = pipeline.run(WithWebsite(), cfg, store, now, limit=10, sources=["help_requested"])
+    assert [f.full_name for f in result.findings] == ["org/withsite-help"]
+    assert result.findings[0].details["gap"]["check_manually"]

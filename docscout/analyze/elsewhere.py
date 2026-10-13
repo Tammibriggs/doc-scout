@@ -14,19 +14,32 @@ _MD_LINK = re.compile(r"\[([^\]\n]{1,120})\]\((https?://[^\s)]{1,300})\)")
 _DOC_WORDS = re.compile(r"\b(docs?|documentation|api|reference|swagger|redoc|developers?|guides?|manual|wiki)\b", re.IGNORECASE)
 _DOC_HOSTS = re.compile(r"(^docs?\.|readthedocs\.io$|gitbook\.io$|\.github\.io$|^developers?\.)", re.IGNORECASE)
 _SIBLING = re.compile(r"(^|[-_.])(docs?|documentation|website|site|api-docs|handbook)([-_.]|$)", re.IGNORECASE)
+_SIBLING_WORDS = re.compile(r"documentation|handbook|website|github|docs?|site|api|io", re.IGNORECASE)  # longest first
+# Name parts too common to tie a docs repo to one project ("apache/airflow-site" isn't OFBiz's).
+_GENERIC_PARTS = {"app", "api", "core", "web", "server", "service", "backend", "frontend", "framework", "platform", "project"}
+SMALL_OWNER = 10  # an owner with this many public repos or fewer is treated as one product
 
 
 def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").lower()
 
 
+def _squash(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
 def _name_tokens(full_name: str) -> set[str]:
-    """'Bubka/2FAuth' -> {'bubka', '2fauth'}: names a project's own docs address would contain."""
-    tokens = set()
-    for part in full_name.lower().split("/"):
-        tokens.add(re.sub(r"[^a-z0-9]", "", part))
-        tokens.update(t for t in re.split(r"[^a-z0-9]+", part) if len(t) >= 4)
-    return {t for t in tokens if len(t) >= 3}
+    """'Bubka/2FAuth' -> {'bubka', '2fauth'}: the full owner and repo names, which a project's own
+    docs address would contain. Parts of a name don't count: "django" from django-crm would
+    match Django's own docs."""
+    return {t for t in (_squash(part) for part in full_name.split("/")) if len(t) >= 3}
+
+
+def _repo_parts(name: str) -> set[str]:
+    """'ofbiz-framework' -> {'ofbizframework', 'ofbiz'}: the distinctive parts of a repo name."""
+    parts = {_squash(name)}
+    parts.update(t for t in re.split(r"[^a-z0-9]+", name.lower()) if t not in _GENERIC_PARTS)
+    return {t for t in parts if len(t) >= 3}
 
 
 def doc_links(readme: str, full_name: str, limit: int = 2) -> list[str]:
@@ -56,12 +69,24 @@ def doc_links(readme: str, full_name: str, limit: int = 2) -> list[str]:
 
 
 def sibling_repos(owner_repos: list[dict[str, Any]], full_name: str, limit: int = 2) -> list[str]:
-    """Other repos from the same owner whose names suggest docs, as 'owner/name'."""
-    own = full_name.lower()
+    """Other repos from the same owner whose names suggest docs for this project, as 'owner/name'.
+
+    A named docs repo must name the project ("mylar3-website"). A generic one ("docs",
+    "website") counts only when the owner is essentially this one product: the owner's
+    name contains the project's, or the owner has few repos. Big organizations host the
+    sites of many projects (apache/airflow-site has nothing to do with OFBiz).
+    """
+    owner, _, repo_name = full_name.partition("/")
+    parts = _repo_parts(repo_name)
+    one_product = len(owner_repos) <= SMALL_OWNER or any(p in _squash(owner) for p in parts)
     names = []
     for repo in owner_repos:
         name = str(repo.get("full_name") or "")
-        if name.lower() != own and not repo.get("archived") and _SIBLING.search(name.split("/")[-1]):
+        sibling = name.split("/")[-1]
+        if name.lower() == full_name.lower() or repo.get("archived") or not _SIBLING.search(sibling):
+            continue
+        rest = _SIBLING_WORDS.sub("", _squash(sibling)).replace(_squash(owner), "")
+        if (not rest and one_product) or any(p in _squash(sibling) for p in parts):
             names.append(name)
     return names[:limit]
 

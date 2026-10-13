@@ -4,6 +4,8 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 
 **Deadline: Monday 19 October 2026**, one week from 12 October. **Target: finish by Thu 15 October** (Fri 16 as a buffer), since M0, M1 and M3 finished early.
 
+**Submission:** the [DEV Hacktoberfest Open Source AI Challenge, Week 2 "Side Hustle"](https://dev.to/devteam/join-the-hacktoberfest-open-source-ai-challenge-side-hustle-2550-in-prizes-across-18-winners-55ba): "Build something with open-weight models or open-source AI that someone would actually pay for", where "the open pieces should be what makes your project work". Due **18 Oct, 11:59 PM PDT (Mon 19 Oct, 07:59 WAT)**. It needs a DEV post (writing quality is weighted most), a demo video or deployed link, and the code. A first user is a bonus. It fits the Gemma category, since DocScout runs Gemma 4 locally. That's why M2 makes Gemma required, not optional.
+
 ## 1. Status and timeline
 
 **Build stages (milestones).** Each stage is usable on its own. M3 (daily runs) comes **before** M2 (LLM), so the unattended test can run while M2 is built. Each stage lists what must ship by the deadline and what ships only if there's time.
@@ -13,9 +15,10 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | **M0. Prove discovery** | ✅ Done (13 Oct). Accuracy check passed, and the local LLM works (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
 | **M1. Useful manual report** | ✅ Done on branch `m1-report` (Mon 12 Oct, ahead of schedule): OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run`, `ignore`, `done`, `score`. ⏳ Exit check: you'd act on at least 3 of the top 10 in a real report | ✅ Also done: claim check (open docs PRs, "I'll take this"); CLA, DCO and AI-policy notes; local-setup note | Mon 12 – Tue 13 Oct |
 | **M3. Daily runs on Linux** | ✅ Built on branch `m3-daily` (Tue 13 Oct, three days early): `run --if-due`, file lock, offline check and resume, a cursor through the search slices, token, settings and repeated-failure alerts, `schedule install/uninstall/status` for systemd, `status`; **notifications when the day's run starts** ("your computer may be slower for about N minutes", estimated from earlier runs) **and when it finishes** (with the report path), each turned off with `docscout set`. Also: GitHub lists fetched through GraphQL, so a run downloads far less (section 5). ⏳ Exit check: the unattended test | ✅ Also done: quiet-day rules; "pool running dry" notification | Tue 13 Oct |
-| **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap, so borderline repos (0.4–0.6) are reported only when the LLM confirms them; when the LLM is unavailable, "LLM review skipped" plus the fix; **a memory check before loading the local model**, so a daily run on a busy laptop skips the LLM instead of swapping | Measuring the LLM against your labels | Wed 14 Oct |
+| **M2. Gemma required** (branch `m2-llm`, built in a separate worktree) | ✅ First, fewer noisy items (section 9). Then: **Gemma reviews every repo that passes the health checks** (up to `max_candidates` a day, most promising first): it decides whether the project really has an API worth documenting, with the 0.8 cap, and writes why it matters plus up to 3 first steps. **Only reviewed repos are reported.** Unreviewed ones are held, not dropped, and reviewed later. A memory check runs before loading the model. `docscout draft owner/repo` writes a first message to the maintainers for a project you've chosen. **Measured on the 58 labels**, with and without Gemma, and with thinking off and on | | Wed 14 Oct |
 | Unattended test | **2 days** from `docscout schedule install`: no manual starts, survives a reboot and going offline. M2 is built in a separate worktree, so the daily runs keep using the M3 code | | Tue 13 – Thu 15 Oct |
-| Polish and wrap-up | README, demo report, merge the stage branches into `main` once their exit checks pass | A real contribution made with it | Thu 15 Oct (Fri 16 buffer) |
+| Polish and wrap-up | README, demo report, merge the stage branches into `main` once their exit checks pass | | Thu 15 Oct (Fri 16 buffer) |
+| Challenge submission | Demo video; a real docs contribution made with a DocScout pick (the "first user"); the DEV post, written in your own voice | | Fri 16 – Sun 18 Oct |
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
 | **M5. macOS and Windows support** | launchd and Task Scheduler setup, notifications and file lock on both, CI on 3 operating systems, `pipx` packaging, a fresh-install test on real machines | **After the deadline** | |
@@ -233,6 +236,12 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   - a Swagger UI, ReDoc or `openapi.json` mention, or `/docs` on a local address (`localhost:8000/docs`).
 
   Prose gaps with these signs are capped at 50 and marked "check manually" until M4. With no endpoints in the repo at all, the gap is **40** ("docs probably elsewhere").
+
+  **These items are reported only when maintainers asked for help** ✅ (13 Oct). In the first daily report, 4 of the 10 items were "docs probably elsewhere" guesses, while projects like docassemble and kuzzle have documentation websites. A help request says the docs need work wherever they live.
+- **Signals must belong to this project** ✅ (13 Oct, after wrong signals in the first daily report):
+  - a docs link counts only if its address contains the full repo or owner name (django-crm had counted Django's own docs);
+  - a named docs repo must name the project (`mylar3-website`), and a generic one (`docs`, `website`) counts only when the owner is one product (`kuzzleio/documentation`) or has at most 10 repos (OFBiz had got `apache/tvm-site` and `apache/airflow-site`);
+  - Markdown files under decision-record, audit, proposal, design or internal folders aren't read as API docs (kuzzle's `docs/adr-001/step-15-audit/A3-api.md`).
 - **Generated-spec limitation:** detection reads the file's header and folder names only. Specs generated without a marker (e.g. JSON from some code generators) show as hand-written.
 
 **Live findings from 12 Oct, already fixed:**
@@ -260,9 +269,19 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 
 ## 11. The LLM (M2)
 
+**Gemma is required** (decided 13 Oct, for the challenge's "the open pieces should be what makes your project work"):
+- **It reviews every repo that passes the health checks** with confidence of at least 0.4, up to `max_candidates` per day (about 13 at 45 s each), most promising first.
+- **Only reviewed repos are reported.** If Gemma can't run (Ollama not running, memory low), findings are held, not dropped. A later check the same day reviews them once memory is free; otherwise the next run does. Held findings wait up to 14 days. If Gemma can't run for 2 days in a row, you get a "needs attention" notification.
+- **`init` no longer offers "none":** the choice is local Gemma or a hosted open-weight model.
+
 **Jobs:**
-1. Write "why it matters" and up to 3 first steps for the top `max_candidates`.
-2. Give a second opinion on repos where the classifier's confidence is between 0.4 and 0.7, and on every reported repo.
+1. **Judge** whether the project really has an API worth documenting (the code classifier is 76% precise: apps that only mention "API" get through, and borderline repos are dropped unseen). Gemma's verdict, API style and a quoted piece of evidence adjust confidence within the limits below.
+2. **Guide:** why its docs matter, and up to 3 first steps based on the gaps code found.
+3. **`docscout draft owner/repo`** (on demand, after you pick a project): a short first message asking the maintainers whether a docs PR is welcome, using the current issue and PR state. DocScout never posts anything itself.
+
+**Thinking:** Gemma 4 supports it (on by default in the model; DocScout turns it off, so the 44.8 s benchmark was without it). The label check compares thinking off and on for borderline repos. If it clearly helps, it's turned on only for those. A `think` setting covers fast machines and hosted models.
+
+**Not built** (to keep the scope small, decided 13 Oct): a weekly report and a `picks` command. Reports stay one per run, and `latest.md` is the newest.
 
 **Review schema:** `{project_type, api_style, confidence, evidence, why, first_steps}`.
 - The API type decides whether the LLM agrees with it. For example, a REST check plus an LLM answer of "GraphQL" counts as disagreement.
@@ -274,7 +293,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 - Ollama: JSON schema output, `think: false`, the model kept loaded during the batch, then unloaded.
 - Any OpenAI-compatible API, falling back to JSON mode if a provider doesn't support schemas.
 
-**M2 tuning:** `bench-llm` sets `max_candidates` (about 13 on this laptop, at 44.8 s per review). The labeled CSV checks the LLM's second opinions, and if it doesn't help, the prompt or model is tuned. The LLM stays on either way.
+**M2 tuning:** `bench-llm` sets `max_candidates` (about 13 on this laptop, at 44.8 s per review). **The label check is required, not optional:** precision and recall on the 58 labeled repos, with and without Gemma, become the evidence in the DEV post. If Gemma doesn't help, the prompt is tuned first.
 
 ## 12. Security
 
@@ -379,7 +398,7 @@ hacktoberfest/
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅
     db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 153 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 156 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

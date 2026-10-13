@@ -82,7 +82,26 @@ def test_docs_elsewhere_signals():
     assert sibling_repos(owner, "org/app") == ["org/app-docs", "org/website"]
     reasons = docs_elsewhere({"homepage": "https://app.example.com"}, text, owner, "org/myapp")
     assert reasons[0] == "Project website: app.example.com"
-    assert "Separate docs repo: org/app-docs" in reasons
+    assert "Separate docs repo: org/website" in reasons and "Separate docs repo: org/app-docs" not in reasons  # another project's
+
+
+def test_docs_signals_must_belong_to_this_project():
+    # Seen in the first daily report (13 Oct): another Apache project's site, and Django's own docs.
+    apache = [{"full_name": f"apache/project{i}"} for i in range(40)] + [{"full_name": "apache/tvm-site"}, {"full_name": "apache/airflow-site"}]
+    assert sibling_repos(apache, "apache/ofbiz-framework") == []
+    assert sibling_repos(apache + [{"full_name": "apache/ofbiz-site"}], "apache/ofbiz-framework") == ["apache/ofbiz-site"]
+    assert doc_links("Built with [Django](https://docs.djangoproject.com/en/5.0/).", "DjangoCRM/django-crm") == []
+    assert doc_links("Read [the docs](https://django-crm-admin.readthedocs.io).", "DjangoCRM/django-crm") == ["django-crm-admin.readthedocs.io"]
+    # A generic docs repo counts when the owner is the product, however many repos it has.
+    kuzzle = [{"full_name": f"kuzzleio/sdk-{i}"} for i in range(40)] + [{"full_name": "kuzzleio/documentation"}]
+    assert sibling_repos(kuzzle, "kuzzleio/kuzzle") == ["kuzzleio/documentation"]
+    assert sibling_repos([{"full_name": "MylarComics/mylar3-website"}], "MylarComics/mylar3") == ["MylarComics/mylar3-website"]
+
+
+def test_internal_design_notes_are_not_api_docs():
+    gh = FakeGitHub({"docs/adr-001/step-15-audit/A3-api.md": readme("thin.md").encode()})
+    gap = RestApi().analyze(ctx(gh, [blob("docs/adr-001/step-15-audit/A3-api.md")], "# App", confidence=0.9))
+    assert gh.fetched == [] and gap.kind == "none"
 
 
 # ---------------------------------------------------------------------- RestApi.analyze

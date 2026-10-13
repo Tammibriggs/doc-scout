@@ -79,6 +79,11 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
     gap = api_type.analyze(ctx)
     if gap is None:
         return None
+    # Docs that may live on a website or in another repo can't be checked yet (stage M4).
+    # They're reported only when maintainers asked for help, which says the docs need work
+    # wherever they are. In the first daily report, 4 of 10 items were such guesses.
+    if gap.check_manually and not ev.candidate.issues:
+        return None
     score = opportunity_score(
         gap.score,
         ev.health or 0.0,

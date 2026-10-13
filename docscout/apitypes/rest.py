@@ -39,6 +39,8 @@ _RUNTIME_SPEC = re.compile(
     re.IGNORECASE,
 )
 _DOCS_FILE = re.compile(r"(api|endpoint|rest)[^/]*\.(md|mdx|markdown)$|(^|/)api/[^/]+\.(md|mdx|markdown)$", re.IGNORECASE)
+# Notes for the project's own developers (decision records, audits, proposals), not API docs for users.
+_INTERNAL_DOCS = re.compile(r"(^|[/_-])(adrs?|rfcs?|decisions?|proposals?|design|audits?|internal|meetings?|changelogs?|archive)([/_-]|$)", re.IGNORECASE)
 MAX_DOCS_FILES = 3
 MAX_DOCS_BYTES = 512 * 1024
 
@@ -103,7 +105,7 @@ class RestApi(ApiType):
                 findings=prose.findings(),
                 effort_units=sum(1 for e in prose.endpoints if e.completeness < COMPLETE),
                 location=None if prose.source == "README" else prose.source,
-                summary=f"{len(prose.endpoints)} endpoints, {round(completeness * 100)}% complete, no OpenAPI spec",
+                summary=f"{len(prose.endpoints)} endpoint{'s' if len(prose.endpoints) != 1 else ''}, {round(completeness * 100)}% complete, no OpenAPI spec",
                 suggestion=suggestion,
                 check_manually=check_manually,
             )
@@ -158,6 +160,7 @@ class RestApi(ApiType):
         paths = sorted(
             (e["path"] for e in ctx.tree
              if e.get("type") == "blob" and _DOCS_FILE.search(e.get("path", "")) and is_owned_path(e["path"])
+             and not _INTERNAL_DOCS.search(e["path"].rpartition("/")[0])
              and 0 < int(e.get("size") or 0) <= MAX_DOCS_BYTES),
             key=lambda p: (p.count("/"), p),
         )  # fmt: skip

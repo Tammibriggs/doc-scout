@@ -30,6 +30,14 @@ def clean(value: object, limit: int = 300) -> str:
     return text
 
 
+def block(value: object, limit: int = 2000) -> str:
+    """Multi-line text for the terminal (e.g. a model's draft): line breaks kept, control and
+    invisible characters removed, so it can't move the cursor, recolor or hide text."""
+    text = _INVISIBLE.sub("", _ANSI.sub("", str(value or "").replace("\r\n", "\n")))
+    text = "\n".join(line.rstrip() for line in text.split("\n")).strip()
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
 def text(value: object, limit: int = 300) -> str:
     """Untrusted text as inert Markdown."""
     return _MD_SPECIAL.sub(r"\\\1", clean(value, limit))

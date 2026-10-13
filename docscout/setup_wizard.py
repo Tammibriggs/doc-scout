@@ -66,7 +66,7 @@ def answers_from_config(cfg: Config) -> Answers:
 
 
 def parse_choices(text: str, options: list[str]) -> list[str]:
-    """'1,3' or 'ollama, none' -> ['ollama', 'none'], in the options' order."""
+    """'1,2' or 'ollama, openai_compatible' -> ['ollama', 'openai_compatible'], in the options' order."""
     picked = set()
     for item in text.replace(" ", ",").split(","):
         item = item.strip().lower()
@@ -186,18 +186,18 @@ def ask_interactively(
         local_model = llm["model"]
     installed = ollama_models(local_url)
     if "llm" in steps:
-        providers = ["ollama", "openai_compatible", "none"]
+        providers = ["ollama", "openai_compatible"]
         if installed is None:
             local_status = "Ollama isn't installed or running on this machine"
         elif local_model not in installed:
             local_status = f"Ollama found, but {local_model} isn't downloaded yet"
         else:
             local_status = "ready on this machine"
-        header("llm", "Which LLM should review projects and suggest first steps?")
-        say(f"   1) Local, with Ollama ({local_model}): free and private, but slow on small machines. Status: {local_status}")
-        say("   2) Hosted: an OpenAI-compatible API such as OpenRouter (needs an API key)")
-        say("   3) None: code-based results only")
-        default = str(providers.index(current.llm["provider"]) + 1)
+        header("llm", "Which model should review projects? Only projects it has reviewed are reported.")
+        say(f"   1) Local, with Ollama ({local_model}): free and private; needs about 2.5 GB of free memory. Status: {local_status}")
+        say("   2) Hosted: an open-weight model through an OpenAI-compatible API such as OpenRouter or Groq (needs an API key)")
+        current_provider = current.llm["provider"]
+        default = str(providers.index(current_provider) + 1) if current_provider in providers else "1"
         llm["provider"] = _ask_until_valid(ask, say, f"   Choice [{default}]: ", lambda t: _one(parse_choices(t or default, providers), t))
     switched = llm["provider"] != current.llm["provider"]
     llm_api_key = None
@@ -211,8 +211,8 @@ def ask_interactively(
         if installed is None:
             notes.append(
                 f"Ollama isn't running at {llm['base_url']}. Install it from https://ollama.com and run "
-                f"`ollama pull {llm['model']}`, or switch with `docscout set --llm none`. "
-                "Until then, reports use code-based results only."
+                f"`ollama pull {llm['model']}`, or use a hosted model: `docscout set --llm openai_compatible`. "
+                "Until then, projects wait for a review and nothing is reported."
             )
         elif llm["model"] not in installed:
             notes.append(f"The LLM model isn't downloaded yet. Run: ollama pull {llm['model']}")

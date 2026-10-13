@@ -291,6 +291,14 @@ class Store:
                 "UPDATE findings SET review=?, score=?, details=? WHERE id=?", (review, score, json.dumps(details), finding_id)
             )
 
+    def latest_finding(self, full_name: str) -> StoredFinding | None:
+        row = self.conn.execute(
+            """SELECT f.id, r.full_name, f.score, f.details, f.run_id FROM findings f JOIN repos r ON r.key = f.repo_key
+               WHERE f.repo_key = ? ORDER BY f.id DESC LIMIT 1""",
+            (full_name.lower(),),
+        ).fetchone()
+        return _finding(row) if row else None
+
     def reviewed_since(self, since: datetime) -> int:
         return sum(r["reviewed"] or 0 for r in self.runs_since(since))
 

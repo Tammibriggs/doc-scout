@@ -145,3 +145,22 @@ def test_benchmark_stops_at_the_first_setup_problem():
     text = bench.format_result(result, "fake")
     assert "can't be used yet: The model m isn't installed" in text
     assert "works without it" in text
+
+
+def test_ollama_sends_thinking_only_when_asked_and_drafts_with_their_own_schema():
+    from docscout.llm.base import DRAFT_SCHEMA
+
+    sent = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        sent.append(body)
+        content = json.dumps({"title": "t", "message": "m"}) if body["format"] == DRAFT_SCHEMA else json.dumps(GOOD)
+        return httpx.Response(200, json={"message": {"content": content}})
+
+    client = OllamaClient(base_url="http://localhost:11434", model="gemma4:e2b", transport=httpx.MockTransport(handler))
+    client.review(RepoContext(full_name="a/b"))
+    client.review(RepoContext(full_name="a/b"), think=True)
+    assert [b["think"] for b in sent] == [False, True]
+    assert client.draft(RepoContext(full_name="a/b")).message == "m"
+    assert sent[-1]["think"] is False

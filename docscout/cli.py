@@ -1,8 +1,9 @@
 """Command-line entry points.
 
 - Setup: ``init``, ``set``, ``profile``.
-- Daily use: ``run`` (find projects and write a report), ``done`` / ``ignore`` (hide a
-  project from future reports), ``score`` (analyze one spec file or repo).
+- Daily use: ``run`` (find projects and write a report), ``draft`` (a first message to the
+  maintainers of a project you picked), ``done`` / ``ignore`` (hide a project from future
+  reports), ``score`` (analyze one spec file or repo).
 - Running unattended: ``schedule install`` / ``uninstall`` / ``status``, ``status``, and
   ``run --if-due``, which the schedule starts every 15 minutes.
 - Stage M0 checks: ``discover``, ``eval``, ``bench-llm``.
@@ -200,6 +201,8 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
         store.close()
     s = result.summary
     print(f"\nChecked {s.evaluated} repos: {s.passed} passed the health checks, {s.with_gaps} have docs gaps.")
+    if s.model:
+        print(f"{s.model} reviewed {s.reviewed} ({s.accepted} accepted).")
     if s.stopped_early:
         print(f"Stopped early: {s.stopped_early}")
     for note in s.notes:
@@ -351,11 +354,9 @@ def _print_findings(findings) -> None:
 def _score_repo(cfg: Config, target: str) -> int:
     from docscout import apitypes
     from docscout.db import StoredFinding
-    from docscout.discover import evaluate
     from docscout.health import utcnow
-    from docscout.pipeline import analyze
     from docscout.report import render_item
-    from docscout.sources import Candidate, github_full_name
+    from docscout.sources import github_full_name
 
     name = github_full_name(target) or target.strip().strip("/")
     if name.count("/") != 1:
@@ -364,14 +365,7 @@ def _score_repo(cfg: Config, target: str) -> int:
     types = apitypes.enabled_types(cfg["api_types"])
     now = utcnow()
     with _github(cfg) as gh:
-        ev = evaluate(gh, Candidate(name, "manual", {"full_name": name}), cfg, now, types)
-        print(f"{name}: {ev.classification.project_type} ({ev.classification.api_type} {ev.classification.api_confidence:.2f})")
-        for reason in ev.classification.reasons:
-            print(f"  - {reason}")
-        if ev.rejected:
-            print(f"Not reported: {ev.rejected}")
-            return 0
-        result = analyze(gh, ev, cfg, {t.key: t for t in types})
+        result = _check_repo(cfg, gh, name, types, now, show=True)
         if result is not None and cfg["checks"]["claim_and_policy"]:
             from docscout.analyze.checks import Checks, paid_checks
 
@@ -381,9 +375,116 @@ def _score_repo(cfg: Config, target: str) -> int:
     if result is None:
         print("Not reported: not enough evidence of an API with docs gaps.")
         return 0
+    finding = StoredFinding(name, result.score.total, result.details, 0)
+    verdict = _review_one_repo(cfg, finding, {t.key: t for t in types})
+    if verdict is None:
+        return 1
+    finding, accepted = verdict
     print()
-    print("\n\n".join(render_item(1, StoredFinding(name, result.score.total, result.details, 0), now)))
+    print("\n\n".join(render_item(1, finding, now)))
+    if not accepted:
+        print(f"\nNot reported: {finding.details['review']['project_type']}, according to the review.")
     return 0
+
+
+def _check_repo(cfg: Config, gh, name: str, types, now, *, show: bool):
+    """Health checks and docs analysis for one repo, as in a run; None if it wouldn't be reported."""
+    from docscout.discover import evaluate
+    from docscout.pipeline import analyze
+    from docscout.sources import Candidate
+
+    ev = evaluate(gh, Candidate(name, "manual", {"full_name": name}), cfg, now, types)
+    if show:
+        print(f"{name}: {ev.classification.project_type} ({ev.classification.api_type} {ev.classification.api_confidence:.2f})")
+        for reason in ev.classification.reasons:
+            print(f"  - {reason}")
+    if ev.rejected:
+        print(f"Not reported: {ev.rejected}")
+        return None
+    return analyze(gh, ev, cfg, {t.key: t for t in types})
+
+
+def _cmd_draft(cfg: Config, args: argparse.Namespace) -> int:
+    from docscout import apitypes, review
+    from docscout.db import Store, StoredFinding
+    from docscout.draft import NEW_ISSUE, write_draft
+    from docscout.health import utcnow
+    from docscout.llm import LLMError, LLMUnavailable, memory
+    from docscout.sources import github_full_name
+
+    name = github_full_name(args.repo) or args.repo.strip().strip("/")
+    if name.count("/") != 1:
+        print(f"Expected OWNER/REPO or a GitHub URL, got {args.repo!r}", file=sys.stderr)
+        return 2
+    store = Store(store_path())
+    try:
+        finding = store.latest_finding(name)
+    finally:
+        store.close()
+    types = apitypes.enabled_types(cfg["api_types"])
+    by_key = {t.key: t for t in types}
+    label = review.model_label(str(cfg["llm"]["model"]))
+    with _github(cfg) as gh:
+        if finding is None:
+            print(f"{name} isn't in your reports, so DocScout checks it first...", file=sys.stderr)
+            result = _check_repo(cfg, gh, name, types, utcnow(), show=False)
+            if result is None:
+                print("No API docs gaps found to write about.", file=sys.stderr)
+                return 1
+            finding = StoredFinding(name, result.score.total, result.details, 0)
+        api_type = by_key.get(finding.details.get("api_type", ""))
+        if api_type is None:
+            print(f"{name} was found for an API type that's switched off now.", file=sys.stderr)
+            return 1
+        short = memory.shortage(cfg["llm"])
+        if short:
+            print(f"{label} can't write a draft now: {short}. Close some apps and try again.", file=sys.stderr)
+            return 1
+        print(f"Asking {label} for a draft (under a minute on most laptops)...", file=sys.stderr)
+        client = review.open_reviewer(cfg)
+        try:
+            draft = write_draft(client, gh, finding, api_type.label)
+        except (LLMUnavailable, LLMError) as exc:
+            print(f"{label} couldn't write a draft: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            client.unload()
+            client.close()
+    print(f"\nPost it as a {'new issue' if draft.where == NEW_ISSUE else draft.where}:\n  {draft.url}")
+    if draft.where == NEW_ISSUE:
+        print(f"Title: {draft.title}")
+    print("\n" + "-" * 60 + "\n" + draft.message + "\n" + "-" * 60)
+    for warning in draft.warnings:
+        print(f"⚠️  {warning}")
+    print("\nEdit it so it sounds like you, then post it yourself. DocScout never posts anything.")
+    return 0
+
+
+def _review_one_repo(cfg: Config, finding, types_by_key) -> tuple | None:
+    """The model's review of one finding, as in a run: (finding with the review, accepted), or None."""
+    from docscout import review
+    from docscout.db import StoredFinding
+    from docscout.llm import LLMError, LLMUnavailable, memory
+
+    label = review.model_label(str(cfg["llm"]["model"]))
+    short = memory.shortage(cfg["llm"])
+    if short:
+        print(f"\n{label} can't review it now: {short}. Close some apps and try again.", file=sys.stderr)
+        return None
+    print(f"\nAsking {label} to review it (under a minute on most laptops)...", file=sys.stderr)
+    client = review.open_reviewer(cfg)
+    try:
+        assessed = review.assess(client, cfg, finding, types_by_key[finding.details["api_type"]])
+    except LLMUnavailable as exc:
+        print(f"{label} isn't available: {exc}", file=sys.stderr)
+        return None
+    except LLMError as exc:
+        print(f"{label} didn't give a valid answer: {exc}", file=sys.stderr)
+        return None
+    finally:
+        client.unload()
+        client.close()
+    return StoredFinding(finding.full_name, assessed.score, assessed.details, finding.run_id), assessed.accepted
 
 
 def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
@@ -428,9 +529,6 @@ def _cmd_bench_llm(cfg: Config, args: argparse.Namespace) -> int:
     if args.base_url:
         llm_cfg["base_url"] = args.base_url
     client = make_client(llm_cfg, api_key=cfg.secret(llm_cfg["api_key_env"]))
-    if client is None:
-        print("LLM provider is 'none'; nothing to benchmark.", file=sys.stderr)
-        return 1
     print(f"Benchmarking {client.name} with {args.runs} sample reviews...", file=sys.stderr)
     try:
         result = bench.run(client, runs=args.runs, readme_chars=int(llm_cfg.get("readme_chars", 1500)))
@@ -445,7 +543,7 @@ def _add_profile_flags(p: argparse.ArgumentParser) -> None:
     group.add_argument("--languages", help='languages you know, comma-separated, e.g. "python, go" ("any" to clear)')
     group.add_argument("--only-these-languages", action="store_true", help="exclude projects in other languages")
     group.add_argument("--sizes", help="project sizes: small, medium, large, huge (comma-separated)")
-    group.add_argument("--llm", choices=["ollama", "openai_compatible", "none"], help="LLM provider")
+    group.add_argument("--llm", choices=["ollama", "openai_compatible"], help="the model that reviews projects: local (ollama) or hosted")
     group.add_argument("--model", dest="llm_model", help="LLM model name")
     group.add_argument("--base-url", dest="llm_base_url", help="LLM API address, e.g. https://api.groq.com/openai/v1")
 
@@ -501,7 +599,6 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("run", help="find projects with API docs gaps and write a report")
     p.add_argument("--limit", type=int, help="repos to check this time (default: [discovery] daily_repo_budget)")
     p.add_argument("--sources", help="comma-separated sources (default: [discovery] sources)")
-    p.add_argument("--no-llm", action="store_true", help="skip LLM reviews (the LLM is added in stage M2)")
     p.add_argument("--if-due", action="store_true", help="only run if today's run is due (what the daily schedule uses)")
     _add_profile_flags(p)
     p.set_defaults(func=_cmd_run)
@@ -513,6 +610,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["install", "uninstall", "status"])
     p.add_argument("--dry-run", action="store_true", help="show what would change, without changing anything")
     p.set_defaults(func=_cmd_schedule)
+
+    p = sub.add_parser("draft", help="a first message to the maintainers of a project you picked, for you to edit and post")
+    p.add_argument("repo", help="OWNER/REPO or a GitHub URL")
+    p.set_defaults(func=_cmd_draft)
 
     p = sub.add_parser("done", help="mark a project as done; it won't be reported again")
     p.add_argument("repo", help="OWNER/REPO or a GitHub URL")

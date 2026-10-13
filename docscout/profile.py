@@ -115,7 +115,7 @@ def describe(values: dict[str, Any], api_types: list[ApiType], *, has_token: boo
     elif llm["provider"] == "openai_compatible":
         llm_text = f"hosted ({llm['model']} at {llm['base_url']})"
     else:
-        llm_text = "none (reports use code-based results only)"
+        llm_text = f"{llm['provider']} (not supported: use ollama or openai_compatible)"
     lines = [
         "DocScout is looking for:",
         f"  API docs:       {', '.join(t.label for t in api_types)}",

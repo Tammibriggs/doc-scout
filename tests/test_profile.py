@@ -224,9 +224,10 @@ def test_rest_today_asks_only_llm_and_token(tmp_path):
 def test_existing_token_means_one_question(tmp_path):
     cfg = make_cfg(tmp_path)
     cfg.secrets_path.write_text("GITHUB_TOKEN=already\n")
-    answers, said, numbered = run_wizard(cfg, asks=["3"])
+    answers, said, numbered = run_wizard(cfg, asks=["1"])
     assert said[0].startswith("DocScout setup: 1 question.")
-    assert answers.llm["provider"] == "none" and answers.github_token is None
+    assert answers.llm["provider"] == "ollama" and answers.github_token is None
+    assert not any("None" in line for line in said)  # there's no model-free option
 
 
 def test_flags_answer_questions_in_advance(tmp_path):
@@ -247,14 +248,15 @@ def test_hosted_llm_asks_for_model_and_key_as_follow_ups(tmp_path):
 
 def test_bad_choice_is_asked_again(tmp_path):
     cfg = make_cfg(tmp_path)
-    answers, said, _ = run_wizard(cfg, asks=["7", "none"], secrets=[""])
+    answers, said, _ = run_wizard(cfg, asks=["7", "none", "1"], secrets=[""])
     assert any("didn't understand '7'" in line for line in said)
-    assert answers.llm["provider"] == "none"
+    assert any("didn't understand 'none'" in line for line in said)
+    assert answers.llm["provider"] == "ollama"
 
 
 def test_rejected_token_is_not_saved(tmp_path):
     cfg = make_cfg(tmp_path)
-    answers, _, _ = run_wizard(cfg, asks=["3"], secrets=["bad-token"])
+    answers, _, _ = run_wizard(cfg, asks=["1"], secrets=["bad-token"])
     messages = setup_wizard.save(answers, cfg, tmp_path / "config.toml", verify_token=lambda t: (False, "GitHub rejected this token"))
     assert "GitHub rejected this token" in messages
     assert not cfg.secrets_path.exists()
@@ -263,7 +265,7 @@ def test_rejected_token_is_not_saved(tmp_path):
 def test_library_docs_path_asks_for_language_and_stays_within_three(tmp_path, monkeypatch):
     monkeypatch.setitem(REGISTRY, "library", LibraryDocs)
     cfg = make_cfg(tmp_path)
-    answers, said, numbered = run_wizard(cfg, asks=["2", "py, golang", "3"], secrets=[""])
+    answers, said, numbered = run_wizard(cfg, asks=["2", "py, golang", "1"], secrets=[""])
     assert len(numbered) == 3 <= setup_wizard.MAX_QUESTIONS
     assert answers.api_types == ["library"] and answers.languages == ["Python", "Go"]
 
@@ -282,7 +284,7 @@ def test_llm_question_shows_whether_ollama_is_ready(tmp_path):
     _, said, _ = run_wizard(cfg, asks=["1"], secrets=[""], models=["llama3:8b"])
     assert any("Status: Ollama found, but gemma4:e2b isn't downloaded yet" in line for line in said)
     answers, said, _ = run_wizard(cfg, asks=["1"], secrets=[""], models=None)
-    assert any("Until then, reports use code-based results only." in note for note in answers.notes)
+    assert any("Until then, projects wait for a review and nothing is reported." in note for note in answers.notes)
 
 
 def test_set_model_warns_when_it_is_not_downloaded(tmp_path, monkeypatch, capsys):

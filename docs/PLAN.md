@@ -150,7 +150,7 @@ All three sources are above 50%, so all stay on.
 | Question | When it's asked |
 |---|---|
 | What do you want to document? | Only when more than one API type exists, so it's skipped today. A type that needs your language (library/SDK docs) adds a "which languages?" follow-up |
-| Which LLM: local, hosted or none | Unless `--llm` is given. Choosing hosted adds a model name and an API key |
+| Which model reviews projects: local (Ollama, Gemma) or hosted (an open-weight model through an OpenAI-compatible API) | Unless `--llm` is given. Choosing hosted adds a model name and an API key. There's no "none" since M2 |
 | GitHub token | Only if none is set. It's tested with GitHub and not saved if rejected |
 
 **Changing settings without questions:**
@@ -272,12 +272,12 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 **Gemma is required** (decided 13 Oct, for the challenge's "the open pieces should be what makes your project work"):
 - ✅ **It reviews every repo that passes the health checks** with confidence of at least 0.4, up to `[llm] reviews_per_run` a day (13: about 10 minutes at 45 s each). Most promising first: before its review, a finding is ranked by the score it would get if the model agrees.
 - ✅ **Only reviewed repos are reported.** If Gemma can't run (Ollama not running, memory low), findings are held, not dropped. A later check the same day reviews them once memory is free; otherwise the next run does. Held findings wait up to 14 days. If Gemma can't run for 2 days in a row, you get a "needs attention" notification.
-- **`init` no longer offers "none":** the choice is local Gemma or a hosted open-weight model.
+- ✅ **`init` no longer offers "none":** the choice is local Gemma or a hosted open-weight model. `run --no-llm` is gone, and `score owner/repo` includes the model's review.
 
 **Jobs:**
 1. **Judge** whether the project really has an API worth documenting (the code classifier is 76% precise: apps that only mention "API" get through, and borderline repos are dropped unseen). Gemma's verdict, API style and a quoted piece of evidence adjust confidence within the limits below.
 2. **Guide:** why its docs matter, and up to 3 first steps based on the gaps code found.
-3. **`docscout draft owner/repo`** (on demand, after you pick a project): a short first message asking the maintainers whether a docs PR is welcome, using the current issue and PR state. DocScout never posts anything itself.
+3. ✅ **`docscout draft owner/repo`** (on demand, after you pick a project): a short first message asking the maintainers whether a docs PR is welcome, using the current issue and PR state. DocScout never posts anything itself. It replies on an open "help wanted" or docs issue when there is one, otherwise it drafts a new issue. The claim check runs again first and warns if someone has started, and CLA or AI-policy notes are shown. The draft is printed with control characters removed.
 
 **Thinking:** Gemma 4 supports it (on by default in the model; DocScout turns it off, so the 44.8 s benchmark was without it). The label check compares thinking off and on for borderline repos. If it clearly helps, it's turned on only for those. A `think` setting covers fast machines and hosted models.
 
@@ -392,16 +392,16 @@ The model's reviews are stored in `findings.details`, so no separate `llm_review
 hacktoberfest/
   pyproject.toml ✅  LICENSE ✅  README.md ✅  docs/PLAN.md ✅  .github/workflows/ci.yml (M5: 3 OS × py3.11, 3.13)
   docscout/
-    cli.py ✅          # init set profile discover eval bench-llm · run score ignore done · status schedule (M3) ✅
+    cli.py ✅          # init set profile discover eval bench-llm · run score ignore done · status schedule (M3) · draft (M2) ✅
     config.py ✅  profile.py ✅  languages.py ✅  setup_wizard.py ✅  errors.py ✅  safe_yaml.py ✅
     github.py ✅  health.py ✅  classify.py ✅  evidence.py ✅  discover.py ✅  evaluate.py ✅  bench.py ✅
     apitypes/ base.py ✅ rest.py ✅          # + spec scoring for REST (M1); graphql.py, grpc.py, … (later)
     sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
     analyze/ tree.py ✅  gaps.py ✅  elsewhere.py ✅  checks.py ✅      apitypes/ openapi.py ✅  rest_prose.py ✅
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
-    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅ (M2)
+    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 168 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 172 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

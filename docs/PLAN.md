@@ -2,20 +2,20 @@
 
 DocScout finds open-source projects that **(a)** serve an API, **(b)** have documentation gaps you can fix, and **(c)** are likely to accept your pull request. Once installed, it runs every day without being started by hand and gives you a short ranked list. Each item lists the exact gaps, links to start from, and warnings about anything that could get the PR rejected. It starts with REST APIs, and other API types plug in as modules.
 
-**Deadline: Monday 19 October 2026**, one week from 12 October.
+**Deadline: Monday 19 October 2026**, one week from 12 October. **Target: finish by Thu 15 October** (Fri 16 as a buffer), since M0, M1 and M3 finished early.
 
 ## 1. Status and timeline
 
-**Build stages (milestones).** Each stage is usable on its own. With one week, M3 (daily runs) comes **before** M2 (LLM), so the unattended test runs for 3 days instead of 1. Each stage lists what must ship by the deadline and what ships only if there's time.
+**Build stages (milestones).** Each stage is usable on its own. M3 (daily runs) comes **before** M2 (LLM), so the unattended test can run while M2 is built. Each stage lists what must ship by the deadline and what ships only if there's time.
 
 | Stage | Must ship | If time allows | Dates |
 |---|---|---|---|
 | **M0. Prove discovery** | ✅ Done (13 Oct). Accuracy check passed, and the local LLM works (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
-| **M1. Useful manual report** | ✅ Done on branch `m1-report` (Mon 12 Oct, ahead of schedule): OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run`, `ignore`, `done`, `score`. ⏳ Exit check: you'd act on at least 3 of the top 10 in a real report | ✅ Also done: claim check (open docs PRs, "I'll take this"); CLA, DCO and AI-policy notes; local-setup note | Tue 13 – Thu 15 Oct |
-| **M3. Daily runs on Linux** | ✅ Built on branch `m3-daily` (Tue 13 Oct, three days early): `run --if-due`, file lock, offline check and resume, a cursor through the search slices, token, settings and repeated-failure alerts, `schedule install/uninstall/status` for systemd, `status`; **notifications when the day's run starts** ("your computer may be slower for about N minutes", estimated from earlier runs) **and when it finishes** (with the report path), each turned off with `docscout set`. Also: GitHub lists fetched through GraphQL, so a run downloads far less (section 5). ⏳ Exit check: the unattended test | ✅ Also done: quiet-day rules; "pool running dry" notification | Fri 16 Oct |
-| **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap, so borderline repos (0.4–0.6) are reported only when the LLM confirms them; when the LLM is unavailable, "LLM review skipped" plus the fix; **a memory check before loading the local model**, so a daily run on a busy laptop skips the LLM instead of swapping | Measuring the LLM against your labels | Sat 17 Oct |
-| Unattended test | Starts when you run `docscout schedule install` (possible from Tue 13, so up to 6 days instead of 3): no manual starts, survives a reboot and going offline. M2 is built in a separate worktree, so the daily runs keep using the M3 code | | Tue 13 – Mon 19 Oct |
-| Polish | README, demo report, a real contribution made with it | | Sun 18 Oct |
+| **M1. Useful manual report** | ✅ Done on branch `m1-report` (Mon 12 Oct, ahead of schedule): OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run`, `ignore`, `done`, `score`. ⏳ Exit check: you'd act on at least 3 of the top 10 in a real report | ✅ Also done: claim check (open docs PRs, "I'll take this"); CLA, DCO and AI-policy notes; local-setup note | Mon 12 – Tue 13 Oct |
+| **M3. Daily runs on Linux** | ✅ Built on branch `m3-daily` (Tue 13 Oct, three days early): `run --if-due`, file lock, offline check and resume, a cursor through the search slices, token, settings and repeated-failure alerts, `schedule install/uninstall/status` for systemd, `status`; **notifications when the day's run starts** ("your computer may be slower for about N minutes", estimated from earlier runs) **and when it finishes** (with the report path), each turned off with `docscout set`. Also: GitHub lists fetched through GraphQL, so a run downloads far less (section 5). ⏳ Exit check: the unattended test | ✅ Also done: quiet-day rules; "pool running dry" notification | Tue 13 Oct |
+| **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap, so borderline repos (0.4–0.6) are reported only when the LLM confirms them; when the LLM is unavailable, "LLM review skipped" plus the fix; **a memory check before loading the local model**, so a daily run on a busy laptop skips the LLM instead of swapping | Measuring the LLM against your labels | Wed 14 Oct |
+| Unattended test | **2 days** from `docscout schedule install`: no manual starts, survives a reboot and going offline. M2 is built in a separate worktree, so the daily runs keep using the M3 code | | Tue 13 – Thu 15 Oct |
+| Polish and wrap-up | README, demo report, merge the stage branches into `main` once their exit checks pass | A real contribution made with it | Thu 15 Oct (Fri 16 buffer) |
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
 | **M5. macOS and Windows support** | launchd and Task Scheduler setup, notifications and file lock on both, CI on 3 operating systems, `pipx` packaging, a fresh-install test on real machines | **After the deadline** | |
@@ -386,7 +386,7 @@ hacktoberfest/
 
 | Risk | Mitigation |
 |---|---|
-| **Deadline (one week)** | M3 before M2; "if time allows" items cut first; M4 and M5 after the deadline |
+| **Deadline (one week; target Thu 15)** | M3 before M2; "if time allows" items cut first; M4 and M5 after the deadline |
 | Discovery accuracy is low (**confirmed** for topic search) | Curated seed, per-source accuracy check in M0, classifier, health gate |
 | Noisy help requests (**confirmed**) | Outreach-label or outside-author rule, deny lists, health gate |
 | The local LLM is too slow on 7.6 GB of RAM (1.6 GB free on 12 Oct; the model is 4.6 GB) | `bench-llm` with apps closed; hosted or `none` as fallback; every LLM setup problem is reported with its fix, and the report works without the LLM ✅ |
@@ -422,7 +422,7 @@ hacktoberfest/
   - ✅ a rejected or missing token sends one alert a day; 3 failures in a row send one;
   - ✅ a quiet day writes no file; 7 quiet days send one hint;
   - ✅ the units and a test notification work through this laptop's systemd user session;
-  - ⏳ the unattended test: from `schedule install` to Mon 19 with no manual starts, including a reboot and an offline period; 7 days after the deadline.
+  - ⏳ the unattended test: 2 days from `schedule install` with no manual starts, including a reboot and an offline period.
 - **M5:** a fresh `pipx` install on a Mac and a Windows machine works, including on battery and after sleep; CI is green on 3 operating systems.
 
 ## 19. Later (after M5)

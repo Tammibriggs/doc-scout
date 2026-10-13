@@ -6,6 +6,7 @@ reviews wait until enough memory is free, and the projects found meanwhile are h
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -30,3 +31,30 @@ def shortage(llm_cfg: dict[str, Any], free: int | None = None) -> str | None:
     if free is None or free >= need * 1e9:
         return None
     return f"only {free / 1e9:.1f} GB of memory is free and {llm_cfg.get('model', 'the model')} needs about {need:g} GB"
+
+
+class Watch:
+    """Free memory before a block and the lowest it reached during it (sampled twice a second)."""
+
+    def __init__(self, interval: float = 0.5) -> None:
+        self.interval = interval
+        self.before: int | None = None
+        self.lowest: int | None = None
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._sample, daemon=True)
+
+    def _sample(self) -> None:
+        while not self._stop.is_set():
+            value = available_bytes()
+            if value is not None and (self.lowest is None or value < self.lowest):
+                self.lowest = value
+            self._stop.wait(self.interval)
+
+    def __enter__(self) -> Watch:
+        self.before = available_bytes()
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        self._thread.join(timeout=2)

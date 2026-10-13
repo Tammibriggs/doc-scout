@@ -296,7 +296,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 - ✅ **Memory check:** a local model loads only when `[llm] min_free_memory_gb` (2.5 for now) is free. A run started on a busy laptop holds its findings, and the next 15-minute check reviews them without a new run until memory is free. The value is set from the label check's memory measurement.
 - ✅ **What the report shows:** Gemma's verdict with its evidence quote and the confidence change (e.g. 0.50 → 0.80), why the docs matter, and numbered first steps. Everything the model writes is escaped like other untrusted text. A project the model can't give a valid answer for in 2 runs is dropped.
 
-**M2 tuning:** `bench-llm` recommends `reviews_per_run` (about 13 on this laptop, at 44.8 s per review). **The label check is required, not optional:** precision and recall on the 58 labeled repos, with and without Gemma, become the evidence in the DEV post. If Gemma doesn't help, the prompt is tuned first.
+**M2 tuning:** `bench-llm` recommends `reviews_per_run` (about 13 on this laptop, at 44.8 s per review). ✅ Built: `docscout eval tests/fixtures/labeled_repos.csv --llm [--think off|borderline|on]` reviews the 50 labeled repos with code confidence of at least 0.4 (about 37 minutes at 45 s each), using the repo data `--reclassify` cached, so it makes no GitHub calls. Reviews are cached per repo, model and thinking setting, so a thinking comparison only reviews the borderline repos again. It reports precision and recall with and without the model, seconds per review, and the memory used, with a suggested `min_free_memory_gb`. In this check the model doesn't see the docs gaps, which a daily run gives it. ⏳ To run with other apps closed. **The label check is required, not optional:** precision and recall on the 58 labeled repos, with and without Gemma, become the evidence in the DEV post. If Gemma doesn't help, the prompt is tuned first.
 
 ## 12. Security
 
@@ -399,9 +399,9 @@ hacktoberfest/
     sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
     analyze/ tree.py ✅  gaps.py ✅  elsewhere.py ✅  checks.py ✅      apitypes/ openapi.py ✅  rest_prose.py ✅
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
-    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅ (M2)
+    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅  llm_eval.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 172 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 174 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

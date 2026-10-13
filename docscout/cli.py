@@ -492,6 +492,8 @@ def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
 
     rows = read_rows(Path(args.csv))
     report = evaluate_rows(rows)
+    if args.with_llm:
+        args.reclassify = True  # the model reviews the repo data reclassify caches
     if args.reclassify:
         from docscout import apitypes
         from docscout.health import utcnow
@@ -513,8 +515,46 @@ def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
             print(f"  couldn't fetch {m}")
     else:
         print(format_report(report))
+    if args.with_llm:
+        return _eval_llm(cfg, args, rows)
     precision = report.overall.precision
     return 0 if precision is not None and precision >= TARGET_PRECISION else 1
+
+
+def _eval_llm(cfg: Config, args: argparse.Namespace, rows: list) -> int:
+    from docscout import apitypes, llm_eval, review
+    from docscout.llm import memory
+    from docscout.reclassify import load_cache
+
+    label = review.model_label(str(cfg["llm"]["model"]))
+    short = memory.shortage(cfg["llm"])
+    if short:
+        print(f"\n{label} can't run now: {short}. Close other apps and try again.", file=sys.stderr)
+        return 1
+    api_type = apitypes.enabled_types(cfg["api_types"])[0]
+    floor = float(cfg["classify"]["drop_below"])
+    count = sum(1 for r in rows if (r.get("label") or "").strip() and float(r.get("api_confidence") or 0) >= floor)
+    think = args.think or str(cfg["llm"]["think"])
+    print(
+        f"\nReviewing {count} labeled repos with {label} (thinking: {think}). Reviews already cached are reused;\n"
+        f"new ones take about 45 s each on a small laptop. Ctrl+C stops, keeping what's done.",
+        file=sys.stderr,
+    )
+    client = review.open_reviewer(cfg)
+    try:
+        result = llm_eval.run(
+            rows, load_cache(data_dir() / "eval_cache.json"), client, cfg, api_type,
+            think=think, cache_path=data_dir() / "llm_eval_cache.json", progress=lambda m: print(m, file=sys.stderr),
+        )  # fmt: skip
+    except KeyboardInterrupt:
+        print("\nStopped. The reviews so far are cached; run the same command to continue.", file=sys.stderr)
+        return 130
+    finally:
+        client.close()
+    before, after = llm_eval.compare(rows, result)
+    print()
+    print(llm_eval.format_result(result, before, after))
+    return 0 if not result.stopped else 1
 
 
 def _cmd_bench_llm(cfg: Config, args: argparse.Namespace) -> int:
@@ -640,6 +680,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("eval", help="measure classifier accuracy on a labeled sample CSV")
     p.add_argument("csv")
     p.add_argument("--reclassify", action="store_true", help="re-run the current classifier on the labeled repos (data is cached after the first run)")
+    p.add_argument("--llm", dest="with_llm", action="store_true", help="also measure the model's review on the labeled repos (about 45 s per repo on a small laptop; cached)")
+    p.add_argument("--think", choices=["off", "borderline", "on"], help="thinking for --llm (default: [llm] think)")
     p.set_defaults(func=_cmd_eval)
 
     p = sub.add_parser("bench-llm", help="measure LLM speed and memory on this machine")

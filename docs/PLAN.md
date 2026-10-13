@@ -124,6 +124,9 @@ All three sources are above 50%, so all stay on.
 | REST issue search, 100 results | 230–630 KB per search (each issue's full text); 8 searches took 440 of the 646 s of a 10-repo run | GraphQL search, 50 results, fields used only. Checked: the same matches and the same first 50 |
 | GitHub search on this connection | 9–17 s per issue search either way | Search time is GitHub's, not bandwidth; fewer bytes still help on a slow link |
 | systemd user session | Has the desktop bus address; a notification sent from a systemd unit appeared on screen | Notifications work from scheduled runs |
+| First real Gemma review (babybuddy, 13 Oct) | Right verdict, quoting the spec; 3 first steps taken from the measured gaps; 1 min 20 s with the GitHub checks | Works. But "why it matters" restated the classification, so the prompt now defines that field |
+| First real `draft` | Vague, offered to fix everything, and ended with "Issue link: [Link to new issue]" | The prompt asks for the numbers, one small first PR, and no links or placeholders. The second draft quoted "97 out of 103 operations" and proposed one endpoint group |
+| Claim check on babybuddy | "chore(deps): bump mkdocs-material … in /docs" by Dependabot counted as someone writing docs | PRs by bots and dependency updates no longer count (a bug since M1) |
 
 ## 6. How it fits together
 
@@ -260,7 +263,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 
 ## 10. Before you contribute (M1; top 10 only, about 3 API calls each)
 
-- **Already claimed?** Checks open PRs that touch docs or the spec, and phrases like "I'll take this" in the issue's comments.
+- **Already claimed?** Checks open PRs that touch docs or the spec, and phrases like "I'll take this" in the issue's comments. PRs by bots and dependency updates don't count (13 Oct).
 - **Requirements, shown only when found.** They never change a repo's score, and each quotes the sentence it matched:
   - a **CLA** to sign;
   - a **DCO sign-off** on every commit;
@@ -401,7 +404,7 @@ hacktoberfest/
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
     db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅  llm_eval.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 174 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 175 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

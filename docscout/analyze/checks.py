@@ -30,6 +30,8 @@ _AI_TERMS = re.compile(
 )
 _AI_POLICY_WORDS = re.compile(r"\b(contribut\w*|pull requests?|PRs?|accept\w*|prohibit\w*|disclos\w*|ban\w*|not allowed|reject\w*)\b", re.IGNORECASE)
 _DOCS_WORK = re.compile(r"\b(docs?|documentation|openapi|swagger|api[- ]docs|readme)\b", re.IGNORECASE)
+# Dependency updates that touch docs tooling ("bump mkdocs-material in /docs") aren't someone writing docs.
+_DEPENDENCY_UPDATE = re.compile(r"\b(bump|bumps|deps?|dependenc(y|ies)|dependabot|renovate)\b|\(deps\)", re.IGNORECASE)
 _CLAIM = re.compile(
     r"\b(i'?ll take|i will take|i'?d like to (?:work|take)|i am working on|i'?m working on|working on (?:this|it)|"
     r"assign (?:this|it)? ?to me|assign me|can i (?:take|work on))\b",
@@ -104,7 +106,11 @@ def paid_checks(gh: GitHub, full_name: str, checks: Checks, paths: dict[str, str
     """Open docs PRs, claims in issue comments, and requirements in CONTRIBUTING and the PR template."""
     try:
         for pr in gh.list_open_pulls(full_name):
-            if _DOCS_WORK.search(f"{pr.get('title', '')} {(pr.get('head') or {}).get('ref', '')}"):
+            user = pr.get("user") or {}
+            if user.get("type") == "Bot" or str(user.get("login", "")).endswith("[bot]"):
+                continue
+            title_and_branch = f"{pr.get('title', '')} {(pr.get('head') or {}).get('ref', '')}"
+            if _DOCS_WORK.search(title_and_branch) and not _DEPENDENCY_UPDATE.search(title_and_branch):
                 checks.claimed.append(f"Open PR #{pr.get('number')}: {pr.get('title', '')}")
         for issue in issues[:2]:
             for comment in gh.list_issue_comments(full_name, int(issue["number"])):

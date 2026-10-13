@@ -23,7 +23,7 @@ from docscout.apitypes import ApiType
 from docscout.config import Config
 from docscout.evaluate import Report, evaluate_rows
 from docscout.llm import LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review, memory
-from docscout.llm.base import review_with_retry
+from docscout.llm.base import PROMPT_VERSION, review_with_retry
 from docscout.review import model_label, think_for
 
 CACHE_VERSION = 1
@@ -110,7 +110,7 @@ def run(
                     continue
                 code_confidence = float(row["api_confidence"])
                 thinking = think_for(think, code_confidence, min_confidence)
-                key = f"{name.lower()}|{client.name}|think={thinking}"
+                key = f"{name.lower()}|{client.name}|think={thinking}|prompt={PROMPT_VERSION}"
                 if key not in cache:
                     started = clock()
                     try:

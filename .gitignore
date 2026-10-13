@@ -9,3 +9,7 @@ secrets.env
 # Local M0 samples and reports
 sample*.csv
 reports/
+
+# Spreadsheet lock files (contain your username and hostname)
+.~lock.*#
+~$*

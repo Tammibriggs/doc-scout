@@ -57,8 +57,25 @@ MIGRATIONS = [
     CREATE INDEX findings_run ON findings(run_id);
     CREATE INDEX findings_repo ON findings(repo_key);
     """,
+    """
+    ALTER TABLE runs ADD COLUMN run_limit INTEGER;                     -- repos this run was allowed to check
+    ALTER TABLE runs ADD COLUMN started_by TEXT NOT NULL DEFAULT 'you';  -- you | schedule
+    ALTER TABLE runs ADD COLUMN resume_after TEXT;                     -- rate limited: continue after this time
+    CREATE TABLE state (                 -- small facts the daily schedule needs, e.g. the last check
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated TEXT NOT NULL
+    );
+    CREATE TABLE sweep (                 -- where each repo-search slice stopped, so days don't repeat page 1
+        slice_key TEXT PRIMARY KEY,
+        page INTEGER NOT NULL DEFAULT 1,
+        cycle INTEGER NOT NULL DEFAULT 0,  -- how many times the slice has been worked through
+        last_used TEXT
+    );
+    """,
 ]
 FINAL_STATUSES = ("ignored", "done")
+PENDING_MAX_AGE_DAYS = 14  # findings not reported yet (an interrupted run, or past max_items) wait this long
 REPO_FIELDS = {"source", "stars", "language", "api_type", "type_conf", "health", "rejected"}
 
 
@@ -95,17 +112,80 @@ class Store:
 
     # ------------------------------------------------------------------ runs
 
-    def start_run(self, now: datetime) -> int:
+    def start_run(self, now: datetime, *, run_limit: int | None = None, started_by: str = "you") -> int:
         with self.conn:
-            cur = self.conn.execute("INSERT INTO runs (started, status) VALUES (?, 'running')", (_iso(now),))
+            cur = self.conn.execute(
+                "INSERT INTO runs (started, status, run_limit, started_by) VALUES (?, 'running', ?, ?)",
+                (_iso(now), run_limit, started_by),
+            )
         return int(cur.lastrowid)
 
     def finish_run(self, run_id: int, now: datetime, *, status: str, analyzed: int, new_items: int, api_calls: int,
-                   report_path: str | None = None, error: str | None = None) -> None:  # fmt: skip
+                   report_path: str | None = None, error: str | None = None,
+                   resume_after: datetime | None = None) -> None:  # fmt: skip
         with self.conn:
             self.conn.execute(
-                "UPDATE runs SET finished=?, status=?, analyzed=?, new_items=?, api_calls=?, report_path=?, error=? WHERE id=?",
-                (_iso(now), status, analyzed, new_items, api_calls, report_path, error, run_id),
+                """UPDATE runs SET finished=?, status=?, analyzed=?, new_items=?, api_calls=?, report_path=?, error=?,
+                   resume_after=? WHERE id=?""",
+                (_iso(now), status, analyzed, new_items, api_calls, report_path, error,
+                 _iso(resume_after) if resume_after else None, run_id),
+            )  # fmt: skip
+
+    def update_progress(self, run_id: int, analyzed: int) -> None:
+        """Saved as the run goes, so a run that's cut off still counts toward today's budget."""
+        with self.conn:
+            self.conn.execute("UPDATE runs SET analyzed=? WHERE id=?", (analyzed, run_id))
+
+    def close_stale_runs(self, now: datetime) -> int:
+        """Mark runs still 'running' as stopped. Only call this while holding the run lock:
+        then no run is active, so these were cut off by a shutdown or a killed process."""
+        with self.conn:
+            cur = self.conn.execute(
+                "UPDATE runs SET status='partial', finished=?, error=? WHERE status='running'",
+                (_iso(now), "stopped before finishing (the computer shut down or the process was stopped)"),
+            )
+        return cur.rowcount
+
+    def runs_since(self, since: datetime) -> list[sqlite3.Row]:
+        """Runs started at or after ``since``, oldest first. Times are compared in UTC."""
+        rows = self.conn.execute("SELECT * FROM runs ORDER BY id").fetchall()
+        return [r for r in rows if datetime.fromisoformat(r["started"]) >= since]
+
+    def recent_runs(self, limit: int) -> list[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+
+    # ------------------------------------------------------------------ state
+
+    def get_state(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM state WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_state(self, key: str, value: str, now: datetime) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO state (key, value, updated) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated",
+                (key, value, _iso(now)),
+            )
+
+    # ------------------------------------------------------------------ search cursor
+
+    def slice_position(self, key: str) -> tuple[int, int, str | None]:
+        """(page to fetch next, times worked through, last used) for a repo-search slice."""
+        row = self.conn.execute("SELECT page, cycle, last_used FROM sweep WHERE slice_key=?", (key,)).fetchone()
+        return (row["page"], row["cycle"], row["last_used"]) if row else (1, 0, None)
+
+    def save_slice(self, key: str, *, page: int, cycle: int) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO sweep (slice_key, page, cycle) VALUES (?, ?, ?) ON CONFLICT(slice_key) DO UPDATE SET page=excluded.page, cycle=excluded.cycle",
+                (key, page, cycle),
+            )
+
+    def touch_slice(self, key: str, now: datetime) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO sweep (slice_key, last_used) VALUES (?, ?) ON CONFLICT(slice_key) DO UPDATE SET last_used=excluded.last_used",
+                (key, _iso(now)),
             )
 
     # ------------------------------------------------------------------ repos
@@ -164,12 +244,15 @@ class Store:
                 "UPDATE findings SET details=? WHERE run_id=? AND repo_key=?", (json.dumps(details), run_id, full_name.lower())
             )
 
-    def run_findings(self, run_id: int, min_score: float, limit: int) -> list[StoredFinding]:
+    def pending_findings(self, now: datetime, min_score: float, limit: int, max_age_days: int = PENDING_MAX_AGE_DAYS) -> list[StoredFinding]:
+        """Findings not reported yet: this run's, plus any left by a run that was cut off
+        before writing its report, or that didn't fit in an earlier report."""
         rows = self.conn.execute(
             """SELECT r.full_name, f.score, f.details, f.run_id FROM findings f JOIN repos r ON r.key = f.repo_key
-               WHERE f.run_id=? AND f.score >= ? AND r.status NOT IN ('ignored', 'done')
+               WHERE r.status = 'new' AND f.score >= ? AND f.created >= ?
+                 AND f.id = (SELECT MAX(id) FROM findings WHERE repo_key = f.repo_key)
                ORDER BY f.score DESC LIMIT ?""",
-            (run_id, min_score, limit),
+            (min_score, _iso(now - timedelta(days=max_age_days)), limit),
         ).fetchall()
         return [StoredFinding(r["full_name"], r["score"], json.loads(r["details"]), r["run_id"]) for r in rows]
 

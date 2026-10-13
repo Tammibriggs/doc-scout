@@ -3,6 +3,8 @@
 - Setup: ``init``, ``set``, ``profile``.
 - Daily use: ``run`` (find projects and write a report), ``done`` / ``ignore`` (hide a
   project from future reports), ``score`` (analyze one spec file or repo).
+- Running unattended: ``schedule install`` / ``uninstall`` / ``status``, ``status``, and
+  ``run --if-due``, which the schedule starts every 15 minutes.
 - Stage M0 checks: ``discover``, ``eval``, ``bench-llm``.
 """
 
@@ -12,6 +14,7 @@ import argparse
 import logging
 import os
 import random
+import signal
 import sys
 from pathlib import Path
 
@@ -39,17 +42,33 @@ def _cmd_init(cfg: Config, args: argparse.Namespace) -> int:
     _save_and_show(cfg, answers, path)
     print("\nEverything else uses a default. To change languages, project sizes or the model:")
     print('  docscout set --languages "python, go"     (see "Changing other settings" in the README)')
-    print("\nNext: docscout discover --sample 60 --csv sample.csv")
+    print("\nNext:")
+    print("  docscout run                 a first report now (about 10 minutes)")
+    print("  docscout schedule install    then it runs every day by itself")
     return 0
 
 
 def _cmd_set(cfg: Config, args: argparse.Namespace) -> int:
     from docscout import setup_wizard
+    from docscout.config import save_user_config
 
-    if not profile_overrides(args) and not llm_overrides(args):
+    notifications = {
+        key: value == "on"
+        for key, value in (("run_started", args.start_notification), ("run_finished", args.finish_notification))
+        if value is not None
+    }
+    if not profile_overrides(args) and not llm_overrides(args) and not notifications:
         print('Nothing to change. For example: docscout set --languages "python, go" --sizes small,medium', file=sys.stderr)
         return 2
-    _save_and_show(cfg, setup_wizard.answers_from_config(cfg), args.config or user_config_path())
+    path = args.config or user_config_path()
+    if notifications:
+        save_user_config(path, {"notifications": notifications}, header=setup_wizard.CONFIG_HEADER)
+        words = {"run_started": "when the daily run starts", "run_finished": "when it finishes"}
+        for key, on in notifications.items():
+            print(f"Notifications {words[key]}: {'on' if on else 'off'}.")
+        if not profile_overrides(args) and not llm_overrides(args):
+            return 0
+    _save_and_show(cfg, setup_wizard.answers_from_config(cfg), path)
     llm = cfg["llm"]
     if llm_overrides(args) and llm["provider"] == "ollama":
         installed = setup_wizard.list_ollama_models(llm["base_url"])
@@ -130,6 +149,19 @@ def store_path() -> Path:
     return data_dir() / "docscout.db"
 
 
+def lock_path() -> Path:
+    return data_dir() / "run.lock"
+
+
+def _stop_on_sigterm() -> None:
+    """The schedule stops a run with SIGTERM (e.g. at shutdown): end it like Ctrl+C, keeping its results."""
+
+    def handler(signum, frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, handler)
+
+
 def _github(cfg: Config):
     from docscout.github import GitHub
 
@@ -144,15 +176,23 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     from docscout.github import AuthError
     from docscout.health import utcnow
 
+    from docscout import lock
+
     sources = args.sources.split(",") if args.sources else list(cfg["discovery"]["sources"])
     if not cfg.github_token and "code_search" in sources:
         sources.remove("code_search")
+    _stop_on_sigterm()
+    if args.if_due:
+        return _run_if_due(cfg, sources)
     limit = args.limit or int(cfg["discovery"]["daily_repo_budget"])
     store = Store(store_path())
     try:
-        with _github(cfg) as gh:
+        with lock.hold(lock_path()), _github(cfg) as gh:
             print(f"Checking up to {limit} repos...", file=sys.stderr)
             result = pipeline.run(gh, cfg, store, utcnow(), limit=limit, sources=sources, progress=lambda m: print("  " + m, file=sys.stderr))
+    except lock.Busy:
+        print("DocScout is already running (probably the daily run). Try again when it's done; `docscout status` shows progress.", file=sys.stderr)
+        return 1
     except AuthError:
         print("GitHub rejected the token (it may have expired). Run `docscout init` to add a new one.", file=sys.stderr)
         return 1
@@ -168,6 +208,93 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
         print(f"Report with {len(result.findings)} new projects: {result.report_path}")
     else:
         print("Nothing new scored high enough for a report this time.")
+    return 0
+
+
+def _run_if_due(cfg: Config, sources: list[str]) -> int:
+    from docscout import daily, notify
+    from docscout.db import Store
+    from docscout.github import GitHub
+    from docscout.health import utcnow
+
+    store = Store(store_path())
+    try:
+        return daily.run_if_due(
+            cfg, store, lock_path=lock_path(), github=GitHub, notifier=notify.send, clock=utcnow, sources=sources
+        )
+    finally:
+        store.close()
+
+
+def _schedule_line(cfg: Config, args: argparse.Namespace) -> tuple[list[str], object | None]:
+    from docscout import scheduler
+
+    try:
+        sched = scheduler.for_this_os()
+    except scheduler.Unsupported as exc:
+        return [f"Daily runs: {exc}"], None
+    st = sched.status(scheduler.command(args.config))
+    if not st.installed:
+        lines = ["Daily runs: off. Turn them on with: docscout schedule install"]
+    elif st.running:
+        nxt = f" Next check: {st.next_check}." if st.next_check else ""
+        lines = [f"Daily runs: on. Every 15 minutes while you're logged in, DocScout checks whether today's run is due.{nxt}"]
+    else:
+        lines = ["Daily runs: installed, but not running."]
+    return lines + [f"  ⚠️  {p}" for p in st.problems], sched if st.installed else None
+
+
+def _cmd_status(cfg: Config, args: argparse.Namespace) -> int:
+    from docscout import daily, lock
+    from docscout.db import Store
+    from docscout.health import utcnow
+
+    lines, sched = _schedule_line(cfg, args)
+    print("\n".join(lines))
+    if not cfg.github_token:
+        print("  ⚠️  No GitHub token, so runs can't start. Add one with: docscout init")
+    store = Store(store_path())
+    try:
+        print()
+        print(daily.status_report(store, cfg, utcnow(), running=lock.is_held(lock_path()), scheduled=sched is not None))
+    finally:
+        store.close()
+    print(f"\nReports: {cfg.reports_dir} (latest.md is the newest)")
+    if sched is not None:
+        print(f"Log: {sched.log_hint()}")
+    return 0
+
+
+def _cmd_schedule(cfg: Config, args: argparse.Namespace) -> int:
+    from docscout import notify, scheduler
+
+    if args.action == "status":
+        return _cmd_status(cfg, args)
+    try:
+        sched = scheduler.for_this_os()
+        if args.action == "install":
+            messages = sched.install(scheduler.command(args.config), dry_run=args.dry_run)
+        else:
+            messages = sched.uninstall(dry_run=args.dry_run)
+    except scheduler.SchedulerError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print("\n".join(messages))
+    if args.action == "uninstall" or args.dry_run:
+        if args.action == "uninstall" and not args.dry_run:
+            print("DocScout won't run by itself any more. Your reports and history are kept.")
+        return 0
+    print(
+        "\nDocScout now checks every 15 minutes, while you're logged in, whether today's run is due.\n"
+        "- No manual starts: it also runs after a restart, and waits if you're offline.\n"
+        "- You'll get a notification when a run starts and when it finishes.\n"
+        "  Turn either off with: docscout set --start-notification off (or --finish-notification off)\n"
+        "- Check on it any time with: docscout status"
+    )
+    if not cfg.github_token:
+        print("\n⚠️  No GitHub token yet, so runs can't start. Add one with: docscout init")
+    if not notify.send("DocScout daily runs are on", "You'll see a notification like this when a run starts and when it finishes."):
+        print("\n⚠️  Couldn't show a desktop notification here (see the message above). Runs still work; check them with docscout status.")
     return 0
 
 
@@ -363,6 +490,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("set", help="change settings without questions, e.g. set --languages go")
     _add_profile_flags(p)
+    group = p.add_argument_group("notifications for the daily run")
+    group.add_argument("--start-notification", choices=["on", "off"], help="notify when the daily run starts")
+    group.add_argument("--finish-notification", choices=["on", "off"], help="notify when it finishes, with the report's location")
     p.set_defaults(func=_cmd_set)
 
     p = sub.add_parser("profile", help="show what DocScout is looking for, in plain words")
@@ -372,8 +502,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, help="repos to check this time (default: [discovery] daily_repo_budget)")
     p.add_argument("--sources", help="comma-separated sources (default: [discovery] sources)")
     p.add_argument("--no-llm", action="store_true", help="skip LLM reviews (the LLM is added in stage M2)")
+    p.add_argument("--if-due", action="store_true", help="only run if today's run is due (what the daily schedule uses)")
     _add_profile_flags(p)
     p.set_defaults(func=_cmd_run)
+
+    p = sub.add_parser("status", help="today's progress, the daily schedule and recent runs")
+    p.set_defaults(func=_cmd_status)
+
+    p = sub.add_parser("schedule", help="run DocScout every day by itself (Linux now; macOS and Windows later)")
+    p.add_argument("action", choices=["install", "uninstall", "status"])
+    p.add_argument("--dry-run", action="store_true", help="show what would change, without changing anything")
+    p.set_defaults(func=_cmd_schedule)
 
     p = sub.add_parser("done", help="mark a project as done; it won't be reported again")
     p.add_argument("repo", help="OWNER/REPO or a GitHub URL")
@@ -425,7 +564,21 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(cfg, args)
     except ConfigError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
+        if getattr(args, "if_due", False):  # nobody is watching the terminal: say so on screen
+            _alert_config_error(exc)
         return 2
+
+
+def _alert_config_error(exc: ConfigError) -> None:
+    from docscout import daily, notify
+    from docscout.db import Store
+    from docscout.health import utcnow
+
+    store = Store(store_path())
+    try:
+        daily.alert(store, notify.send, utcnow(), "config", "DocScout needs attention", f"Your settings have a problem, so the daily run can't start: {exc}")
+    finally:
+        store.close()
 
 
 def main_bg() -> int:

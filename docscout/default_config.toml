@@ -30,7 +30,7 @@ issue_keywords = ["openapi", "swagger", "endpoint"]   # added to [discovery] hel
 
 [discovery]
 daily_repo_budget = 60          # repos analyzed per day; `run --limit N` overrides it for one run
-slices_per_run = 4
+slices_per_run = 4              # repo-search slices worked on per run; each continues where it stopped
 recheck_after_days = 90
 sources = ["awesome_selfhosted", "repo_search", "help_requested"]   # add "code_search" to enable it
 seed_max_age_days = 7
@@ -41,7 +41,7 @@ issue_label_families = ['documentation,docs', '"help wanted","good first issue"'
 help_requested_keywords = ["api"]   # generic title keywords; each API type adds its own
 issue_label_denylist = ["bounty", "tier:", "points"]
 issue_title_denylist = ["dependency dashboard"]
-issue_lookback_days = 60        # first run only; later runs search since the last run
+issue_lookback_days = 60        # help requests updated within this many days
 
 [health]
 # Accepted star ranges come from [profile] project_sizes.
@@ -85,3 +85,9 @@ max_items = 10                  # new items per report
 dir = "~/Documents/DocScout/reports"
 still_open_count = 5
 dry_pool_warning_days = 7
+
+[notifications]
+# Desktop notifications for the daily run (`docscout schedule install`). Problems that need
+# you, such as an expired GitHub token or repeated failures, are always shown.
+run_started = true              # "DocScout is checking projects; your computer may be slower for about N minutes"
+run_finished = true             # when it's done: how many new projects, and where the report is

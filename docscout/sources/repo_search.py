@@ -2,18 +2,32 @@
 
 A slice is one configured query in one star band. Slicing keeps every query under
 GitHub's 1000-result cap, and lets a daily run work through a few slices at a time.
+
+Daily runs use :func:`sweep`: a cursor remembers which page each slice reached, so
+day after day the search moves on through the results instead of repeating page 1.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from typing import Protocol
 
 from docscout.github import GitHub
-from docscout.sources import Candidate
+from docscout.sources import Candidate, interleave
 
 SOURCE = "repo_search"
+PER_PAGE = 100
+MAX_RESULTS = 1000  # GitHub returns at most this many results per query
+
+
+class Cursor(Protocol):
+    """Where each slice stopped; :class:`docscout.db.Store` provides it."""
+
+    def slice_position(self, key: str) -> tuple[int, int, str | None]: ...
+    def save_slice(self, key: str, *, page: int, cycle: int) -> None: ...
+    def touch_slice(self, key: str, now: datetime) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -53,3 +67,35 @@ def fetch_slice(
             yield Candidate(full_name=item["full_name"], source=SOURCE, meta=item)
         if not items or page * 100 >= min(total, 1000):
             return
+
+
+def sweep(
+    gh: GitHub, slices: list[Slice], cursor: Cursor, *, per_run: int, pushed_within_days: int, today: date, now: datetime
+) -> Iterator[Candidate]:
+    """Candidates from the ``per_run`` least recently used slices, taking turns between them.
+
+    Each slice continues from the page where it stopped. A page counts as done once all
+    of it has been handed out (repos already checked are skipped later at no cost), and
+    after the last page the slice starts again from page 1.
+    """
+    positions = {s.key: cursor.slice_position(s.key) for s in slices}
+    chosen = sorted(slices, key=lambda s: (positions[s.key][2] or "", s.key))[: max(1, per_run)]
+    for s in chosen:
+        cursor.touch_slice(s.key, now)
+    since = today - timedelta(days=pushed_within_days)
+    yield from interleave(_walk(gh, s, positions[s.key], cursor, since) for s in chosen)
+
+
+def _walk(gh: GitHub, slice_: Slice, position: tuple[int, int, str | None], cursor: Cursor, since: date) -> Iterator[Candidate]:
+    page, cycle, _ = position
+    query = slice_.search_query(since)
+    while True:
+        # Sorted by stars, which change slowly, so pages stay stable from one day to the next.
+        total, items = gh.search_repos(query, page=page, per_page=PER_PAGE, sort="stars")
+        for item in items:
+            yield Candidate(full_name=item["full_name"], source=SOURCE, meta=item)
+        if not items or page * PER_PAGE >= min(total, MAX_RESULTS):
+            cursor.save_slice(slice_.key, page=1, cycle=cycle + 1)
+            return
+        page += 1
+        cursor.save_slice(slice_.key, page=page, cycle=cycle)

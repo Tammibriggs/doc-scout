@@ -79,12 +79,23 @@ def test_store_skips_handled_and_recent_repos(store, now):
         store.save_repo("org/c", now, **{"status = 'done' --": 1})
 
 
-def test_database_upgrades_from_an_empty_file(tmp_path):
+def test_database_upgrades_keep_earlier_history(tmp_path, now):
+    import sqlite3
+
+    from docscout.db import MIGRATIONS
+
     path = tmp_path / "old.db"
-    Store(path).close()
-    again = Store(path)
-    assert again.conn.execute("PRAGMA user_version").fetchone()[0] == 1
-    again.close()
+    old = sqlite3.connect(path)  # a database from before the daily schedule existed
+    old.executescript(MIGRATIONS[0])
+    old.execute("PRAGMA user_version = 1")
+    old.execute("INSERT INTO runs (started, status, analyzed) VALUES ('2026-10-12T09:00:00+00:00', 'ok', 12)")
+    old.commit()
+    old.close()
+    store = Store(path)
+    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    run = store.recent_runs(1)[0]
+    assert (run["analyzed"], run["started_by"], run["run_limit"]) == (12, "you", None)
+    store.close()
 
 
 # ---------------------------------------------------------------------- full run
@@ -124,7 +135,7 @@ class RunGitHub(FakeGitHub):
 
 
 def fake_sources(*names):
-    def source(name, gh, cfg, rng, today, api_types, policy=None):
+    def source(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):
         for full_name in names:
             yield Candidate(full_name, name, dict(GOOD_REPO, full_name=full_name, description="Self-hosted uptime app with a REST API"))
 
@@ -192,7 +203,7 @@ def test_rate_limit_keeps_results_and_auth_failure_is_raised(cfg, store, now, mo
 
 
 def test_limit_counts_only_repos_that_cost_api_calls(cfg, store, now, monkeypatch):
-    def source(name, gh, cfg, rng, today, api_types, policy=None):
+    def source(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):
         yield Candidate("org/gen", name, dict(GOOD_REPO, description="OpenAPI code generator and validator SDK", topics=["codegen"]))
         yield Candidate("org/spec-app", name, dict(GOOD_REPO, full_name="org/spec-app"))
 
@@ -214,7 +225,7 @@ def test_rejections_that_cost_api_calls_count_toward_the_limit(cfg, store, now, 
         def list_commits(self, name, since):
             return [{"author": {"login": "only-me"}, "commit": {"author": {"email": "me@x"}}, "sha": "a" * 40}]
 
-    def source(name, gh, cfg, rng, today, api_types, policy=None):
+    def source(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):
         yield Candidate("org/huge", name, {"full_name": "org/huge", "stargazers_count": 90000})  # free
         yield Candidate("org/solo", name, dict(GOOD_REPO, full_name="org/solo"))  # costs calls, then rejected
         yield Candidate("org/never", name, dict(GOOD_REPO, full_name="org/never"))
@@ -256,7 +267,7 @@ def test_checks_quote_requirements_and_ignore_unrelated_ai_mentions():
 def test_a_failing_source_is_skipped_and_noted(cfg, store, now, monkeypatch):
     from docscout.sources import SourceUnavailable
 
-    def source(name, gh, cfg, rng, today, api_types, policy=None):
+    def source(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):
         if name == "awesome_selfhosted":
             raise SourceUnavailable("couldn't download the curated list")
             yield  # pragma: no cover

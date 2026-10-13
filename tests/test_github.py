@@ -96,7 +96,7 @@ def test_code_search_requires_token():
 def test_short_lived_404_after_repo_fetch_is_retried_once():
     # Seen live: /pulls returned 404 once for a repo that had just been fetched fine.
     responses = iter([httpx.Response(404, json={"message": "Not Found"}), httpx.Response(200, json=[{"number": 1}])])
-    gh, clock = client(lambda req: next(responses))
+    gh, clock = client(lambda req: next(responses), token=None)  # without a token, PR lists come from REST
     assert gh.list_closed_pulls("a/b") == [{"number": 1}]
     assert 2 in clock.slept
 
@@ -110,7 +110,7 @@ def test_lasting_404_still_raises_and_plain_lookups_are_not_retried():
         calls.append(req.url.path)
         return httpx.Response(404, json={"message": "Not Found"})
 
-    gh, _ = client(handler)
+    gh, _ = client(handler, token=None)
     with pytest.raises(NotFound):
         gh.list_commits("a/b", "2026-01-01T00:00:00Z")
     assert len(calls) == 2
@@ -118,3 +118,104 @@ def test_lasting_404_still_raises_and_plain_lookups_are_not_retried():
     with pytest.raises(NotFound):
         gh.get_repo("a/gone")
     assert len(calls) == 1
+
+
+# ---------------------------------------------------------------------- GraphQL (with a token)
+
+
+def graphql_handler(answers, seen):
+    import json
+
+    def handler(req):
+        assert req.url.path == "/graphql" and req.method == "POST"
+        body = json.loads(req.content)
+        seen.append(body["variables"])
+        return next(answers)
+
+    return handler
+
+
+def test_pr_and_commit_lists_use_small_graphql_answers_in_the_rest_shape():
+    pr = {"number": 7, "title": "docs: endpoints", "headRefName": "docs-api", "createdAt": "2026-10-01T00:00:00Z",
+          "closedAt": "2026-10-02T00:00:00Z", "mergedAt": "2026-10-02T00:00:00Z", "authorAssociation": "CONTRIBUTOR",
+          "author": {"login": "ana", "__typename": "User"}}  # fmt: skip
+    bot_pr = dict(pr, number=8, author={"login": "dependabot", "__typename": "Bot"})
+    commit = {"oid": "abc123", "author": {"email": "ana@example.com", "user": {"login": "ana"}}}
+    unlinked = {"oid": "def456", "author": {"email": "x@example.com", "user": None}}
+    answers = iter([
+        httpx.Response(200, json={"data": {"repository": {"pullRequests": {"nodes": [pr, bot_pr]}}}}),
+        httpx.Response(200, json={"data": {"repository": {"defaultBranchRef": {"target": {"history": {"nodes": [commit, unlinked]}}}}}}),
+        httpx.Response(200, json={"data": {"repository": {"defaultBranchRef": None}}}),
+    ])  # fmt: skip
+    seen = []
+    gh, _ = client(graphql_handler(answers, seen))
+    pulls = gh.list_closed_pulls("org/app")
+    assert pulls[0] == {"number": 7, "title": "docs: endpoints", "head": {"ref": "docs-api"}, "user": {"login": "ana", "type": "User"},
+                        "author_association": "CONTRIBUTOR", "created_at": "2026-10-01T00:00:00Z",
+                        "closed_at": "2026-10-02T00:00:00Z", "merged_at": "2026-10-02T00:00:00Z"}  # fmt: skip
+    assert pulls[1]["user"]["type"] == "Bot"
+    assert seen[0] == {"owner": "org", "name": "app", "states": ["CLOSED", "MERGED"], "after": None}
+    commits = gh.list_commits("org/app", "2026-07-01T00:00:00Z")
+    assert commits == [
+        {"sha": "abc123", "author": {"login": "ana"}, "commit": {"author": {"email": "ana@example.com"}}},
+        {"sha": "def456", "author": None, "commit": {"author": {"email": "x@example.com"}}},
+    ]
+    assert gh.list_commits("org/empty", "2026-07-01T00:00:00Z") == []  # empty repository
+    assert gh.calls["graphql"] == 3
+
+
+def test_graphql_not_found_is_retried_once_and_rate_limits_wait():
+    from docscout.github import NotFound
+
+    clock = FakeClock()
+    missing = httpx.Response(200, json={"data": {"repository": None}, "errors": [{"type": "NOT_FOUND", "message": "Could not resolve"}]})
+    limited = httpx.Response(200, headers={"X-RateLimit-Reset": str(int(clock.t) + 120)},
+                             json={"errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]})  # fmt: skip
+    found = httpx.Response(200, json={"data": {"repository": {"pullRequests": {"nodes": []}}}})
+    gh, _ = client(graphql_handler(iter([missing, limited, found]), []), clock=clock)
+    assert gh.list_open_pulls("org/app") == []
+    assert clock.slept[0] == 2 and 119 <= clock.slept[1] <= 122
+
+    gh, _ = client(graphql_handler(iter([missing, missing]), []))
+    with pytest.raises(NotFound):
+        gh.list_closed_pulls("org/gone")
+
+
+def test_a_second_page_of_prs_only_when_the_first_is_all_recent():
+    clock = FakeClock()  # 1970-01-12: PRs updated in 1970 are within 180 days
+    recent = {"number": 1, "updatedAt": "1970-01-10T00:00:00Z", "author": None}
+    old = {"number": 2, "updatedAt": "1960-01-01T00:00:00Z", "author": None}
+
+    def page(nodes, more):
+        return httpx.Response(200, json={"data": {"repository": {"pullRequests": {
+            "pageInfo": {"hasNextPage": more, "endCursor": "c1"}, "nodes": nodes}}}})  # fmt: skip
+
+    seen = []
+    gh, _ = client(graphql_handler(iter([page([recent], True), page([old], True)]), seen), clock=clock)
+    assert [p["number"] for p in gh.list_closed_pulls("org/app")] == [1, 2]
+    assert [v["after"] for v in seen] == [None, "c1"]  # stops after 2 pages even if there are more
+
+    seen.clear()
+    gh, _ = client(graphql_handler(iter([page([old], True)]), seen), clock=clock)
+    assert [p["number"] for p in gh.list_closed_pulls("org/app")] == [2] and len(seen) == 1
+
+
+def test_issue_search_and_owner_repos_come_from_graphql_with_only_the_fields_used():
+    from docscout.sources import help_requested
+
+    issue = {"number": 12, "title": "Document the API", "url": "https://github.com/org/app/issues/12", "authorAssociation": "NONE",
+             "author": {"login": "ana", "__typename": "User"}, "labels": {"nodes": [{"name": "docs"}]},
+             "repository": {"nameWithOwner": "org/app"}}  # fmt: skip
+    answers = iter([
+        httpx.Response(200, json={"data": {"search": {"issueCount": 1, "nodes": [issue, {}]}}}),  # {} = a pull request
+        httpx.Response(200, json={"data": {"repositoryOwner": {"repositories": {"nodes": [
+            {"nameWithOwner": "org/app-docs", "isArchived": False}, {"nameWithOwner": "org/old", "isArchived": True}]}}}}),
+    ])  # fmt: skip
+    seen = []
+    gh, _ = client(graphql_handler(answers, seen))
+    found = list(help_requested.fetch(gh, ["is:issue label:docs api in:title"], label_denylist=[], title_denylist=[]))
+    assert [(c.full_name, c.issues[0]["html_url"], c.issues[0]["labels"]) for c in found] == [
+        ("org/app", "https://github.com/org/app/issues/12", ["docs"])
+    ]
+    assert seen[0] == {"q": "is:issue label:docs api in:title sort:updated-desc", "first": 50}
+    assert gh.list_owner_repos("org") == [{"full_name": "org/app-docs", "archived": False}, {"full_name": "org/old", "archived": True}]

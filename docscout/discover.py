@@ -27,7 +27,7 @@ from docscout.apitypes import ApiType
 from docscout.classify import Classification, classify
 from docscout.config import Config, data_dir
 from docscout.github import AuthError, GitHub, GitHubError, NotFound, RateLimited
-from docscout.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats, star_range_reason
+from docscout.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats, star_range_reason, utcnow
 from docscout.profile import LanguagePolicy, language_policy
 from docscout.sources import Candidate, awesome_selfhosted, code_search, help_requested, repo_search
 
@@ -166,8 +166,14 @@ def source_candidates(
     today: date,
     api_types: list[ApiType],
     policy: LanguagePolicy | None = None,
+    cursor: repo_search.Cursor | None = None,
+    now: datetime | None = None,
 ) -> Iterator[Candidate]:
-    """Candidates from one source, in a shuffled order suitable for sampling."""
+    """Candidates from one source, in a shuffled order suitable for sampling.
+
+    With a ``cursor`` (daily runs), repo search works through its slices page by page
+    across days instead of sampling page 1.
+    """
     disc = cfg["discovery"]
     # Required languages narrow the searches themselves; code search can't (its language: means file language).
     qualifiers = policy.search_qualifiers() if policy else ""
@@ -177,6 +183,17 @@ def source_candidates(
         yield from seed
     elif name == repo_search.SOURCE:
         slices = repo_search.all_slices(apitypes.repo_queries(api_types), disc["star_bands"], qualifiers)
+        if cursor is not None:
+            yield from repo_search.sweep(
+                gh,
+                slices,
+                cursor,
+                per_run=int(disc["slices_per_run"]),
+                pushed_within_days=cfg["health"]["pushed_within_days"],
+                today=today,
+                now=now or utcnow(),
+            )
+            return
         rng.shuffle(slices)
         for slice_ in slices:
             page = list(

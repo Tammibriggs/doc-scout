@@ -12,9 +12,9 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 |---|---|---|---|
 | **M0. Prove discovery** | ✅ Done (13 Oct). Accuracy check passed, and the local LLM works (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
 | **M1. Useful manual report** | ✅ Done on branch `m1-report` (Mon 12 Oct, ahead of schedule): OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run`, `ignore`, `done`, `score`. ⏳ Exit check: you'd act on at least 3 of the top 10 in a real report | ✅ Also done: claim check (open docs PRs, "I'll take this"); CLA, DCO and AI-policy notes; local-setup note | Tue 13 – Thu 15 Oct |
-| **M3. Daily runs on Linux** | `run --if-due`, file lock, offline check and resume, a cursor through the search slices, a 401 alert, `schedule install/uninstall/status` for systemd; **notifications when the day's run starts** ("DocScout is checking projects; your computer may be slower for about 10 minutes") **and when it finishes** (with the report path), each can be turned off | Quiet-day rules; "pool running dry" warning | Fri 16 Oct |
+| **M3. Daily runs on Linux** | ✅ Built on branch `m3-daily` (Tue 13 Oct, three days early): `run --if-due`, file lock, offline check and resume, a cursor through the search slices, token, settings and repeated-failure alerts, `schedule install/uninstall/status` for systemd, `status`; **notifications when the day's run starts** ("your computer may be slower for about N minutes", estimated from earlier runs) **and when it finishes** (with the report path), each turned off with `docscout set`. Also: GitHub lists fetched through GraphQL, so a run downloads far less (section 5). ⏳ Exit check: the unattended test | ✅ Also done: quiet-day rules; "pool running dry" notification | Fri 16 Oct |
 | **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap, so borderline repos (0.4–0.6) are reported only when the LLM confirms them; when the LLM is unavailable, "LLM review skipped" plus the fix; **a memory check before loading the local model**, so a daily run on a busy laptop skips the LLM instead of swapping | Measuring the LLM against your labels | Sat 17 Oct |
-| Unattended test | Runs Fri 16 → Mon 19 in the background: no manual starts, survives a reboot and going offline | | Fri 16 – Mon 19 Oct |
+| Unattended test | Starts when you run `docscout schedule install` (possible from Tue 13, so up to 6 days instead of 3): no manual starts, survives a reboot and going offline. M2 is built in a separate worktree, so the daily runs keep using the M3 code | | Tue 13 – Mon 19 Oct |
 | Polish | README, demo report, a real contribution made with it | | Sun 18 Oct |
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
@@ -27,7 +27,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 - the secrets file is created private on Unix, and the permission call is skipped on Windows;
 - the windowless `docscout-bg` entry point exists.
 
-M3 builds scheduling behind a small per-OS interface (`scheduler/linux.py`), so M5 only adds `macos.py` and `windows.py`. Their exact settings are already worked out (section 10).
+M3 builds scheduling behind a small per-OS interface (`scheduler/linux.py`), so M5 only adds `macos.py` and `windows.py`. Their exact settings are already worked out (section 14).
 
 **How work is saved:** `main` holds finished work. Each stage gets its own branch (`m1-report`, `m2-llm`, …), merged into `main` when its exit check passes. There's a commit at each key stage, always with tests passing, and never with secrets or local samples.
 
@@ -71,7 +71,7 @@ All three sources are above 50%, so all stay on.
 |---|---|---|
 | Reported items that really serve an API **and** have a real docs gap | ≥ 70% | M0 (classifier), M1 (gaps) |
 | Items per weekly report you'd actually act on | ≥ 5 | M1 |
-| Daily run time without the LLM, on your laptop | ≤ 10 min | M1 |
+| Daily run time without the LLM, on your laptop | ≤ 10 min. Measured 13 Oct: 10 repos took 11 min and 6.6 MB before the GraphQL change, then **2 min 45 s and 1.1 MB**, so about 10–12 min for 60 on this connection | M1, M3 |
 | Manual starts needed | 0, including after reboots, sleep and offline days | M3 (Linux), M5 (macOS and Windows; also on battery) |
 | Silent failures | 0. An expired token or repeated failures always cause a notification | M3 |
 | Setup | At most 3 questions; usually 1–2 | ✅ M0 |
@@ -81,7 +81,7 @@ All three sources are above 50%, so all stay on.
 
 - **Platform and output:**
   - GitHub only; Hacktoberfest isn't part of the scoring.
-  - Output is a Markdown report plus a desktop notification, with a new dated file per run. Days with nothing new stay quiet.
+  - Output is a Markdown report plus desktop notifications, with a new dated file per run. Days with nothing new write no file; the finish notification just says "Nothing new today" (and can be turned off).
   - Cross-platform: Linux by the deadline, macOS and Windows after it.
 - **Independent of language and framework.**
   - Checks follow open standards (OpenAPI now; GraphQL, `.proto` and AsyncAPI later) or plain-text signals.
@@ -95,9 +95,10 @@ All three sources are above 50%, so all stay on.
   - Everything else has a default; `docscout set` changes it.
   - `daily_repo_budget` is configurable (default 60).
 - **Languages:** REST *prefers* your languages (ranked higher); library/SDK docs will *require* them. A profile can force either.
-- **Process:** commits at key stages; a branch per stage.
+- **GitHub lists come from GraphQL when there's a token** (pull requests, commits, issue search, an owner's repos), asking only for the fields DocScout reads. REST stays as the fallback without a token.
+- **Process:** commits at key stages; a branch per stage; [CLAUDE.md](../CLAUDE.md) keeps this plan updated with every important change.
 
-## 5. What real data showed (checked live, 11–12 October)
+## 5. What real data showed (checked live, 11–13 October)
 
 | Source or query | Result | What this means |
 |---|---|---|
@@ -115,6 +116,11 @@ All three sources are above 50%, so all stay on.
 | macOS `StartInterval` | Skips runs missed during sleep | Use `StartCalendarInterval` (M5) |
 | Windows Task Scheduler | Won't start on battery by default | Set the battery flags explicitly (M5) |
 | `pythonw` / gui-scripts | `sys.stderr` is None; child processes flash a console window | `main_bg` logs to a file; subprocesses use `CREATE_NO_WINDOW` (M5) |
+| REST closed-PR list, per repo (13 Oct) | **1.5–1.9 MB**, 35–65 s on this connection: about 19 KB of JSON per pull request | Ask GraphQL for only the fields used: about 30 KB per repo |
+| GraphQL, 100 PRs at once vs 50 | 12–28 s vs usually 1–5 s | Pages of 50; a second page only when the first doesn't reach back 180 days |
+| REST issue search, 100 results | 230–630 KB per search (each issue's full text); 8 searches took 440 of the 646 s of a 10-repo run | GraphQL search, 50 results, fields used only. Checked: the same matches and the same first 50 |
+| GitHub search on this connection | 9–17 s per issue search either way | Search time is GitHub's, not bandwidth; fewer bytes still help on a slow link |
+| systemd user session | Has the desktop bus address; a notification sent from a systemd unit appeared on screen | Notifications work from scheduled runs |
 
 ## 6. How it fits together
 
@@ -313,26 +319,31 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 Score: gap 72 × health 0.90 × type 0.95 + bonus 10
 ```
 
-**Quiet days:**
-- Earlier items still open are re-checked.
-- If there's still nothing new, no file is written and no notification sent; `docscout status` shows why.
-- After 7 empty days, one "pool running dry" notification.
+**Quiet days ✅:**
+- Nothing new: no file is written. With finish notifications on, it says "Nothing new today"; `docscout status` shows the day's runs.
+- Earlier items still open appear under "Still open from earlier" in the next report. Re-checking them for changes (someone else fixed the docs, a PR was merged) is in section 19.
+- After 7 days in a row with nothing new, one notification suggests a wider search (`docscout set --sizes …`).
+- Findings that didn't fit in a report (`max_items`), or whose run was cut off before writing it, go into the next report for up to 14 days.
 
-**Failure alerts:** an expired token (401) or 3 failed runs in a row send a "DocScout needs attention" notification.
+**Problem alerts ✅:** no token, a rejected token (401), broken settings, or 3 failed runs in a row send a "DocScout needs attention" notification, at most once a day each. These can't be turned off.
 
 ## 14. Running unattended
 
 | Situation | Behavior |
 |---|---|
-| Every 15 minutes | `run --if-due` exits in under 1 second unless a run is due **and** the machine is online |
-| Online check | `GET /rate_limit`. It doesn't count against the API quota |
-| Offline | Logs it and exits; the run stays due and starts at most 15 minutes after reconnecting |
-| Interrupted | Each repo or slice is saved as it finishes; the next trigger resumes |
-| Rate limited | Waits for the reset time; if that's more than 15 minutes, stops and resumes later |
-| LLM unavailable | The report uses code-based results and says "LLM review skipped" |
+| Every 15 minutes | `run --if-due` exits in under 1 second unless a run is due **and** the machine is online ✅ |
+| When a run is due | Today's runs (yours and scheduled ones) have checked fewer than `daily_repo_budget` repos, and no scheduled run today ran out of candidates. "Today" is your local day ✅ |
+| Online check | One `GET /rate_limit` with a 10 s timeout and no retries; free. A 401 sends an alert instead of starting a run ✅ |
+| Offline | Logs it and exits; the run stays due and starts at most 15 minutes after reconnecting ✅ |
+| Connection lost mid-run | The run stops as "partial" without marking the remaining repos as checked; the next check continues it ✅ |
+| Shut down or killed mid-run | Progress and findings are saved as they happen and the OS releases the lock. The next check marks the run "cut off", continues it, and reports its findings ✅. SIGTERM (shutdown) ends a run like Ctrl+C |
+| Rate limited | Waits for the reset time; if that's more than 15 minutes, stops and continues after the reset ✅ |
+| Failed run | The next try waits an hour; at most 8 scheduled runs a day ✅ |
+| Another run in progress | The file lock makes the new one exit quietly; a manual `docscout run` says so ✅ |
+| LLM unavailable | The report uses code-based results and says "LLM review skipped" (M2) |
 
 `docscout schedule install|uninstall|status [--dry-run]`:
-- **Linux (M3, by the deadline):** a systemd user service and timer: `OnStartupSec=2min`, `OnCalendar=*:0/15`, `Persistent=true`, `Nice=10`.
+- **Linux (M3) ✅:** a systemd user service and timer in `~/.config/systemd/user/`: `OnStartupSec=2min`, `OnCalendar=*:0/15`, `Persistent=true`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=2h`. It starts this installation's Python with `-m docscout run --if-due`, and runs while you're logged in (no lingering, since notifications need your desktop session). `schedule status` warns when the timer is stopped, when the Python it starts no longer exists, or when the last check failed; `install` sends a test notification.
 - **macOS (M5, after the deadline):** a LaunchAgent with `RunAtLoad` plus `StartCalendarInterval` at minutes 0/15/30/45, so runs missed during sleep happen on wake. Loaded with `launchctl bootstrap gui/<uid>`, with absolute paths.
 - **Windows (M5, after the deadline):** Task Scheduler XML with one repeating 15-minute `TimeTrigger`, plus:
   - `StartWhenAvailable=true`;
@@ -341,14 +352,16 @@ Score: gap 72 × health 0.90 × type 0.95 + bonus 10
 
   It runs the windowless `docscout-bg` entry point, and every subprocess uses `CREATE_NO_WINDOW`.
 
-## 15. Data model (M1: SQLite, versioned with `PRAGMA user_version`)
+## 15. Data model (SQLite, versioned with `PRAGMA user_version`; version 2 since M3)
 
-- `repos(full_name PK, source, stars, language, language_match, license, pushed_at, head_sha, api_type, type_conf, status[new|reported|ignored|done], ignore_reason, first_seen, last_checked, next_check)`
-- `findings(repo, run_id, api_type, kind, gap, health, score, effort, flags_json, details_json)`
-- `pr_stats(repo PK, outsider_merged_180d, merge_rate, median_ttm_days, docs_prs_merged, committers_90d, fetched_at)`
-- `issues(url PK, repo, number, title, labels, outreach, author_assoc, claimed, state, first_seen, last_checked)`
-- `queue(repo PK, priority, source, enqueued_at)`, `sweep_cursor(slice_key PK, page, cycle, done_at)` and `seed_meta(source PK, fetched_at)`
-- `runs(id, started, finished, status[ok|offline|partial|empty|failed], analyzed, new_items, api_calls, error)` and `llm_reviews(repo, provider, model, seconds, review_json, created)`
+As built ✅:
+- `repos(key PK, full_name, source, stars, language, api_type, type_conf, health, rejected, status[new|reported|ignored|done], status_reason, first_seen, last_checked, last_reported)`
+- `findings(id, run_id, repo_key, api_type, kind, gap, score, effort, details JSON, created)`: the PR stats, issues and before-you-start checks live in `details`
+- `runs(id, started, finished, status[running|ok|empty|partial|failed], analyzed, new_items, api_calls, report_path, error, run_limit, started_by[you|schedule], resume_after)`: `analyzed` is saved as the run goes
+- `sweep(slice_key PK, page, cycle, last_used)`: the repo-search cursor
+- `state(key PK, value, updated)`: the last scheduled check, alerts sent today, failures in a row, days without anything new
+
+Planned: `llm_reviews(repo, provider, model, seconds, review_json, created)` (M2).
 
 ## 16. Code layout
 
@@ -357,16 +370,16 @@ Score: gap 72 × health 0.90 × type 0.95 + bonus 10
 hacktoberfest/
   pyproject.toml ✅  LICENSE ✅  README.md ✅  docs/PLAN.md ✅  .github/workflows/ci.yml (M5: 3 OS × py3.11, 3.13)
   docscout/
-    cli.py ✅          # init set profile discover eval bench-llm ✅ · run score ignore done status (M1) · schedule doctor (M3)
+    cli.py ✅          # init set profile discover eval bench-llm · run score ignore done · status schedule (M3) ✅
     config.py ✅  profile.py ✅  languages.py ✅  setup_wizard.py ✅  errors.py ✅  safe_yaml.py ✅
     github.py ✅  health.py ✅  classify.py ✅  evidence.py ✅  discover.py ✅  evaluate.py ✅  bench.py ✅
     apitypes/ base.py ✅ rest.py ✅          # + spec scoring for REST (M1); graphql.py, grpc.py, … (later)
     sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
     analyze/ tree.py ✅  gaps.py ✅  elsewhere.py ✅  checks.py ✅      apitypes/ openapi.py ✅  rest_prose.py ✅
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅
-    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅    lock.py · netcheck.py · notify.py · scheduler/linux.py (M3)
-    scheduler/macos.py · scheduler/windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 119 tests · fixtures/specs, fixtures/readmes ✅ · fixtures/labeled_repos.csv (after M0 check)
+    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅
+    scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
+  tests/ ✅ 153 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -382,7 +395,9 @@ hacktoberfest/
 | Wasted effort (already claimed, CLA, AI policy) | Claim check and requirement badges on the top 10 |
 | Prompt injection pushes a repo up the ranking | Confidence raise capped at 0.8; code-only gates; sanitized output |
 | A malicious repo targets your machine | Alias-free YAML, in-memory archives, fixed notification text, sanitized report, safe fetcher (M4) |
-| The token expires and runs fail silently | 401 alert; alert after 3 failed runs |
+| The token expires and runs fail silently | Alerts for a missing or rejected token, broken settings and 3 failed runs in a row ✅ |
+| A slow connection makes the daily run long (**seen** 13 Oct) | GraphQL lists with only the fields used ✅; low CPU and disk priority ✅; the start notification gives the expected time, learned from earlier runs ✅ |
+| Code changes while the daily runs use this folder (editable install) | M2 is built in a separate git worktree; this folder stays on tested code |
 | macOS/Windows scheduler quirks (**confirmed**) | Settings in section 14, `--dry-run` tests, a real test on both (M5) |
 
 ## 18. Verification per stage
@@ -402,13 +417,14 @@ hacktoberfest/
   - `provider = "none"` still gives a full report;
   - you rate at least 7 of 10 first steps as useful.
 - **M3:**
-  - offline: logs it, then runs once you reconnect;
-  - Ctrl+C resumes; `kill -9` doesn't leave runs blocked;
-  - an invalid token sends an alert;
-  - a quiet day writes no file;
-  - 3 days (Fri 16 – Mon 19) with no manual starts; 7 days after the deadline.
+  - ✅ offline: logs it, then runs once you reconnect; a connection lost mid-run pauses it without skipping repos;
+  - ✅ a cut-off run is continued and its findings reported; `kill -9` doesn't leave runs blocked (tested with a real killed process);
+  - ✅ a rejected or missing token sends one alert a day; 3 failures in a row send one;
+  - ✅ a quiet day writes no file; 7 quiet days send one hint;
+  - ✅ the units and a test notification work through this laptop's systemd user session;
+  - ⏳ the unattended test: from `schedule install` to Mon 19 with no manual starts, including a reboot and an offline period; 7 days after the deadline.
 - **M5:** a fresh `pipx` install on a Mac and a Windows machine works, including on battery and after sleep; CI is green on 3 operating systems.
 
 ## 19. Later (after M5)
 
-Pre-contribution message drafts; learning from merged or rejected PRs; running the LLM only when plugged in or idle; new API types (GraphQL, gRPC, AsyncAPI, OpenRPC, library/SDK docs via help requests); Up For Grabs as a seed; GitLab and Codeberg; a dashboard; Spectral lint; standalone executables.
+Re-checking still-open items for changes (docs fixed by someone else, a PR merged); pre-contribution message drafts; learning from merged or rejected PRs; running the LLM only when plugged in or idle; new API types (GraphQL, gRPC, AsyncAPI, OpenRPC, library/SDK docs via help requests); Up For Grabs as a seed; GitLab and Codeberg; a dashboard; Spectral lint; standalone executables.

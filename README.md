@@ -92,6 +92,39 @@ Repos are only checked again after 90 days (`[discovery] recheck_after_days`), a
 .venv/bin/docscout score owner/repo             # the full check, as it would appear in a report
 ```
 
+## Run it every day by itself (Linux)
+
+```bash
+.venv/bin/docscout schedule install   # once
+.venv/bin/docscout status             # any time: today's progress, the schedule and recent runs
+```
+
+After that you never start it yourself:
+- **Every 15 minutes while you're logged in,** DocScout checks whether today's run is due. If it isn't, it exits within a second.
+- **Once a day** it checks up to `daily_repo_budget` repos (60 by default) and writes a report. A notification says when it starts ("your computer may be slower for about N minutes") and when it finishes, with where the report is.
+- **After a restart,** the first check is 2 minutes after you log in.
+- **When you're offline,** it waits, and starts within 15 minutes of the connection coming back. If the connection drops during a run, the run pauses and continues later, without checking anything twice.
+- **If the computer shuts down mid-run,** the next check continues the run, and anything already found still goes into the report.
+- **Problems that need you** (no GitHub token, an expired token, three failed runs in a row, broken settings) always get a notification, at most once a day each.
+- **A week without anything new** gets one notification suggesting a wider search.
+- It runs at low priority, so the computer stays responsive.
+
+Running `docscout run` yourself counts toward the day: the scheduled run then only checks what's left of the day's budget. Only one run happens at a time.
+
+**To turn notifications off:**
+
+```bash
+.venv/bin/docscout set --start-notification off    # or --finish-notification off; "on" turns them back on
+```
+
+Problem notifications can't be turned off.
+
+**To stop daily runs:** `docscout schedule uninstall`. Your reports and history are kept. Add `--dry-run` to `install` or `uninstall` to see the changes without making them.
+
+**The log:** `journalctl --user -u docscout.service -n 50`.
+
+On macOS and Windows, daily runs come in a later version (stage M5). Until then, run `docscout run` yourself.
+
 ## Stage M0: check the tool finds the right projects
 
 ```bash

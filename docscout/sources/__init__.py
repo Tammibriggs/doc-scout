@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
+
 
 class SourceUnavailable(Exception):
     """A source can't provide candidates this run; the other sources carry on."""
@@ -33,3 +35,14 @@ def github_full_name(url: str | None) -> str | None:
         return None
     owner, repo = match.groups()
     return f"{owner}/{repo}"
+
+
+def interleave(streams: Iterable[Iterator[Any]]) -> Iterator[Any]:
+    """Round-robin over several iterators until all are exhausted."""
+    active = list(streams)
+    while active:
+        for stream in list(active):
+            try:
+                yield next(stream)
+            except StopIteration:
+                active.remove(stream)

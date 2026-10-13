@@ -78,7 +78,7 @@ def fetch(
     *,
     label_denylist: list[str],
     title_denylist: list[str],
-    max_pages: int = 2,
+    max_pages: int = 1,
 ) -> Iterator[Candidate]:
     """One candidate per repo, carrying every qualifying issue found for it."""
     by_repo: dict[str, Candidate] = {}

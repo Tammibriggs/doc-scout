@@ -2,7 +2,8 @@
 
 Sources take turns, starting with maintainers' help requests (the strongest signal).
 Repos already reported, marked done or ignored, or checked recently are skipped. Each
-analyzed repo is saved as soon as it's done, so an interrupted run loses nothing.
+analyzed repo is saved as soon as it's done, so an interrupted run loses nothing: the
+next run skips what was checked, and its report includes findings that weren't reported.
 """
 
 from __future__ import annotations
@@ -10,9 +11,9 @@ from __future__ import annotations
 import logging
 import random
 import time
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -31,34 +32,26 @@ from docscout.github import AuthError, GitHub, GitHubError, RateLimited
 from docscout.profile import language_policy, one_line
 from docscout.report import RunSummary, render, write
 from docscout.scoring import Score, opportunity_score
-from docscout.sources import SourceUnavailable, awesome_selfhosted
+from docscout.sources import SourceUnavailable, awesome_selfhosted, interleave
 
 log = logging.getLogger(__name__)
 
 SOURCE_ORDER = ("help_requested", "awesome_selfhosted", "repo_search", "code_search")
+# Problems that affect every source and repo alike, so the run stops instead of skipping one.
+STOP_RUN = (RateLimited, AuthError, httpx.TransportError)
+CONNECTION_LOST = "lost the internet connection; the next run continues where this one stopped"
 
 
 def guarded(name: str, stream: Iterator[Any], notes: list[str]) -> Iterator[Any]:
     """A source that fails is skipped for this run (with a note); the others carry on.
-    Rate limits and an expired token still stop the run, since they affect every source."""
+    Rate limits, an expired token and a lost connection still stop the run."""
     try:
         yield from stream
-    except (RateLimited, AuthError):
+    except STOP_RUN:
         raise
     except (SourceUnavailable, GitHubError, httpx.HTTPError) as exc:
         log.warning("skipping the %s source this run: %s", name, exc)
         notes.append(f"Skipped the {name} source this run: {exc}")
-
-
-def interleave(streams: Iterable[Iterator[Any]]) -> Iterator[Any]:
-    """Round-robin over several iterators until all are exhausted."""
-    active = list(streams)
-    while active:
-        for stream in list(active):
-            try:
-                yield next(stream)
-            except StopIteration:
-                active.remove(stream)
 
 
 @dataclass
@@ -120,14 +113,14 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
     return Analysis(gap, score, details)
 
 
-def before_you_start(gh: GitHub, run_id: int, store: Store, findings: list[StoredFinding]) -> None:
+def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding]) -> None:
     """Claim and requirement checks for reported items (about 2-3 API calls each)."""
     for finding in findings:
         d = finding.details
         checks = Checks(**d.get("checks", {}))
         paid_checks(gh, finding.full_name, checks, d.get("check_paths", {}), d.get("issues", []), d.get("head_sha"))
         d["checks"] = checks.as_dict()
-        store.update_details(run_id, finding.full_name, d)
+        store.update_details(finding.run_id, finding.full_name, d)
 
 
 @dataclass
@@ -137,7 +130,8 @@ class RunResult:
     findings: list[StoredFinding]
     still_open: list[StoredFinding]
     report_path: Path | None
-    status: str
+    status: str  # ok | empty | partial | failed
+    resume_after: datetime | None = None  # rate limited: when the next run can continue
 
 
 def run(
@@ -151,6 +145,7 @@ def run(
     rng: random.Random | None = None,
     progress: Callable[[str], None] = lambda message: None,
     clock: Callable[[], float] = time.monotonic,
+    started_by: str = "you",
 ) -> RunResult:
     types = apitypes.enabled_types(cfg["api_types"])
     by_key = {t.key: t for t in types}
@@ -158,12 +153,17 @@ def run(
     rng = rng or random.Random(now.strftime("%Y-%m-%d"))
     recheck = int(cfg["discovery"]["recheck_after_days"])
     ordered = [s for s in SOURCE_ORDER if s in sources] + [s for s in sources if s not in SOURCE_ORDER]
-    run_id = store.start_run(now)
+    run_id = store.start_run(now, run_limit=limit, started_by=started_by)
     summary = RunSummary()
-    streams = [guarded(name, source_candidates(name, gh, cfg, rng, now.date(), types, policy), summary.notes) for name in ordered]
+    streams = [
+        guarded(name, source_candidates(name, gh, cfg, rng, now.date(), types, policy, cursor=store, now=now), summary.notes)
+        for name in ordered
+    ]
     started = clock()
     status = "ok"
     auth_error: AuthError | None = None
+    offline = False
+    resume_after: datetime | None = None
     seen: set[str] = set()
     try:
         for cand in interleave(streams):
@@ -176,15 +176,17 @@ def run(
             summary.evaluated += 1
             try:
                 ev = evaluate(gh, cand, cfg, now, types, policy)
-            except (RateLimited, AuthError):
+            except STOP_RUN:
                 raise
             except (GitHubError, httpx.HTTPError) as exc:
                 log.warning("skipping %s: %s", cand.full_name, exc)
                 summary.analyzed += 1
                 store.save_repo(cand.full_name, now, source=cand.source, rejected=f"error: {exc}")
+                store.update_progress(run_id, summary.analyzed)
                 continue
             if ev.used_api:
                 summary.analyzed += 1
+                store.update_progress(run_id, summary.analyzed)
             store.save_repo(
                 cand.full_name,
                 now,
@@ -201,7 +203,7 @@ def run(
             summary.passed += 1
             try:
                 result = analyze(gh, ev, cfg, by_key)
-            except (RateLimited, AuthError):
+            except STOP_RUN:
                 raise
             except (GitHubError, httpx.HTTPError) as exc:
                 log.warning("couldn't analyze %s: %s", cand.full_name, exc)
@@ -223,13 +225,17 @@ def run(
             progress(f"{cand.full_name}: {result.gap.kind} gap {result.gap.score:.0f}, score {result.score.total:.0f}")
     except RateLimited as exc:
         status, summary.stopped_early = "partial", str(exc)
+        resume_after = now + timedelta(seconds=clock() - started + exc.wait_seconds)
     except AuthError as exc:
         status, summary.stopped_early, auth_error = "failed", str(exc), exc
+    except httpx.TransportError as exc:
+        log.warning("lost the connection to GitHub: %s", exc)
+        status, summary.stopped_early, offline = "partial", CONNECTION_LOST, True
     except KeyboardInterrupt:
-        status, summary.stopped_early = "partial", "interrupted (Ctrl+C)"
+        status, summary.stopped_early = "partial", "interrupted"
     except Exception as exc:  # keep what was found; the error is reported, not hidden
         log.exception("run stopped by an unexpected error")
-        status, summary.stopped_early = "partial", f"unexpected error: {exc!r}"
+        status, summary.stopped_early = "failed", f"unexpected error: {exc!r}"
 
     summary.api_calls = dict(gh.calls)
     summary.seconds = clock() - started
@@ -238,13 +244,14 @@ def run(
         if note:
             summary.notes.append(note)
     report_cfg = cfg["report"]
-    findings = store.run_findings(run_id, float(report_cfg["min_score"]), int(report_cfg["max_items"]))
-    if findings and cfg["checks"]["claim_and_policy"] and auth_error is None:
+    min_score, max_items = float(report_cfg["min_score"]), int(report_cfg["max_items"])
+    findings = store.pending_findings(now, min_score, max_items)
+    if findings and cfg["checks"]["claim_and_policy"] and auth_error is None and not offline:
         try:
-            before_you_start(gh, run_id, store, findings)
+            before_you_start(gh, store, findings)
         except Exception as exc:  # optional extras: never lose the report over them
             log.warning("skipped some before-you-start checks: %s", exc)
-        findings = store.run_findings(run_id, float(report_cfg["min_score"]), int(report_cfg["max_items"]))
+        findings = store.pending_findings(now, min_score, max_items)
     still_open = store.still_open(run_id, int(report_cfg["still_open_count"]))
     report_path = None
     if findings:
@@ -256,14 +263,15 @@ def run(
         status = "empty"
     store.finish_run(
         run_id,
-        now,
+        now + timedelta(seconds=clock() - started),
         status=status,
         analyzed=summary.analyzed,
         new_items=len(findings),
         api_calls=sum(summary.api_calls.values()),
         report_path=str(report_path) if report_path else None,
         error=summary.stopped_early,
+        resume_after=resume_after,
     )
     if auth_error is not None:
         raise auth_error
-    return RunResult(run_id, summary, findings, still_open, report_path, status)
+    return RunResult(run_id, summary, findings, still_open, report_path, status, resume_after)

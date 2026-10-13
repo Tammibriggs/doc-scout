@@ -60,7 +60,8 @@ min_outsider_merged_prs_180d = 0
 prefilter_below = 0.25          # skip repos whose metadata alone says "not an API" (saves API calls)
 llm_band = [0.4, 0.7]           # repos in this confidence band always get an LLM second opinion
 llm_raise_cap = 0.8             # the LLM may raise confidence up to this value, never higher
-drop_below = 0.4                # repos below this confidence are not reported
+min_confidence = 0.6            # repos at or above this count as serving an API (tuned on the labeled sample)
+drop_below = 0.4                # below this, never reported; between this and min_confidence only if the LLM confirms (M2)
 
 [llm]
 provider = "ollama"             # ollama | openai_compatible | none

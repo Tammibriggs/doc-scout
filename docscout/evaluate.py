@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import csv
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from docscout.discover import LABELS
 
@@ -45,28 +47,37 @@ def _add(score: Score, label: str, predicted_api: bool) -> None:
     score.correct_api += predicted_api and label == "serves_api"
 
 
+def read_rows(path: Path) -> list[dict[str, Any]]:
+    with open(path, newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
+
+
 def evaluate_csv(path: Path, thresholds: tuple[float, ...] = (0.5, 0.6, 0.7)) -> Report:
+    return evaluate_rows(read_rows(path), thresholds)
+
+
+def evaluate_rows(rows: Iterable[dict[str, Any]], thresholds: tuple[float, ...] = (0.5, 0.6, 0.7)) -> Report:
+    """Rows need: label, source, predicted_type, api_confidence (a spreadsheet may add extra columns)."""
     overall = Score()
     by_source: dict[str, Score] = defaultdict(Score)
     by_threshold = {t: Score() for t in thresholds}
     confusion: Counter[tuple[str, str]] = Counter()
     invalid: list[str] = []
-    with open(path, newline="", encoding="utf-8") as fh:
-        for row in csv.DictReader(fh):
-            label = (row.get("label") or "").strip().lower()
-            if not label:
-                continue
-            if label not in LABELS:
-                invalid.append(f"{row.get('full_name')}: {label!r}")
-                continue
-            predicted = row.get("predicted_type", "")
-            is_api = predicted == "serves_api"
-            _add(overall, label, is_api)
-            _add(by_source[row.get("source", "?")], label, is_api)
-            confusion[(label, predicted)] += 1
-            conf = float(row.get("api_confidence") or 0)
-            for t, score in by_threshold.items():
-                _add(score, label, conf >= t)
+    for row in rows:
+        label = (row.get("label") or "").strip().lower()
+        if not label:
+            continue
+        if label not in LABELS:
+            invalid.append(f"{row.get('full_name')}: {label!r}")
+            continue
+        predicted = row.get("predicted_type", "")
+        is_api = predicted == "serves_api"
+        _add(overall, label, is_api)
+        _add(by_source[row.get("source", "?")], label, is_api)
+        confusion[(label, predicted)] += 1
+        conf = float(row.get("api_confidence") or 0)
+        for t, score in by_threshold.items():
+            _add(score, label, conf >= t)
     return Report(overall, dict(by_source), confusion, by_threshold, invalid)
 
 

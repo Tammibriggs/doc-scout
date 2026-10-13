@@ -94,7 +94,7 @@ def evaluate(
     types = api_types if api_types is not None else apitypes.enabled_types(cfg["api_types"])
     policy = policy if policy is not None else language_policy(cfg["profile"], types)
     meta = cand.meta
-    stage1 = classify(meta, now=now, api_types=types, prior=cand.prior, issues=cand.issues)
+    stage1 = classify(meta, now=now, api_types=types, min_confidence=cfg["classify"]["min_confidence"], prior=cand.prior, issues=cand.issues)
     result = Evaluated(cand, meta, stage1)
     prefilter = cfg["classify"].get("prefilter_below", 0.25)
     if stage1.project_type == "spam":
@@ -118,7 +118,7 @@ def evaluate(
             result.rejected = "repo not found"
             return result
         result.repo = meta
-        result.classification = classify(meta, now=now, api_types=types, prior=cand.prior, issues=cand.issues)
+        result.classification = classify(meta, now=now, api_types=types, min_confidence=cfg["classify"]["min_confidence"], prior=cand.prior, issues=cand.issues)
         if result.classification.project_type == "spam":
             result.rejected = f"spam: {result.classification.reasons[0]}"
             return result
@@ -148,7 +148,7 @@ def evaluate(
 
     tree, _truncated = gh.get_tree(cand.full_name, meta.get("default_branch") or "HEAD")
     readme = gh.get_readme(cand.full_name)
-    result.classification = classify(meta, now=now, api_types=types, prior=cand.prior, tree=tree, readme=readme, issues=cand.issues)
+    result.classification = classify(meta, now=now, api_types=types, min_confidence=cfg["classify"]["min_confidence"], prior=cand.prior, tree=tree, readme=readme, issues=cand.issues)
     result.health = health_score(stats, has_contributing(tree))
     result.definition_paths = [f"{t.key}: {f.path}" for t in types for f in t.find_definitions(tree)[:3]]
     result.tree, result.readme = tree, readme
@@ -317,8 +317,9 @@ def _row(ev: Evaluated) -> dict[str, Any]:
 
 
 def write_sample(path: Path, rows: list[Evaluated]) -> None:
+    # Every field is quoted, so spreadsheets that also split on ";" keep the columns intact.
     with open(path, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=SAMPLE_COLUMNS)
+        writer = csv.DictWriter(fh, fieldnames=SAMPLE_COLUMNS, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         for ev in rows:
             writer.writerow(_row(ev))
@@ -326,7 +327,7 @@ def write_sample(path: Path, rows: list[Evaluated]) -> None:
 
 def write_rejected(path: Path, rows: list[Evaluated]) -> None:
     with open(path, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.writer(fh)
+        writer = csv.writer(fh, quoting=csv.QUOTE_ALL)
         writer.writerow(["full_name", "source", "rejected_because", "predicted_type", "api_confidence"])
         for ev in rows:
             writer.writerow(

@@ -112,7 +112,15 @@ Repos are only checked again after 90 days (`[discovery] recheck_after_days`), a
 .venv/bin/docscout bench-llm
 ```
 
-**Done when:** at least 70% of the repos the classifier calls `serves_api` really are. If a source is below 50%, remove it from `[discovery] sources`. The labeled CSV then becomes a regression test.
+**Done when:** at least 70% of the repos the classifier calls `serves_api` really are. If a source is below 50%, remove it from `[discovery] sources`.
+
+**After changing the classifier,** re-run it on labeled repos and compare:
+
+```bash
+.venv/bin/docscout eval tests/fixtures/labeled_repos.csv --reclassify
+```
+
+The first run fetches each repo's details and caches them in your data folder; later runs make no API calls. It prints the new accuracy and every prediction that changed ("now right", "now wrong" or "still wrong").
 
 ### Labeling guide
 

@@ -256,10 +256,31 @@ def _score_repo(cfg: Config, target: str) -> int:
 
 
 def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout.evaluate import TARGET_PRECISION, evaluate_csv, format_report
+    from docscout.evaluate import TARGET_PRECISION, evaluate_rows, format_report, read_rows
 
-    report = evaluate_csv(Path(args.csv))
-    print(format_report(report))
+    rows = read_rows(Path(args.csv))
+    report = evaluate_rows(rows)
+    if args.reclassify:
+        from docscout import apitypes
+        from docscout.health import utcnow
+        from docscout.reclassify import reclassify
+
+        before = report.overall.precision
+        types = apitypes.enabled_types(cfg["api_types"])
+        with _github(cfg) as gh:
+            rows, changed, missing = reclassify(rows, gh, data_dir() / "eval_cache.json", utcnow(), types, cfg["classify"]["min_confidence"])
+        report = evaluate_rows(rows)
+        print(f"Precision when sampled: {before:.0%}. With the current classifier:\n" if before is not None else "")
+        print(format_report(report))
+        if changed:
+            print(f"\nPredictions that changed ({len(changed)}):")
+            for c in changed:
+                verdict = "now right" if c.after == c.label else ("now wrong" if c.before == c.label else "still wrong")
+                print(f"  {c.full_name:<45} label {c.label:<12} {c.before} -> {c.after} ({c.confidence_after:.2f}) {verdict}")
+        for m in missing:
+            print(f"  couldn't fetch {m}")
+    else:
+        print(format_report(report))
     precision = report.overall.precision
     return 0 if precision is not None and precision >= TARGET_PRECISION else 1
 
@@ -374,6 +395,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("eval", help="measure classifier accuracy on a labeled sample CSV")
     p.add_argument("csv")
+    p.add_argument("--reclassify", action="store_true", help="re-run the current classifier on the labeled repos (data is cached after the first run)")
     p.set_defaults(func=_cmd_eval)
 
     p = sub.add_parser("bench-llm", help="measure LLM speed and memory on this machine")

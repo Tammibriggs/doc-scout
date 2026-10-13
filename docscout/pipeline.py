@@ -57,7 +57,8 @@ class Analysis:
 def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiType]) -> Analysis | None:
     """Docs gaps and score for a repo that passed the checks, or None if there's nothing to report."""
     api_type = types_by_key.get(ev.classification.api_type or "")
-    if api_type is None or ev.classification.api_confidence < cfg["classify"]["drop_below"]:
+    # Until the LLM can confirm borderline repos (stage M2), only confident ones are reported.
+    if api_type is None or ev.classification.api_confidence < cfg["classify"]["min_confidence"]:
         return None
     ctx = DocsContext(
         gh=gh,

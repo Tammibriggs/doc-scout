@@ -21,6 +21,10 @@ from docscout.evidence import build_signals, role_hits
 from docscout.health import parse_time
 
 NEUTRAL = 0.4
+# Confidence from which a repo counts as serving an API. On the 58 labeled repos (13 Oct), 0.6
+# gave 76% precision and 90% recall, against 69% and 94% at 0.5. Repos between the LLM band's
+# floor and this value need the LLM's confirmation to be reported (stage M2).
+MIN_CONFIDENCE = 0.6
 PROMO_WORDS = {"free", "fee", "fees", "best", "guide", "ultimate", "cheap", "unlimited", "premium", "earn", "giveaway"}
 YEAR = re.compile(r"\b20[2-3]\d\b")
 
@@ -58,6 +62,7 @@ def classify(
     tree: list[dict[str, Any]] | None = None,
     readme: str | None = None,
     issues: list[dict[str, Any]] | None = None,
+    min_confidence: float = MIN_CONFIDENCE,
 ) -> Classification:
     spam = is_spam(meta, now)
     if spam:
@@ -76,7 +81,7 @@ def classify(
     assert best is not None, "at least one API type must be enabled"
     confidence, api_type, reasons = best
 
-    if confidence >= 0.5:
+    if confidence >= min_confidence:
         project_type = "serves_api"
     else:
         hits = role_hits(signals)

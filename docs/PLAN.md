@@ -10,10 +10,10 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 
 | Stage | Must ship | If time allows | Dates |
 |---|---|---|---|
-| **M0. Prove discovery** | ✅ Code (commits `3d3e49e`…); ⏳ **your accuracy check** (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
+| **M0. Prove discovery** | ✅ Done (13 Oct). Accuracy check passed, and the local LLM works (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
 | **M1. Useful manual report** | ✅ Done on branch `m1-report` (Mon 12 Oct, ahead of schedule): OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run`, `ignore`, `done`, `score`. ⏳ Exit check: you'd act on at least 3 of the top 10 in a real report | ✅ Also done: claim check (open docs PRs, "I'll take this"); CLA, DCO and AI-policy notes; local-setup note | Tue 13 – Thu 15 Oct |
 | **M3. Daily runs on Linux** | `run --if-due`, file lock, offline check and resume, a cursor through the search slices, `notify-send`, a 401 alert, `schedule install/uninstall/status` for systemd | Quiet-day rules; "pool running dry" warning | Fri 16 Oct |
-| **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap; when the LLM is unavailable, "LLM review skipped" plus the fix | Measuring the LLM against your labels | Sat 17 Oct |
+| **M2. LLM layer** | First steps for the top candidates; second opinion for unclear types (0.4–0.7) with the 0.8 cap, so borderline repos (0.4–0.6) are reported only when the LLM confirms them; when the LLM is unavailable, "LLM review skipped" plus the fix; **a memory check before loading the local model**, so a daily run on a busy laptop skips the LLM instead of swapping | Measuring the LLM against your labels | Sat 17 Oct |
 | Unattended test | Runs Fri 16 → Mon 19 in the background: no manual starts, survives a reboot and going offline | | Fri 16 – Mon 19 Oct |
 | Polish | README, demo report, a real contribution made with it | | Sun 18 Oct |
 | **Deadline** | | | **Mon 19 Oct** |
@@ -31,16 +31,39 @@ M3 builds scheduling behind a small per-OS interface (`scheduler/linux.py`), so 
 
 **How work is saved:** `main` holds finished work. Each stage gets its own branch (`m1-report`, `m2-llm`, …), merged into `main` when its exit check passes. There's a commit at each key stage, always with tests passing, and never with secrets or local samples.
 
-## 2. The next step: the M0 accuracy check
+## 2. M0 results (13 October)
 
-This is the gate for everything after it. It answers two questions: does DocScout find real API projects (≥ 70% accuracy), and can your laptop run the local LLM?
-1. Create a GitHub token, then run `docscout init`.
-2. Run `docscout discover --sample 60 --csv sample.csv`.
-3. Label the `label` column.
-4. Run `docscout eval sample.csv`.
-5. Run `docscout bench-llm` with other apps closed.
+**Accuracy on 58 hand-labeled repos.** The labels are in `tests/fixtures/labeled_repos.csv`, and `docscout eval tests/fixtures/labeled_repos.csv --reclassify` repeats this check whenever the classifier changes, with the repo data cached after the first run.
 
-Detailed instructions are in the README's "Stage M0" section. **Result:** the accuracy per source and the LLM speed and memory figures. I then tune the classifier, switch off any source below 50%, and save the labeled CSV as a regression test.
+| | Precision | Recall |
+|---|---|---|
+| When sampled | 71% | 71% |
+| After the fixes below | **76%** | **90%** |
+
+| Source | Precision now |
+|---|---|
+| awesome_selfhosted | 68% |
+| help_requested | 77% |
+| repo_search | 100% |
+
+All three sources are above 50%, so all stay on.
+
+**What changed:**
+- **The spam rule** (more than 15 topics counted as spam only on new repos; spam re-checked after fetching full details). This recovered 7 real API apps that had been labeled spam.
+- **"specification" is no longer a tool word.**
+- **A repo counts as an API project from 0.6 confidence, not 0.5.** At 0.5 it was 69% precision and 94% recall.
+- **Rejected: requiring explicit API evidence.** It reached 72% precision but only 68% recall, because real API apps like 2FAuth and Squidex never mention their API in their description or README.
+
+**Remaining false positives** are apps without an API that look like apps with one (memories, sish, django-wiki, Zero-K). Telling them apart needs the README read, which is the LLM's second-opinion job in M2. Until M2, repos between 0.4 and 0.6 aren't reported.
+
+**LLM benchmark** (`gemma4:e2b`, other apps closed):
+- 44.8 s per review on average; the first took 51.2 s because it includes loading the model;
+- all 3 sample answers correct, each with 3 first steps;
+- lowest free memory 1.2 GB.
+
+**Decision:**
+- **Use the local model.** About 13 reviews fit in the 10-minute daily budget (600 s ÷ 44.8 s).
+- **Add a memory check before loading the model**, because a daily run on a laptop with other apps open (1.6 GB free on 12 Oct) would otherwise swap. That check is part of M2.
 
 ## 3. Success criteria
 
@@ -245,7 +268,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 - Ollama: JSON schema output, `think: false`, the model kept loaded during the batch, then unloaded.
 - Any OpenAI-compatible API, falling back to JSON mode if a provider doesn't support schemas.
 
-**M2 tuning:** `bench-llm` sets `max_candidates`. The labeled CSV checks the LLM's second opinions, and if it doesn't help, the prompt or model is tuned. The LLM stays on either way.
+**M2 tuning:** `bench-llm` sets `max_candidates` (about 13 on this laptop, at 44.8 s per review). The labeled CSV checks the LLM's second opinions, and if it doesn't help, the prompt or model is tuned. The LLM stays on either way.
 
 ## 12. Security
 

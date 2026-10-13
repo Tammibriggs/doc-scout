@@ -11,7 +11,21 @@ import json
 
 import httpx
 
-from docscout.llm.base import REVIEW_SCHEMA, LLMError, LLMUnavailable, RepoContext, Review, build_messages, parse_review
+from typing import Any
+
+from docscout.llm.base import (
+    DRAFT_SCHEMA,
+    REVIEW_SCHEMA,
+    Draft,
+    LLMError,
+    LLMUnavailable,
+    RepoContext,
+    Review,
+    build_draft_messages,
+    build_messages,
+    parse_draft,
+    parse_review,
+)
 
 
 class OpenAICompatClient:
@@ -38,20 +52,26 @@ class OpenAICompatClient:
         except httpx.HTTPError as exc:
             raise LLMError(f"cannot reach LLM provider: {exc}") from exc
 
-    def review(self, ctx: RepoContext, readme_chars: int = 1500) -> Review:
-        messages = build_messages(ctx, readme_chars)
+    def review(self, ctx: RepoContext, readme_chars: int = 1500, think: bool = False) -> Review:
+        # Hosted reasoning models decide on thinking themselves; there's no common switch for it.
+        return parse_review(self._structured(build_messages(ctx, readme_chars), REVIEW_SCHEMA, "review"))
+
+    def draft(self, ctx: RepoContext, issue: str | None = None) -> Draft:
+        return parse_draft(self._structured(build_draft_messages(ctx, issue), DRAFT_SCHEMA, "draft"))
+
+    def _structured(self, messages: list[dict[str, str]], schema: dict[str, Any], name: str) -> str:
         payload: dict = {"model": self.model, "messages": messages, "temperature": 0}
         if self._schema_mode:
             payload["response_format"] = {
                 "type": "json_schema",
-                "json_schema": {"name": "review", "schema": REVIEW_SCHEMA},
+                "json_schema": {"name": name, "schema": schema},
             }
             resp = self._post(payload)
             if resp.status_code == 400:
                 self._schema_mode = False
         if not self._schema_mode:
             payload["response_format"] = {"type": "json_object"}
-            schema_note = "\n\nReply with a JSON object matching this JSON schema:\n" + json.dumps(REVIEW_SCHEMA)
+            schema_note = "\n\nReply with a JSON object matching this JSON schema:\n" + json.dumps(schema)
             payload["messages"] = [
                 {**messages[0], "content": messages[0]["content"] + schema_note},
                 messages[1],
@@ -64,10 +84,9 @@ class OpenAICompatClient:
         if resp.status_code >= 400:
             raise LLMError(f"LLM provider error {resp.status_code}: {resp.text[:200]}")
         try:
-            content = resp.json()["choices"][0]["message"]["content"] or ""
+            return resp.json()["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError, ValueError) as exc:
             raise LLMError(f"unexpected response shape: {resp.text[:200]}") from exc
-        return parse_review(content)
 
     def unload(self) -> None:
         pass

@@ -28,17 +28,22 @@ from docscout import lock, pipeline
 from docscout.config import Config
 from docscout.db import Store
 from docscout.github import AuthError, GitHub
+from docscout.llm import memory
 from docscout.notify import Notifier
+from docscout.review import ReviewOutcome, model_label
 
 log = logging.getLogger(__name__)
 
 MAX_SCHEDULED_RUNS_PER_DAY = 8  # a run that keeps getting cut short doesn't retry all day
 RETRY_AFTER_FAILURE = timedelta(hours=1)
 FAILURES_BEFORE_ALERT = 3
-DEFAULT_SECONDS_PER_REPO = 10  # for the "about N minutes" estimate before there's any history
+DEFAULT_SECONDS_PER_REPO = 10  # checking one repo, for the "about N minutes" estimate before there's any history
+DEFAULT_SECONDS_PER_REVIEW = 45  # one review by gemma4:e2b on the 7.6 GB development laptop
+MODEL_BLOCKED_ALERT = timedelta(days=2)
 
 CONTINUING = "continuing today's run"
 NOT_STARTED = "today's run hasn't happened yet"
+REVIEWING = "projects are waiting for the model's review"
 TOKEN_MISSING = "Run docscout init to add one. Until then, the daily run can't start."
 TOKEN_REJECTED = "GitHub rejected your token (it may have expired). Run docscout init to add a new one."
 
@@ -48,6 +53,7 @@ class Due:
     due: bool
     reason: str
     remaining: int = 0  # repos left in today's budget
+    reviews: int = 0  # reviews left in today's allowance ([llm] reviews_per_run a day)
 
 
 def day_start(now: datetime, tz: tzinfo | None = None) -> datetime:
@@ -64,21 +70,31 @@ def clock_time(value: str | datetime, tz: tzinfo | None = None) -> str:
     return _when(value).astimezone(tz).strftime("%H:%M")
 
 
+def _review_only(store: Store, cfg: Config, now: datetime, reviews_left: int, done: str) -> Due:
+    """When today's checking is done: still due if projects wait for a review and today's
+    review allowance isn't used up (the run's reviews were skipped for lack of memory)."""
+    waiting = store.count_waiting(now, float(cfg["report"]["min_score"]))
+    if waiting and reviews_left > 0:
+        return Due(True, REVIEWING, 0, min(waiting, reviews_left))
+    return Due(False, done)
+
+
 def check_due(store: Store, cfg: Config, now: datetime, tz: tzinfo | None = None) -> Due:
-    """Whether a scheduled run should start now, and how many repos it may check."""
+    """Whether a scheduled run should start now, and how many repos it may check and review."""
     budget = int(cfg["discovery"]["daily_repo_budget"])
     today = store.runs_since(day_start(now, tz))
     running = [r for r in today if r["status"] == "running"]
     if running:
         return Due(False, f"a run is in progress (started {clock_time(running[-1]['started'], tz)})")
     used = sum(r["analyzed"] or 0 for r in today)
+    reviews_left = int(cfg["llm"]["reviews_per_run"]) - sum(r["reviewed"] or 0 for r in today)
     if used >= budget:
-        return Due(False, "today's run is done")
+        return _review_only(store, cfg, now, reviews_left, "today's run is done")
     scheduled = [r for r in today if r["started_by"] == "schedule"]
     for r in scheduled:
         # Finished without using its whole allowance: the sources had nothing more today.
         if r["status"] in ("ok", "empty") and r["run_limit"] and (r["analyzed"] or 0) < r["run_limit"]:
-            return Due(False, "today's run is done; there were no more candidates")
+            return _review_only(store, cfg, now, reviews_left, "today's run is done; there were no more candidates")
     if len(scheduled) >= MAX_SCHEDULED_RUNS_PER_DAY:
         return Due(False, f"stopped for today after {len(scheduled)} tries; the runs below say why")
     last = today[-1] if today else None
@@ -88,23 +104,33 @@ def check_due(store: Store, cfg: Config, now: datetime, tz: tzinfo | None = None
             return Due(False, f"the last run failed; trying again after {clock_time(retry, tz)}")
     if last is not None and last["resume_after"] and _when(last["resume_after"]) > now:
         return Due(False, f"waiting for GitHub's rate limit; continuing after {clock_time(last['resume_after'], tz)}")
+    reviews = max(0, reviews_left)
     if used:
-        return Due(True, CONTINUING, budget - used)
-    return Due(True, NOT_STARTED, budget)
+        return Due(True, CONTINUING, budget - used, reviews)
+    return Due(True, NOT_STARTED, budget, reviews)
 
 
-def estimated_minutes(store: Store, repos: int) -> int:
-    """How long checking ``repos`` repos should take, from recent finished runs."""
+def review_seconds(store: Store) -> float:
+    return float(store.get_state("review_seconds") or DEFAULT_SECONDS_PER_REVIEW)
+
+
+def estimated_minutes(store: Store, repos: int, reviews: int = 0) -> int:
+    """How long checking ``repos`` repos and reviewing up to ``reviews`` should take, from recent runs."""
     rates = []
     for r in store.recent_runs(20):
         if r["status"] in ("ok", "empty") and r["finished"] and (r["analyzed"] or 0) >= 5:
             seconds = (_when(r["finished"]) - _when(r["started"])).total_seconds()
             if seconds > 0:
-                rates.append(seconds / r["analyzed"])
+                rates.append(seconds / r["analyzed"])  # includes that run's reviews
         if len(rates) == 5:
             break
-    rate = statistics.median(rates) if rates else DEFAULT_SECONDS_PER_REPO
-    return max(1, math.ceil(rate * repos / 60))
+    if rates:
+        seconds = statistics.median(rates) * repos
+    else:
+        seconds = DEFAULT_SECONDS_PER_REPO * repos + review_seconds(store) * reviews
+    if not repos:  # only reviews
+        seconds = review_seconds(store) * reviews
+    return max(1, math.ceil(seconds / 60))
 
 
 def connection(gh: GitHub) -> str:
@@ -174,6 +200,27 @@ def _track_dry_days(store: Store, notifier: Notifier, cfg: Config, now: datetime
     store.set_state("dry_days", json.dumps(state), now)
 
 
+def _track_model(store: Store, notifier: Notifier, cfg: Config, now: datetime, outcome: ReviewOutcome | None, tz: tzinfo | None) -> None:
+    """Remember review speed, and alert once the model has been unable to review for 2 days."""
+    if outcome is None:
+        return
+    if outcome.reviewed:
+        store.set_state("model_blocked_since", "", now)
+        store.set_state("review_seconds", f"{outcome.seconds / outcome.reviewed:.1f}", now)
+        return
+    if not (outcome.skipped and outcome.waiting):
+        return
+    since = store.get_state("model_blocked_since")
+    if not since:
+        store.set_state("model_blocked_since", now.isoformat(timespec="seconds"), now)
+    elif now - _when(since) >= MODEL_BLOCKED_ALERT:
+        label = model_label(str(cfg["llm"]["model"]))
+        alert(
+            store, notifier, now, "model-blocked", "DocScout needs attention",
+            f"{label} hasn't been able to review projects for 2 days, so {outcome.waiting} are waiting: {outcome.skipped}.", tz,
+        )  # fmt: skip
+
+
 def _short_path(path: Path) -> str:
     home = str(Path.home())
     text = str(path)
@@ -189,14 +236,21 @@ def _notify_finished(notifier: Notifier, result: pipeline.RunResult, tz: tzinfo 
         later = "Lost the internet connection. The rest continues when you're back online."
     elif result.resume_after is not None:
         later = f"Reached GitHub's rate limit. The rest continues after {clock_time(result.resume_after, tz)}."
+    review = result.review or ReviewOutcome()
+    label = result.summary.model or "the model"
+    waiting = f"{review.waiting} more {'are' if review.waiting != 1 else 'is'} waiting for {label}'s review." if review.waiting else ""
     if result.report_path:
         count = len(result.findings)
-        body = f"Report: {_short_path(result.report_path)}" + (f"\n{later}" if later else "")
+        body = "\n".join(part for part in (f"Report: {_short_path(result.report_path)}", later, waiting) if part)
         notifier(f"DocScout found {count} new project{'s' if count != 1 else ''}", body)
     elif result.status == "partial":
         notifier("DocScout paused today's check", later or "It continues automatically.")
     elif result.status == "failed":
         notifier("DocScout stopped because of an error", "Run docscout status to see what happened.")
+    elif review.skipped and review.waiting:
+        notifier(f"DocScout is waiting for {label}", f"{review.waiting} projects to review: {review.skipped}. It tries again at the next check.")
+    elif review.reviewed:
+        notifier("DocScout is done", f"{label} reviewed {review.reviewed} project{'s' if review.reviewed != 1 else ''}; none made the report.")
     else:
         notifier("DocScout is done", "Nothing new today.")
 
@@ -257,13 +311,28 @@ def _run_locked(
             _record(store, now, "GitHub rejected the token")
             alert(store, notifier, now, "token-rejected", "DocScout needs attention", TOKEN_REJECTED, tz)
             return 1
+        label = model_label(str(cfg["llm"]["model"]))
+        if due.reason == REVIEWING:
+            # Only reviews to do: start them only once there's enough memory, without a run each time.
+            short = memory.shortage(cfg["llm"])
+            if short:
+                _record(store, now, f"{due.reviews} projects waiting for {label}: {short}")
+                _track_model(store, notifier, cfg, now, ReviewOutcome(skipped=short, waiting=due.reviews), tz)
+                return 0
         _record(store, now, f"started a run: {due.reason}")
         if settings["run_started"]:
-            minutes = estimated_minutes(store, due.remaining)
-            title = "DocScout is continuing today's check" if due.reason == CONTINUING else "DocScout is checking projects"
+            minutes = estimated_minutes(store, due.remaining, due.reviews)
+            if due.reason == REVIEWING:
+                title = f"DocScout is reviewing {due.reviews} project{'s' if due.reviews != 1 else ''} with {label}"
+            elif due.reason == CONTINUING:
+                title = "DocScout is continuing today's check"
+            else:
+                title = "DocScout is checking projects"
             notifier(title, f"Your computer may be slower for about {minutes} minute{'s' if minutes != 1 else ''}.")
         try:
-            result = pipeline.run(gh, cfg, store, now, limit=due.remaining, sources=sources, started_by="schedule", progress=log.info)
+            result = pipeline.run(
+                gh, cfg, store, now, limit=due.remaining, sources=sources, started_by="schedule", progress=log.info, reviews=due.reviews
+            )
         except AuthError:
             _count_failure(store, notifier, clock(), True, tz)
             alert(store, notifier, clock(), "token-rejected", "DocScout needs attention", TOKEN_REJECTED, tz)
@@ -279,6 +348,7 @@ def _run_locked(
         _notify_finished(notifier, result, tz)
     _count_failure(store, notifier, clock(), result.status == "failed", tz)
     _track_dry_days(store, notifier, cfg, clock(), result, tz)
+    _track_model(store, notifier, cfg, clock(), result.review, tz)
     return 1 if result.status == "failed" else 0
 
 
@@ -301,6 +371,8 @@ def status_report(
         due = check_due(store, cfg, now, tz)
         if not due.due:
             state = due.reason
+        elif due.reason == REVIEWING:
+            state = f"the next check with enough free memory reviews {due.reviews} waiting project{'s' if due.reviews != 1 else ''}"
         elif not scheduled:
             state = NOT_STARTED if due.reason == NOT_STARTED else "today's run stopped early; docscout run continues it"
         elif due.reason == CONTINUING:
@@ -308,6 +380,9 @@ def status_report(
         else:
             state = "today's run starts at the next check"
     lines = [f"Today: {used} of {budget} repos checked. {state[0].upper()}{state[1:]}."]
+    waiting = store.count_waiting(now, float(cfg["report"]["min_score"]))
+    if waiting:
+        lines.append(f"Waiting for {model_label(str(cfg['llm']['model']))}'s review: {waiting} project{'s' if waiting != 1 else ''}.")
     checked = last_check(store)
     if checked:
         lines.append(f"Last scheduled check: {checked[0].astimezone(tz).strftime('%d %b %H:%M')}, {checked[1]}.")

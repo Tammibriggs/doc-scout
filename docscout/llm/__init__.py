@@ -4,15 +4,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from docscout.llm.base import LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review
+from docscout.errors import ConfigError
+from docscout.llm.base import Draft, LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review
 
-__all__ = ["LLMClient", "LLMError", "LLMUnavailable", "RepoContext", "Review", "apply_review", "make_client"]
+__all__ = ["Draft", "LLMClient", "LLMError", "LLMUnavailable", "RepoContext", "Review", "apply_review", "make_client"]
+
+PROVIDERS = ("ollama", "openai_compatible")
 
 
-def make_client(llm_cfg: dict[str, Any], api_key: str | None = None) -> LLMClient | None:
+def make_client(llm_cfg: dict[str, Any], api_key: str | None = None) -> LLMClient:
+    """The configured model. There's no "none": only projects the model has reviewed are reported."""
     provider = llm_cfg["provider"]
     if provider == "none":
-        return None
+        raise ConfigError(
+            'DocScout needs a model to review projects ([llm] provider = "none" is no longer supported). '
+            "Use a local one (docscout set --llm ollama) or a hosted one (docscout set --llm openai_compatible)."
+        )
     if provider == "ollama":
         from docscout.llm.ollama import OllamaClient
 
@@ -31,4 +38,4 @@ def make_client(llm_cfg: dict[str, Any], api_key: str | None = None) -> LLMClien
             api_key=api_key,
             timeout=float(llm_cfg.get("timeout_seconds", 300)),
         )
-    raise ValueError(f"unknown LLM provider {provider!r} (use ollama, openai_compatible or none)")
+    raise ConfigError(f"unknown LLM provider {provider!r} (use ollama or openai_compatible)")

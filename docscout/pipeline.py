@@ -31,6 +31,8 @@ from docscout.config import data_dir
 from docscout.github import AuthError, GitHub, GitHubError, RateLimited
 from docscout.profile import language_policy, one_line
 from docscout.report import RunSummary, render, write
+from docscout import review as reviews_mod
+from docscout.review import ReviewOutcome, Reviewer, model_label, potential_confidence, review_waiting
 from docscout.scoring import Score, opportunity_score
 from docscout.sources import SourceUnavailable, awesome_selfhosted, interleave
 
@@ -62,10 +64,14 @@ class Analysis:
 
 
 def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiType]) -> Analysis | None:
-    """Docs gaps and score for a repo that passed the checks, or None if there's nothing to report."""
+    """Docs gaps for a repo that passed the checks, or None if there's nothing to report.
+
+    Borderline repos (from ``drop_below`` up) are analyzed too: the model's review decides
+    whether they're reported. Until then the score is what it would be if the model agrees.
+    """
     api_type = types_by_key.get(ev.classification.api_type or "")
-    # Until the LLM can confirm borderline repos (stage M2), only confident ones are reported.
-    if api_type is None or ev.classification.api_confidence < cfg["classify"]["min_confidence"]:
+    code_confidence = ev.classification.api_confidence
+    if api_type is None or code_confidence < cfg["classify"]["drop_below"]:
         return None
     ctx = DocsContext(
         gh=gh,
@@ -87,7 +93,7 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
     score = opportunity_score(
         gap.score,
         ev.health or 0.0,
-        ev.classification.api_confidence,
+        potential_confidence(code_confidence, float(cfg["classify"]["llm_raise_cap"])),
         ev.candidate.issues,
         ev.language_match,
         int(cfg["scoring"]["language_bonus"]),
@@ -95,6 +101,8 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
     repo = ev.repo
     details = {
         "api_type": api_type.key,
+        "code_confidence": code_confidence,
+        "readme_excerpt": (ev.readme or "")[: int(cfg["llm"].get("readme_chars", 1500))],
         "api_label": api_type.label,
         "gap": gap.as_dict(),
         "score": score.as_dict(),
@@ -106,6 +114,7 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
             "language_match": ev.language_match,
             "pushed_at": repo.get("pushed_at"),
             "description": repo.get("description"),
+            "topics": list(repo.get("topics") or [])[:15],
         },
         "stats": ev.stats.as_dict() if ev.stats else {},
         "issues": ev.candidate.issues[:3],
@@ -137,6 +146,7 @@ class RunResult:
     report_path: Path | None
     status: str  # ok | empty | partial | failed
     resume_after: datetime | None = None  # rate limited: when the next run can continue
+    review: ReviewOutcome | None = None
 
 
 def run(
@@ -151,7 +161,11 @@ def run(
     progress: Callable[[str], None] = lambda message: None,
     clock: Callable[[], float] = time.monotonic,
     started_by: str = "you",
+    reviewer: Reviewer | None = None,
+    reviews: int | None = None,
 ) -> RunResult:
+    """Check up to ``limit`` repos (0: only review what's waiting), then let the model review
+    up to ``reviews`` findings ([llm] reviews_per_run by default), then report."""
     types = apitypes.enabled_types(cfg["api_types"])
     by_key = {t.key: t for t in types}
     policy = language_policy(cfg["profile"], types)
@@ -171,7 +185,7 @@ def run(
     resume_after: datetime | None = None
     seen: set[str] = set()
     try:
-        for cand in interleave(streams):
+        for cand in interleave(streams if limit > 0 else []):
             if summary.analyzed >= limit:
                 break
             key = cand.full_name.lower()
@@ -242,9 +256,25 @@ def run(
         log.exception("run stopped by an unexpected error")
         status, summary.stopped_early = "failed", f"unexpected error: {exc!r}"
 
+    review = ReviewOutcome()
+    if auth_error is None:
+        try:
+            review = review_waiting(
+                store,
+                cfg,
+                now,
+                by_key,
+                limit=int(cfg["llm"]["reviews_per_run"]) if reviews is None else reviews,
+                reviewer=reviewer or (lambda: reviews_mod.open_reviewer(cfg)),
+                progress=progress,
+            )
+        except KeyboardInterrupt:
+            status, summary.stopped_early = "partial", "interrupted"
+    _review_notes(summary, review, cfg)
+
     summary.api_calls = dict(gh.calls)
     summary.seconds = clock() - started
-    if awesome_selfhosted.SOURCE in ordered:
+    if awesome_selfhosted.SOURCE in ordered and limit > 0:
         note = awesome_selfhosted.staleness_note(data_dir() / "awesome_selfhosted.json", now)
         if note:
             summary.notes.append(note)
@@ -276,7 +306,19 @@ def run(
         report_path=str(report_path) if report_path else None,
         error=summary.stopped_early,
         resume_after=resume_after,
+        reviewed=review.reviewed,
     )
     if auth_error is not None:
         raise auth_error
-    return RunResult(run_id, summary, findings, still_open, report_path, status, resume_after)
+    return RunResult(run_id, summary, findings, still_open, report_path, status, resume_after, review)
+
+
+def _review_notes(summary: RunSummary, review: ReviewOutcome, cfg: Config) -> None:
+    label = model_label(str(cfg["llm"]["model"]))
+    summary.model = label
+    summary.reviewed, summary.accepted = review.reviewed, review.accepted
+    if review.skipped:
+        summary.notes.append(f"{label} couldn't review projects this time: {review.skipped}")
+    if review.waiting:
+        plural = "s are" if review.waiting != 1 else " is"
+        summary.notes.append(f"{review.waiting} project{plural} waiting for {label}'s review; they'll be reviewed at a later check.")

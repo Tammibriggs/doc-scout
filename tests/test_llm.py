@@ -133,7 +133,7 @@ def test_benchmark_stops_at_the_first_setup_problem():
         name = "fake"
         calls = 0
 
-        def review(self, ctx, readme_chars=1500):
+        def review(self, ctx, readme_chars=1500, think=False):
             Missing.calls += 1
             raise LLMUnavailable("The model m isn't installed. Run: ollama pull m")
 

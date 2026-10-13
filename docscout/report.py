@@ -28,6 +28,25 @@ class RunSummary:
     seconds: float = 0.0
     stopped_early: str | None = None
     notes: list[str] = field(default_factory=list)  # e.g. a source that was skipped or is going stale
+    model: str | None = None  # the reviewing model, e.g. "Gemma"
+    reviewed: int = 0
+    accepted: int = 0
+
+
+_STYLE_NAMES = {"rest": "REST", "graphql": "GraphQL", "grpc": "gRPC", "event": "event", "rpc": "RPC"}
+
+
+def _verdict(review: dict[str, Any]) -> str:
+    kind = review.get("project_type")
+    if kind == "serves_api":
+        style = _STYLE_NAMES.get(str(review.get("api_style")))
+        return f"an app or service with its own {style} API" if style else "an app or service with its own API"
+    return {"api_tooling": "a tool for working with APIs", "library": "a library or SDK", "spam": "spam"}.get(str(kind), "something else")
+
+
+def _model_name(review: dict[str, Any]) -> str:
+    name = str(review.get("model") or "the model")
+    return "Gemma" if "gemma" in name.lower() else name.split(":", 1)[-1]
 
 
 def _days_ago(value: str | None, now: datetime) -> str:
@@ -59,6 +78,12 @@ def render_item(index: int, finding: StoredFinding, now: datetime) -> list[str]:
     lines.append(" · ".join(meta))
     if repo.get("description"):
         lines.append(f"> {text(repo['description'], 200)}")
+    review: dict[str, Any] = d.get("review") or {}
+    who = text(_model_name(review), 60)
+    if review:
+        evidence = f" (\"{text(review['evidence'], 200)}\")" if review.get("evidence") else ""
+        change = f"{float(review.get('code_confidence', 0)):.2f} → {float(review.get('final_confidence', 0)):.2f}"
+        lines.append(f"**{who}'s review:** {text(_verdict(review))}{evidence} · type confidence {change}")
 
     label = text(kind_label(gap.kind, d.get("api_label", "API")))
     if gap.location:
@@ -81,6 +106,11 @@ def render_item(index: int, finding: StoredFinding, now: datetime) -> list[str]:
         lines.append("**Check manually:** " + " · ".join(text(r, 140) for r in gap.check_manually))
     if gap.unverified:
         lines.append("*Unverified: based on finding no docs, not on reading them.*")
+    if review.get("why"):
+        lines.append(f"**Why it matters ({who}):** {text(review['why'], 600)}")
+    if review.get("first_steps"):
+        steps = "\n".join(f"{i}. {text(step, 300)}" for i, step in enumerate(review["first_steps"][:3], 1))
+        lines.append(f"**First steps ({who}):**\n\n{steps}")
 
     checks = d.get("checks") or {}
     if checks:
@@ -145,9 +175,10 @@ def render(
 def _footer(summary: RunSummary) -> str:
     calls = ", ".join(f"{k} {v}" for k, v in sorted(summary.api_calls.items())) or "none"
     minutes, seconds = divmod(int(summary.seconds), 60)
+    reviewed = f"{text(summary.model, 60)} reviewed {summary.reviewed} ({summary.accepted} accepted) · " if summary.model else ""
     footer = (
         f"*Checked {summary.evaluated} repos · {summary.passed} passed the health checks · "
-        f"{summary.with_gaps} with docs gaps · GitHub API calls: {calls} · took {minutes}m{seconds:02d}s*"
+        f"{summary.with_gaps} with docs gaps · {reviewed}GitHub API calls: {calls} · took {minutes}m{seconds:02d}s*"
     )
     if summary.stopped_early:
         footer += f"\n\n*Stopped early: {text(summary.stopped_early, 200)}*"

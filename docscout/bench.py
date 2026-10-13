@@ -1,6 +1,6 @@
 """``docscout bench-llm``: measure LLM speed and memory on this machine.
 
-Runs a few reviews on built-in sample repos and recommends ``max_candidates`` so the
+Runs a few reviews on built-in sample repos and recommends ``reviews_per_run`` so the
 daily LLM step fits a time budget. Close memory-hungry apps first on small machines.
 """
 
@@ -10,8 +10,8 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 
+from docscout.llm.memory import available_bytes
 from docscout.llm.base import LLMClient, LLMError, LLMUnavailable, RepoContext, Review, review_with_retry
 
 SAMPLES = [
@@ -62,20 +62,13 @@ class BenchResult:
     def avg_seconds(self) -> float | None:
         return sum(self.seconds) / len(self.seconds) if self.seconds else None
 
-    def recommended_max_candidates(self, budget_minutes: float = 10) -> int | None:
+    def recommended_reviews_per_run(self, budget_minutes: float = 10) -> int | None:
         if not self.avg_seconds:
             return None
         return max(1, min(30, int(budget_minutes * 60 / self.avg_seconds)))
 
 
-def _mem_available() -> int | None:
-    meminfo = Path("/proc/meminfo")
-    if not meminfo.is_file():
-        return None
-    for line in meminfo.read_text().splitlines():
-        if line.startswith("MemAvailable:"):
-            return int(line.split()[1]) * 1024
-    return None
+_mem_available = available_bytes
 
 
 def run(client: LLMClient, runs: int = 3, readme_chars: int = 1500) -> BenchResult:
@@ -140,7 +133,7 @@ def format_result(result: BenchResult, client_name: str) -> str:
         lines.append(f"  - {review.project_type}/{review.api_style} ({mark}); first steps: {len(review.first_steps)}")
     for error in result.errors:
         lines.append(f"  error: {error}")
-    rec = result.recommended_max_candidates()
+    rec = result.recommended_reviews_per_run()
     if rec:
-        lines.append(f"  recommended [llm] max_candidates = {rec}  (keeps the daily LLM step near 10 minutes)")
+        lines.append(f"  recommended [llm] reviews_per_run = {rec}  (keeps the reviews near 10 minutes a day)")
     return "\n".join(lines)

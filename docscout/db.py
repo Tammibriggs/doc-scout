@@ -73,6 +73,10 @@ MIGRATIONS = [
         last_used TEXT
     );
     """,
+    """
+    ALTER TABLE findings ADD COLUMN review TEXT;  -- NULL: waiting for the model | accepted | rejected | error
+    ALTER TABLE runs ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 FINAL_STATUSES = ("ignored", "done")
 PENDING_MAX_AGE_DAYS = 14  # findings not reported yet (an interrupted run, or past max_items) wait this long
@@ -89,6 +93,15 @@ class StoredFinding:
     score: float
     details: dict[str, Any]
     run_id: int
+    finding_id: int | None = None
+
+
+_LATEST_PENDING = """FROM findings f JOIN repos r ON r.key = f.repo_key
+    WHERE r.status = 'new' AND f.created >= ? AND f.id = (SELECT MAX(id) FROM findings WHERE repo_key = f.repo_key)"""
+
+
+def _finding(row: sqlite3.Row) -> StoredFinding:
+    return StoredFinding(row["full_name"], row["score"], json.loads(row["details"]), row["run_id"], row["id"])
 
 
 class Store:
@@ -122,13 +135,13 @@ class Store:
 
     def finish_run(self, run_id: int, now: datetime, *, status: str, analyzed: int, new_items: int, api_calls: int,
                    report_path: str | None = None, error: str | None = None,
-                   resume_after: datetime | None = None) -> None:  # fmt: skip
+                   resume_after: datetime | None = None, reviewed: int = 0) -> None:  # fmt: skip
         with self.conn:
             self.conn.execute(
                 """UPDATE runs SET finished=?, status=?, analyzed=?, new_items=?, api_calls=?, report_path=?, error=?,
-                   resume_after=? WHERE id=?""",
+                   resume_after=?, reviewed=? WHERE id=?""",
                 (_iso(now), status, analyzed, new_items, api_calls, report_path, error,
-                 _iso(resume_after) if resume_after else None, run_id),
+                 _iso(resume_after) if resume_after else None, reviewed, run_id),
             )  # fmt: skip
 
     def update_progress(self, run_id: int, analyzed: int) -> None:
@@ -245,16 +258,41 @@ class Store:
             )
 
     def pending_findings(self, now: datetime, min_score: float, limit: int, max_age_days: int = PENDING_MAX_AGE_DAYS) -> list[StoredFinding]:
-        """Findings not reported yet: this run's, plus any left by a run that was cut off
-        before writing its report, or that didn't fit in an earlier report."""
+        """Findings the model accepted that aren't reported yet: this run's, plus any left by
+        a run that was cut off before writing its report, or that didn't fit in a report."""
         rows = self.conn.execute(
-            """SELECT r.full_name, f.score, f.details, f.run_id FROM findings f JOIN repos r ON r.key = f.repo_key
-               WHERE r.status = 'new' AND f.score >= ? AND f.created >= ?
-                 AND f.id = (SELECT MAX(id) FROM findings WHERE repo_key = f.repo_key)
-               ORDER BY f.score DESC LIMIT ?""",
-            (min_score, _iso(now - timedelta(days=max_age_days)), limit),
+            f"""SELECT f.id, r.full_name, f.score, f.details, f.run_id {_LATEST_PENDING}
+                AND f.review = 'accepted' AND f.score >= ? ORDER BY f.score DESC LIMIT ?""",
+            (_iso(now - timedelta(days=max_age_days)), min_score, limit),
         ).fetchall()
-        return [StoredFinding(r["full_name"], r["score"], json.loads(r["details"]), r["run_id"]) for r in rows]
+        return [_finding(r) for r in rows]
+
+    def findings_to_review(self, now: datetime, min_score: float, limit: int, max_age_days: int = PENDING_MAX_AGE_DAYS) -> list[StoredFinding]:
+        """Findings waiting for the model, most promising first. Before a review, ``score``
+        is what the finding would score if the model confirms it."""
+        rows = self.conn.execute(
+            f"""SELECT f.id, r.full_name, f.score, f.details, f.run_id {_LATEST_PENDING}
+                AND f.review IS NULL AND f.score >= ? ORDER BY f.score DESC LIMIT ?""",
+            (_iso(now - timedelta(days=max_age_days)), min_score, limit),
+        ).fetchall()
+        return [_finding(r) for r in rows]
+
+    def count_waiting(self, now: datetime, min_score: float, max_age_days: int = PENDING_MAX_AGE_DAYS) -> int:
+        row = self.conn.execute(
+            f"SELECT COUNT(*) {_LATEST_PENDING} AND f.review IS NULL AND f.score >= ?",
+            (_iso(now - timedelta(days=max_age_days)), min_score),
+        ).fetchone()
+        return int(row[0])
+
+    def set_review(self, finding_id: int, review: str | None, score: float, details: dict[str, Any]) -> None:
+        """``review`` is accepted, rejected or error; None keeps the finding waiting."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE findings SET review=?, score=?, details=? WHERE id=?", (review, score, json.dumps(details), finding_id)
+            )
+
+    def reviewed_since(self, since: datetime) -> int:
+        return sum(r["reviewed"] or 0 for r in self.runs_since(since))
 
     def still_open(self, before_run: int, limit: int) -> list[StoredFinding]:
         """The latest finding of each repo reported earlier and not yet marked done or ignored."""

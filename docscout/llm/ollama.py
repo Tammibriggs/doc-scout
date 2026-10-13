@@ -1,7 +1,8 @@
 """Local backend: Ollama's native chat API.
 
 The native API (not /v1) is used because it allows a JSON schema in ``format``,
-``think: false``, ``num_ctx`` and ``keep_alive``. The model stays loaded for 2 minutes
+``think``, ``num_ctx`` and ``keep_alive``. Thinking is off unless asked for: on this
+laptop it multiplies the time per review. The model stays loaded for 2 minutes
 between reviews of a batch and is unloaded once with :meth:`OllamaClient.unload`;
 ``keep_alive: 0`` on every request would reload the multi-GB model each time.
 """
@@ -10,7 +11,21 @@ from __future__ import annotations
 
 import httpx
 
-from docscout.llm.base import REVIEW_SCHEMA, LLMError, LLMUnavailable, RepoContext, Review, build_messages, parse_review
+from typing import Any
+
+from docscout.llm.base import (
+    DRAFT_SCHEMA,
+    REVIEW_SCHEMA,
+    Draft,
+    LLMError,
+    LLMUnavailable,
+    RepoContext,
+    Review,
+    build_draft_messages,
+    build_messages,
+    parse_draft,
+    parse_review,
+)
 
 
 class OllamaClient:
@@ -36,22 +51,29 @@ class OllamaClient:
         except httpx.ConnectError as exc:
             raise LLMUnavailable(
                 f"Ollama isn't running at {self.base_url}. Start it with `ollama serve`, install it from "
-                "https://ollama.com, or switch with `docscout set --llm openai_compatible` (or `--llm none`)."
+                "https://ollama.com, or use a hosted model: `docscout set --llm openai_compatible`."
             ) from exc
         except httpx.HTTPError as exc:
             raise LLMError(f"cannot reach Ollama: {exc}") from exc
 
-    def review(self, ctx: RepoContext, readme_chars: int = 1500) -> Review:
-        payload = {
+    def review(self, ctx: RepoContext, readme_chars: int = 1500, think: bool = False) -> Review:
+        return parse_review(self._structured(build_messages(ctx, readme_chars), REVIEW_SCHEMA, think))
+
+    def draft(self, ctx: RepoContext, issue: str | None = None) -> Draft:
+        return parse_draft(self._structured(build_draft_messages(ctx, issue), DRAFT_SCHEMA, False))
+
+    def _structured(self, messages: list[dict[str, str]], schema: dict[str, Any], think: bool) -> str:
+        """The model's JSON answer, shaped by ``schema``."""
+        payload: dict[str, Any] = {
             "model": self.model,
-            "messages": build_messages(ctx, readme_chars),
-            "format": REVIEW_SCHEMA,
+            "messages": messages,
+            "format": schema,
             "stream": False,
             "keep_alive": "2m",
             "options": {"num_ctx": self.num_ctx, "temperature": 0},
         }
         if self._send_think:
-            payload["think"] = False
+            payload["think"] = think
         resp = self._chat(payload)
         if resp.status_code == 400 and "think" in resp.text.lower() and self._send_think:
             # Models without thinking support may reject the flag entirely.
@@ -62,8 +84,7 @@ class OllamaClient:
             raise LLMUnavailable(f"The model {self.model} isn't installed. Run: ollama pull {self.model}")
         if resp.status_code >= 400:
             raise LLMError(f"Ollama error {resp.status_code}: {resp.text[:200]}")
-        content = (resp.json().get("message") or {}).get("content", "")
-        return parse_review(content)
+        return (resp.json().get("message") or {}).get("content", "")
 
     def loaded_model_bytes(self) -> int | None:
         """Memory the model currently uses, from /api/ps (None if not loaded)."""

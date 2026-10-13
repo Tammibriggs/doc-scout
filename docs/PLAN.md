@@ -15,7 +15,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | **M0. Prove discovery** | ✅ Done (13 Oct). Accuracy check passed, and the local LLM works (section 2) | — | Mon 12 – Tue 13 Oct (morning) |
 | **M1. Useful manual report** | ✅ Done on branch `m1-report` (Mon 12 Oct, ahead of schedule): OpenAPI spec gap scorer; endpoint completeness in prose docs; "docs elsewhere / generated, check manually" flag; generated-spec warning; scoring with your languages ranked higher; SQLite (seen, ignored, done); safe Markdown report; `run`, `ignore`, `done`, `score`. ⏳ Exit check: you'd act on at least 3 of the top 10 in a real report | ✅ Also done: claim check (open docs PRs, "I'll take this"); CLA, DCO and AI-policy notes; local-setup note | Mon 12 – Tue 13 Oct |
 | **M3. Daily runs on Linux** | ✅ Built on branch `m3-daily` (Tue 13 Oct, three days early): `run --if-due`, file lock, offline check and resume, a cursor through the search slices, token, settings and repeated-failure alerts, `schedule install/uninstall/status` for systemd, `status`; **notifications when the day's run starts** ("your computer may be slower for about N minutes", estimated from earlier runs) **and when it finishes** (with the report path), each turned off with `docscout set`. Also: GitHub lists fetched through GraphQL, so a run downloads far less (section 5). ⏳ Exit check: the unattended test | ✅ Also done: quiet-day rules; "pool running dry" notification | Tue 13 Oct |
-| **M2. Gemma required** (branch `m2-llm`, built in a separate worktree) | ✅ First, fewer noisy items (section 9). Then: **Gemma reviews every repo that passes the health checks** (up to `max_candidates` a day, most promising first): it decides whether the project really has an API worth documenting, with the 0.8 cap, and writes why it matters plus up to 3 first steps. **Only reviewed repos are reported.** Unreviewed ones are held, not dropped, and reviewed later. A memory check runs before loading the model. `docscout draft owner/repo` writes a first message to the maintainers for a project you've chosen. **Measured on the 58 labels**, with and without Gemma, and with thinking off and on | | Wed 14 Oct |
+| **M2. Gemma required** (branch `m2-llm`, built in a separate worktree) | ✅ First, fewer noisy items (section 9). Then ✅: **Gemma reviews every repo that passes the health checks** (up to `reviews_per_run` a day, most promising first): it decides whether the project really has an API worth documenting, with the 0.8 cap, and writes why it matters plus up to 3 first steps. **Only reviewed repos are reported.** Unreviewed ones are held, not dropped, and reviewed later. A memory check runs before loading the model. `docscout draft owner/repo` writes a first message to the maintainers for a project you've chosen. **Measured on the 58 labels**, with and without Gemma, and with thinking off and on | | Wed 14 Oct |
 | Unattended test | **2 days** from `docscout schedule install`: no manual starts, survives a reboot and going offline. M2 is built in a separate worktree, so the daily runs keep using the M3 code | | Tue 13 – Thu 15 Oct |
 | Polish and wrap-up | README, demo report, merge the stage branches into `main` once their exit checks pass | | Thu 15 Oct (Fri 16 buffer) |
 | Challenge submission | Demo video; a real docs contribution made with a DocScout pick (the "first user"); the DEV post, written in your own voice | | Fri 16 – Sun 18 Oct |
@@ -270,8 +270,8 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 ## 11. The LLM (M2)
 
 **Gemma is required** (decided 13 Oct, for the challenge's "the open pieces should be what makes your project work"):
-- **It reviews every repo that passes the health checks** with confidence of at least 0.4, up to `max_candidates` per day (about 13 at 45 s each), most promising first.
-- **Only reviewed repos are reported.** If Gemma can't run (Ollama not running, memory low), findings are held, not dropped. A later check the same day reviews them once memory is free; otherwise the next run does. Held findings wait up to 14 days. If Gemma can't run for 2 days in a row, you get a "needs attention" notification.
+- ✅ **It reviews every repo that passes the health checks** with confidence of at least 0.4, up to `[llm] reviews_per_run` a day (13: about 10 minutes at 45 s each). Most promising first: before its review, a finding is ranked by the score it would get if the model agrees.
+- ✅ **Only reviewed repos are reported.** If Gemma can't run (Ollama not running, memory low), findings are held, not dropped. A later check the same day reviews them once memory is free; otherwise the next run does. Held findings wait up to 14 days. If Gemma can't run for 2 days in a row, you get a "needs attention" notification.
 - **`init` no longer offers "none":** the choice is local Gemma or a hosted open-weight model.
 
 **Jobs:**
@@ -293,7 +293,10 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 - Ollama: JSON schema output, `think: false`, the model kept loaded during the batch, then unloaded.
 - Any OpenAI-compatible API, falling back to JSON mode if a provider doesn't support schemas.
 
-**M2 tuning:** `bench-llm` sets `max_candidates` (about 13 on this laptop, at 44.8 s per review). **The label check is required, not optional:** precision and recall on the 58 labeled repos, with and without Gemma, become the evidence in the DEV post. If Gemma doesn't help, the prompt is tuned first.
+- ✅ **Memory check:** a local model loads only when `[llm] min_free_memory_gb` (2.5 for now) is free. A run started on a busy laptop holds its findings, and the next 15-minute check reviews them without a new run until memory is free. The value is set from the label check's memory measurement.
+- ✅ **What the report shows:** Gemma's verdict with its evidence quote and the confidence change (e.g. 0.50 → 0.80), why the docs matter, and numbered first steps. Everything the model writes is escaped like other untrusted text. A project the model can't give a valid answer for in 2 runs is dropped.
+
+**M2 tuning:** `bench-llm` recommends `reviews_per_run` (about 13 on this laptop, at 44.8 s per review). **The label check is required, not optional:** precision and recall on the 58 labeled repos, with and without Gemma, become the evidence in the DEV post. If Gemma doesn't help, the prompt is tuned first.
 
 ## 12. Security
 
@@ -371,16 +374,16 @@ Score: gap 72 × health 0.90 × type 0.95 + bonus 10
 
   It runs the windowless `docscout-bg` entry point, and every subprocess uses `CREATE_NO_WINDOW`.
 
-## 15. Data model (SQLite, versioned with `PRAGMA user_version`; version 2 since M3)
+## 15. Data model (SQLite, versioned with `PRAGMA user_version`; version 3 since M2)
 
 As built ✅:
 - `repos(key PK, full_name, source, stars, language, api_type, type_conf, health, rejected, status[new|reported|ignored|done], status_reason, first_seen, last_checked, last_reported)`
-- `findings(id, run_id, repo_key, api_type, kind, gap, score, effort, details JSON, created)`: the PR stats, issues and before-you-start checks live in `details`
-- `runs(id, started, finished, status[running|ok|empty|partial|failed], analyzed, new_items, api_calls, report_path, error, run_limit, started_by[you|schedule], resume_after)`: `analyzed` is saved as the run goes
+- `findings(id, run_id, repo_key, api_type, kind, gap, score, effort, details JSON, created, review[NULL waiting|accepted|rejected|error])`: the PR stats, issues, before-you-start checks and the model's review live in `details`
+- `runs(id, started, finished, status[running|ok|empty|partial|failed], analyzed, new_items, api_calls, report_path, error, run_limit, started_by[you|schedule], resume_after)`: `analyzed` is saved as the run goes; `reviewed` (M2) counts the day's reviews
 - `sweep(slice_key PK, page, cycle, last_used)`: the repo-search cursor
 - `state(key PK, value, updated)`: the last scheduled check, alerts sent today, failures in a row, days without anything new
 
-Planned: `llm_reviews(repo, provider, model, seconds, review_json, created)` (M2).
+The model's reviews are stored in `findings.details`, so no separate `llm_reviews` table was needed.
 
 ## 16. Code layout
 
@@ -395,10 +398,10 @@ hacktoberfest/
     apitypes/ base.py ✅ rest.py ✅          # + spec scoring for REST (M1); graphql.py, grpc.py, … (later)
     sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
     analyze/ tree.py ✅  gaps.py ✅  elsewhere.py ✅  checks.py ✅      apitypes/ openapi.py ✅  rest_prose.py ✅
-    llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅
-    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅
+    llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
+    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 156 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 168 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

@@ -64,11 +64,14 @@ min_confidence = 0.6            # repos at or above this count as serving an API
 drop_below = 0.4                # below this, never reported; between this and min_confidence only if the LLM confirms (M2)
 
 [llm]
-provider = "ollama"             # ollama | openai_compatible | none
+# The model reviews every project that passes the health checks; only reviewed projects are reported.
+provider = "ollama"             # ollama (local) | openai_compatible (hosted, e.g. an open-weight model on OpenRouter or Groq)
 model = "gemma4:e2b"
 base_url = "http://localhost:11434"
 api_key_env = "DOCSCOUT_LLM_API_KEY"
-max_candidates = 5              # reset after `docscout bench-llm`
+reviews_per_run = 13            # about 10 minutes at 45 s per review; `docscout bench-llm` measures yours
+think = "off"                   # off | borderline (only where the code is unsure) | on. Slower; see the plan's measurements
+min_free_memory_gb = 2.5        # a local model waits until this much memory is free, so the computer doesn't swap
 num_ctx = 4096
 timeout_seconds = 300
 readme_chars = 1500

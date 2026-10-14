@@ -24,7 +24,7 @@ from docscout.config import Config
 from docscout.evaluate import Report, evaluate_rows
 from docscout.llm import LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review, memory
 from docscout.llm.base import PROMPT_VERSION, review_with_retry
-from docscout.review import factual_checks, model_label, think_for
+from docscout.review import model_label, think_for
 
 CACHE_VERSION = 1
 
@@ -67,7 +67,7 @@ def save_cache(path: Path, reviews: dict[str, Any]) -> None:
     path.write_text(json.dumps({"version": CACHE_VERSION, "reviews": reviews}), encoding="utf-8")
 
 
-def _context(name: str, inputs: dict[str, Any], readme_chars: int, wanted: str, reasons: str = "") -> RepoContext:
+def _context(name: str, inputs: dict[str, Any], readme_chars: int, wanted: str) -> RepoContext:
     meta = inputs.get("meta") or {}
     return RepoContext(
         full_name=name,
@@ -77,7 +77,6 @@ def _context(name: str, inputs: dict[str, Any], readme_chars: int, wanted: str, 
         readme_excerpt=(inputs.get("readme") or "")[:readme_chars],
         issues=[i.get("title", "") for i in inputs.get("issues") or []],
         wanted_api_types=[wanted],
-        checks=factual_checks(reasons.split("; ")),  # as in a daily run, which also adds the docs gaps
     )
 
 
@@ -115,8 +114,7 @@ def run(
                 if key not in cache:
                     started = clock()
                     try:
-                        context = _context(name, data, readme_chars, api_type.label, row.get("reasons") or "")
-                        review = review_with_retry(client, context, readme_chars, thinking)
+                        review = review_with_retry(client, _context(name, data, readme_chars, api_type.label), readme_chars, thinking)
                     except LLMUnavailable:
                         raise
                     except LLMError as exc:

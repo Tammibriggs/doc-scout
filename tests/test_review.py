@@ -321,14 +321,3 @@ def test_dependency_bumps_in_docs_tooling_are_not_someone_writing_docs():
     checks = paid_checks(Pulls(), "org/app", Checks(), {}, [], None)
     assert checks.claimed == ["Open PR #1172: docs: describe the feeding endpoints"]
 
-
-def test_the_model_sees_measured_facts_but_not_the_codes_keyword_guesses():
-    reasons = ["curated source (+0.20)", "app words: self-hosted, app phrase", "owns an OpenAPI/Swagger spec (+0.10)", "README documents 5 endpoints"]
-    assert review.factual_checks(reasons) == [
-        "listed in awesome-selfhosted, a curated list of self-hosted apps", "owns an OpenAPI/Swagger spec", "README documents 5 endpoints"
-    ]
-    from docscout.llm.base import build_messages
-    from docscout.llm import RepoContext
-
-    user = build_messages(RepoContext(full_name="a/b", checks=["owns an OpenAPI/Swagger spec"]))[1]["content"]
-    assert "DocScout's checks:\n- owns an OpenAPI/Swagger spec" in user

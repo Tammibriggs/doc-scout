@@ -75,13 +75,15 @@ All three sources are above 50%, so all stay on.
 | Code only | 76% | 90% | 37 | |
 | Gemma, first rule, thinking off | 80% | **52%** | 20 | 51.1 s |
 | Gemma, first rule, thinking for borderline repos | 76% | 52% | 21 | 133.3 s |
-| Gemma, new rule (same cached reviews) | 81% | 81% | 31 | 51.1 s |
+| **Gemma, new rule (same cached reviews)** | **81%** | **81%** | 31 | 51.1 s |
+| Gemma, prompt v3 + new rule (re-measured) | 74% | 81% | 34 | 61.5 s |
 
 - **The first rule threw out 12 real API apps.** Seven were answers like `serves_api` with style `none` (an app with an API, but "no API style"). flipt was rejected for being gRPC, though it serves REST too. The rule counted any answer other than "serves_api + rest" as disagreement and cut confidence from 1.00 to 0.20.
 - **The new rule:** an app that serves an API agrees whatever style the model names, and only a clear verdict (confidence ≥ `llm_veto_confidence`, 0.7) that it's a tool, library, spam or something else lowers confidence. On the cached reviews it makes 12 mistakes, the same number as code alone: precision up from 76% to 81%, recall down from 90% to 81%. Picked over alternatives on the same 58 labels, so the gain is small and uncertain.
 - **Thinking:** no more accurate and 2.6 times slower, so it stays off.
 - **Memory:** Gemma used 5.5–5.9 GB (6.2 GB free before and 0.7 GB at the lowest; 7.0 and 1.1 in the second run) on a 7.8 GB laptop. `min_free_memory_gb` is 6, so reviews wait until most memory is free. On this laptop that's typically right after login, when the daily run starts.
-- **Next:** prompt version 3 says what `serves_api` means, offers style `unknown` instead of a contradictory `none`, and passes Gemma the code's *measured* facts (an owned OpenAPI spec, endpoints in the README), not its keyword guesses. A daily run also gives it the measured docs gaps. ⏳ Re-measure with `eval --llm`.
+- **Prompt v3 was worse, so it was reverted.** It defined `serves_api` more precisely, offered style `unknown`, and passed Gemma the code's measured facts (owned spec, endpoints in the README). Gemma then copied the code instead of judging: its evidence quotes became "DocScout's checks: owns an OpenAPI/Swagger spec…", and it agreed with the code's false positives. Back to prompt v2 with the new rule: 12 mistakes, like code alone, but 3 fewer wrong picks (6 instead of 9) and 3 more missed apps. For a contributor, a wrong pick wastes time; a missed one costs little.
+- **Memory got worse:** during the v3 run free memory reached 0.0 GB (6.7 GB free before), so the laptop swapped. Running 11 reviews a day unattended on 7.8 GB is heavy. ⏳ Decide: fewer daily reviews, or a hosted open-weight model.
 
 ## 3. Success criteria
 

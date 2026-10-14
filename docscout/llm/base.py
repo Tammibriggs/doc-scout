@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 ProjectType = Literal["serves_api", "api_tooling", "library", "spam", "other"]
 # Every API style the model may name, whether or not DocScout has an API type for it yet,
 # so it can say "this is GraphQL, not REST" even while only REST is enabled.
-ApiStyle = Literal["rest", "graphql", "grpc", "event", "rpc", "none", "unknown"]
+ApiStyle = Literal["rest", "graphql", "grpc", "event", "rpc", "none"]
 
 
 class LLMError(Exception):
@@ -47,7 +47,10 @@ class Review(BaseModel):
 
 
 REVIEW_SCHEMA: dict[str, Any] = Review.model_json_schema()
-PROMPT_VERSION = 3  # part of cached reviews' keys, so a changed prompt isn't measured with old answers
+# Part of cached reviews' keys, so a changed prompt isn't measured with old answers. Version 3
+# (14 Oct) passed the code's measured facts and was measured worse: the model copied them
+# instead of judging (74% precision vs 81%), so it was reverted to version 2.
+PROMPT_VERSION = 2
 
 
 class Draft(BaseModel):
@@ -77,30 +80,26 @@ class RepoContext:
     issues: list[str] = field(default_factory=list)
     # Labels of the API types the contributor is looking for, e.g. ["REST"].
     wanted_api_types: list[str] = field(default_factory=list)
-    # Facts DocScout's code measured in the repo's files, e.g. "owns an OpenAPI/Swagger spec".
-    checks: list[str] = field(default_factory=list)
 
 
 SYSTEM_PROMPT = """You review open-source GitHub repositories for someone who wants to contribute API documentation.
 They are looking for these kinds of API: {wanted}.
 
 Decide what kind of project the repository is:
-- serves_api: an application or service that exposes its own API for other programs to call (HTTP endpoints, GraphQL, gRPC, webhooks). A web app with only a user interface is "other".
+- serves_api: an application or service that exposes its own API that users call.
 - api_tooling: a tool for working with APIs (code generator, validator, mock server, test tool, API client app, framework).
 - library: a library or SDK that is imported into other code.
 - spam: promotional or keyword-stuffed repository.
 - other: anything else.
 
 Decide which style of API it exposes (api_style):
-- rest: HTTP endpoints addressed by URL and method (GET /users), often described by OpenAPI/Swagger. If it has REST endpoints at all, even next to gRPC or GraphQL, answer rest.
+- rest: HTTP endpoints addressed by URL and method (GET /users), often described by OpenAPI/Swagger.
 - graphql: a GraphQL schema and endpoint.
 - grpc: gRPC services defined in .proto files.
 - event: event or message APIs (webhooks, WebSocket, Kafka, MQTT), often described by AsyncAPI.
 - rpc: JSON-RPC or XML-RPC methods.
 - none: it does not expose an API of its own.
-- unknown: it seems to expose an API, but the data doesn't show which style.
 If documentation issues are listed, use them to decide which API they are about.
-"DocScout's checks" are facts measured from the repository's files (for example an OpenAPI spec it owns); give them more weight than wording in the README.
 
 Then write for the contributor:
 - "why": one or two sentences on who uses this API and what better documentation would let them do. Don't explain your classification here; that belongs in "evidence".
@@ -143,8 +142,6 @@ def build_messages(ctx: RepoContext, readme_chars: int = 1500) -> list[dict[str,
         parts.append("Documentation findings:\n" + "\n".join(f"- {_clean(f, 200)}" for f in ctx.findings[:10]))
     if ctx.issues:
         parts.append("Open documentation issues:\n" + "\n".join(f"- {_clean(i, 150)}" for i in ctx.issues[:5]))
-    if ctx.checks:
-        parts.append("DocScout's checks:\n" + "\n".join(f"- {_clean(c, 150)}" for c in ctx.checks[:10]))
     parts.append("README excerpt:\n" + _clean(ctx.readme_excerpt, readme_chars))
     user = "<repo_data>\n" + "\n\n".join(parts) + "\n</repo_data>"
     system = SYSTEM_PROMPT.format(wanted=", ".join(ctx.wanted_api_types) or "any")

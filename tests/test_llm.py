@@ -40,7 +40,7 @@ def test_an_app_naming_another_or_no_api_style_is_neutral():
     # e.g. flipt (gRPC with a REST gateway) and apps answered "serves_api" with style "none".
     assert combine(0.98, review("serves_api", 0.8, api_style="grpc")) == 0.98
     assert combine(1.0, review("serves_api", 0.8, api_style="none")) == 1.0
-    assert combine(0.5, review("serves_api", 0.9, api_style="unknown")) == 0.5  # and it doesn't raise either
+    assert combine(0.5, review("serves_api", 0.9, api_style="graphql")) == 0.5  # and it doesn't raise either
 
 
 def test_injected_readme_cannot_push_past_cap():

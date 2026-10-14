@@ -14,7 +14,6 @@ sanitized in the report.
 from __future__ import annotations
 
 import logging
-import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -66,22 +65,6 @@ def think_for(mode: str, code_confidence: float, min_confidence: float) -> bool:
     return mode == "on" or (mode == "borderline" and code_confidence < min_confidence)
 
 
-_GUESSES = ("app words", "tool words", "library words", "spam")
-
-
-def factual_checks(reasons: list[str]) -> list[str]:
-    """The classifier's evidence that was measured from files, without its keyword guesses
-    ("app words: ...") and weights, so the model judges the wording independently."""
-    checks = []
-    for reason in reasons:
-        if not reason or reason.lower().startswith(_GUESSES):
-            continue
-        if reason.lower().startswith("curated source"):
-            reason = "listed in awesome-selfhosted, a curated list of self-hosted apps"
-        checks.append(re.sub(r"\s*\([+-]?\d[\d.]*\)", "", reason).strip())
-    return checks
-
-
 def context_for(finding: StoredFinding, wanted: list[str]) -> RepoContext:
     d = finding.details
     gap: dict[str, Any] = d.get("gap") or {}
@@ -100,7 +83,6 @@ def context_for(finding: StoredFinding, wanted: list[str]) -> RepoContext:
         findings=[f for f in findings if f],
         issues=issues,
         wanted_api_types=wanted,
-        checks=factual_checks(list(d.get("reasons") or [])),
     )
 
 

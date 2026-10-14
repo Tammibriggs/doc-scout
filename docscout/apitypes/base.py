@@ -87,5 +87,18 @@ class ApiType:
 
     # ------------------------------------------------------------ LLM
 
+    def llm_verdict(self, review: Review, veto_confidence: float = 0.7) -> str:
+        """'agree', 'neutral' or 'disagree' with the code's "this repo serves this API type".
+
+        Measured on the 58 labeled repos (14 Oct): the small local model often calls an app
+        that serves an API "serves_api" with style "none", or names only one of several
+        styles (flipt: gRPC with a REST gateway). Counting those as disagreement dropped
+        12 real API apps, so they're neutral. Only a clear verdict that it isn't an app
+        with an API (a tool, library, spam or something else) lowers confidence.
+        """
+        if review.project_type == "serves_api":
+            return "agree" if review.api_style == self.llm_style else "neutral"
+        return "disagree" if review.confidence >= veto_confidence else "neutral"
+
     def llm_agrees(self, review: Review) -> bool:
-        return review.project_type == "serves_api" and review.api_style == self.llm_style
+        return self.llm_verdict(review) == "agree"

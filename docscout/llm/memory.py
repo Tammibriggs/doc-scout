@@ -27,7 +27,7 @@ def shortage(llm_cfg: dict[str, Any], free: int | None = None) -> str | None:
     if llm_cfg.get("provider") != "ollama":
         return None
     free = available_bytes() if free is None else free
-    need = float(llm_cfg.get("min_free_memory_gb", 2.5))
+    need = float(llm_cfg.get("min_free_memory_gb", 6))
     if free is None or free >= need * 1e9:
         return None
     return f"only {free / 1e9:.1f} GB of memory is free and {llm_cfg.get('model', 'the model')} needs about {need:g} GB"

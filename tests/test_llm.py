@@ -19,7 +19,7 @@ def review(project_type="serves_api", confidence=0.9, api_style="rest"):
 
 
 def combine(code_confidence, r):
-    return apply_review(code_confidence, r, agrees=REST.llm_agrees(r))
+    return apply_review(code_confidence, r, verdict=REST.llm_verdict(r))
 
 
 def test_agreement_raises_confidence_but_only_to_the_cap():
@@ -29,14 +29,18 @@ def test_agreement_raises_confidence_but_only_to_the_cap():
     assert combine(0.9, review("serves_api", 1.0)) == 0.9  # code was already above the cap
 
 
-def test_disagreement_lowers_in_proportion():
+def test_a_clear_no_lowers_in_proportion_and_an_unsure_one_changes_nothing():
     assert combine(0.6, review("api_tooling", 0.9)) == pytest.approx(0.06)
-    assert combine(0.6, review("library", 0.25)) == pytest.approx(0.45)
+    assert combine(0.6, review("other", 0.8)) == pytest.approx(0.12)
+    assert combine(0.6, review("library", 0.5)) == 0.6  # below llm_veto_confidence
 
 
-def test_service_with_a_different_api_style_counts_as_disagreement():
-    # It serves an API, but GraphQL, not REST: lowers REST confidence.
-    assert combine(0.6, review("serves_api", 0.9, api_style="graphql")) == pytest.approx(0.06)
+def test_an_app_naming_another_or_no_api_style_is_neutral():
+    # Measured on the labels (14 Oct): counting these as disagreement dropped 12 real API apps,
+    # e.g. flipt (gRPC with a REST gateway) and apps answered "serves_api" with style "none".
+    assert combine(0.98, review("serves_api", 0.8, api_style="grpc")) == 0.98
+    assert combine(1.0, review("serves_api", 0.8, api_style="none")) == 1.0
+    assert combine(0.5, review("serves_api", 0.9, api_style="unknown")) == 0.5  # and it doesn't raise either
 
 
 def test_injected_readme_cannot_push_past_cap():

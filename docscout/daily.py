@@ -38,7 +38,7 @@ MAX_SCHEDULED_RUNS_PER_DAY = 8  # a run that keeps getting cut short doesn't ret
 RETRY_AFTER_FAILURE = timedelta(hours=1)
 FAILURES_BEFORE_ALERT = 3
 DEFAULT_SECONDS_PER_REPO = 10  # checking one repo, for the "about N minutes" estimate before there's any history
-DEFAULT_SECONDS_PER_REVIEW = 45  # one review by gemma4:e2b on the 7.6 GB development laptop
+DEFAULT_SECONDS_PER_REVIEW = 51  # one review by gemma4:e2b on the 7.8 GB development laptop (measured on 50 repos)
 MODEL_BLOCKED_ALERT = timedelta(days=2)
 
 CONTINUING = "continuing today's run"

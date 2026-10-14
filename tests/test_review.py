@@ -92,7 +92,7 @@ def test_the_model_lets_borderline_projects_in_and_keeps_lookalikes_out(cfg, sto
     reported = store.pending_findings(now, 25, 10)
     assert [f.full_name for f in reported] == ["org/borderline"]
     r = reported[0].details["review"]
-    assert (r["code_confidence"], r["final_confidence"], r["agrees"]) == (0.5, 0.8, True)  # raised, but only to the cap
+    assert (r["code_confidence"], r["final_confidence"], r["verdict"]) == (0.5, 0.8, "agree")  # raised, but only to the cap
     assert "type 0.80" in reported[0].details["breakdown"]
     assert model.unloaded
 
@@ -109,7 +109,7 @@ def test_nothing_unreviewed_is_reported_and_low_memory_holds_projects(cfg, store
     add_finding(store, now, "org/app", code_confidence=0.9)
     monkeypatch.setattr(memory, "available_bytes", lambda: int(1.2e9))
     out = review_now(store, cfg, now, None)  # the model is never opened
-    assert out.skipped == "only 1.2 GB of memory is free and gemma4:e2b needs about 2.5 GB"
+    assert out.skipped == "only 1.2 GB of memory is free and gemma4:e2b needs about 6 GB"
     assert out.waiting == 1 and store.pending_findings(now, 25, 10) == []
 
 
@@ -213,7 +213,7 @@ def test_a_model_blocked_for_two_days_asks_for_attention(cfg, store, tmp_path, n
         clock.advance(days=1)
     assert [n for n in notes if n[2]] == [
         ("DocScout needs attention", "Gemma hasn't been able to review projects for 2 days, so 1 are waiting: "
-         "only 1.0 GB of memory is free and gemma4:e2b needs about 2.5 GB.", True)
+         "only 1.0 GB of memory is free and gemma4:e2b needs about 6 GB.", True)
     ]  # fmt: skip
 
 
@@ -320,3 +320,15 @@ def test_dependency_bumps_in_docs_tooling_are_not_someone_writing_docs():
 
     checks = paid_checks(Pulls(), "org/app", Checks(), {}, [], None)
     assert checks.claimed == ["Open PR #1172: docs: describe the feeding endpoints"]
+
+
+def test_the_model_sees_measured_facts_but_not_the_codes_keyword_guesses():
+    reasons = ["curated source (+0.20)", "app words: self-hosted, app phrase", "owns an OpenAPI/Swagger spec (+0.10)", "README documents 5 endpoints"]
+    assert review.factual_checks(reasons) == [
+        "listed in awesome-selfhosted, a curated list of self-hosted apps", "owns an OpenAPI/Swagger spec", "README documents 5 endpoints"
+    ]
+    from docscout.llm.base import build_messages
+    from docscout.llm import RepoContext
+
+    user = build_messages(RepoContext(full_name="a/b", checks=["owns an OpenAPI/Swagger spec"]))[1]["content"]
+    assert "DocScout's checks:\n- owns an OpenAPI/Swagger spec" in user

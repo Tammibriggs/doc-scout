@@ -68,6 +68,21 @@ All three sources are above 50%, so all stay on.
 - **Use the local model.** About 13 reviews fit in the 10-minute daily budget (600 s ÷ 44.8 s).
 - **Add a memory check before loading the model**, because a daily run on a laptop with other apps open (1.6 GB free on 12 Oct) would otherwise swap. That check is part of M2.
 
+**M2 label check (14 Oct)**: `gemma4:e2b` reviewed the 50 labeled repos with code confidence of at least 0.4. In this check Gemma saw only the README excerpt, description, topics and issue titles.
+
+| | Precision | Recall | Reported | Time per review |
+|---|---|---|---|---|
+| Code only | 76% | 90% | 37 | |
+| Gemma, first rule, thinking off | 80% | **52%** | 20 | 51.1 s |
+| Gemma, first rule, thinking for borderline repos | 76% | 52% | 21 | 133.3 s |
+| Gemma, new rule (same cached reviews) | 81% | 81% | 31 | 51.1 s |
+
+- **The first rule threw out 12 real API apps.** Seven were answers like `serves_api` with style `none` (an app with an API, but "no API style"). flipt was rejected for being gRPC, though it serves REST too. The rule counted any answer other than "serves_api + rest" as disagreement and cut confidence from 1.00 to 0.20.
+- **The new rule:** an app that serves an API agrees whatever style the model names, and only a clear verdict (confidence ≥ `llm_veto_confidence`, 0.7) that it's a tool, library, spam or something else lowers confidence. On the cached reviews it makes 12 mistakes, the same number as code alone: precision up from 76% to 81%, recall down from 90% to 81%. Picked over alternatives on the same 58 labels, so the gain is small and uncertain.
+- **Thinking:** no more accurate and 2.6 times slower, so it stays off.
+- **Memory:** Gemma used 5.5–5.9 GB (6.2 GB free before and 0.7 GB at the lowest; 7.0 and 1.1 in the second run) on a 7.8 GB laptop. `min_free_memory_gb` is 6, so reviews wait until most memory is free. On this laptop that's typically right after login, when the daily run starts.
+- **Next:** prompt version 3 says what `serves_api` means, offers style `unknown` instead of a contradictory `none`, and passes Gemma the code's *measured* facts (an owned OpenAPI spec, endpoints in the README), not its keyword guesses. A daily run also gives it the measured docs gaps. ⏳ Re-measure with `eval --llm`.
+
 ## 3. Success criteria
 
 | Metric | Target | Checked in |
@@ -273,7 +288,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 ## 11. The LLM (M2)
 
 **Gemma is required** (decided 13 Oct, for the challenge's "the open pieces should be what makes your project work"):
-- ✅ **It reviews every repo that passes the health checks** with confidence of at least 0.4, up to `[llm] reviews_per_run` a day (13: about 10 minutes at 45 s each). Most promising first: before its review, a finding is ranked by the score it would get if the model agrees.
+- ✅ **It reviews every repo that passes the health checks** with confidence of at least 0.4, up to `[llm] reviews_per_run` a day (11: about 10 minutes at the measured 51 s each). Most promising first: before its review, a finding is ranked by the score it would get if the model agrees.
 - ✅ **Only reviewed repos are reported.** If Gemma can't run (Ollama not running, memory low), findings are held, not dropped. A later check the same day reviews them once memory is free; otherwise the next run does. Held findings wait up to 14 days. If Gemma can't run for 2 days in a row, you get a "needs attention" notification.
 - ✅ **`init` no longer offers "none":** the choice is local Gemma or a hosted open-weight model. `run --no-llm` is gone, and `score owner/repo` includes the model's review.
 
@@ -282,7 +297,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 2. **Guide:** why its docs matter, and up to 3 first steps based on the gaps code found.
 3. ✅ **`docscout draft owner/repo`** (on demand, after you pick a project): a short first message asking the maintainers whether a docs PR is welcome, using the current issue and PR state. DocScout never posts anything itself. It replies on an open "help wanted" or docs issue when there is one, otherwise it drafts a new issue. The claim check runs again first and warns if someone has started, and CLA or AI-policy notes are shown. The draft is printed with control characters removed.
 
-**Thinking:** Gemma 4 supports it (on by default in the model; DocScout turns it off, so the 44.8 s benchmark was without it). The label check compares thinking off and on for borderline repos. If it clearly helps, it's turned on only for those. A `think` setting covers fast machines and hosted models.
+**Thinking:** Gemma 4 supports it (on by default in the model; DocScout turns it off). ✅ Measured (section 2): no more accurate, 2.6 times slower, so `think = "off"`. The setting stays for faster machines and hosted models.
 
 **Not built** (to keep the scope small, decided 13 Oct): a weekly report and a `picks` command. Reports stay one per run, and `latest.md` is the newest.
 
@@ -296,7 +311,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 - Ollama: JSON schema output, `think: false`, the model kept loaded during the batch, then unloaded.
 - Any OpenAI-compatible API, falling back to JSON mode if a provider doesn't support schemas.
 
-- ✅ **Memory check:** a local model loads only when `[llm] min_free_memory_gb` (2.5 for now) is free. A run started on a busy laptop holds its findings, and the next 15-minute check reviews them without a new run until memory is free. The value is set from the label check's memory measurement.
+- ✅ **Memory check:** a local model loads only when `[llm] min_free_memory_gb` (6, measured: Gemma used 5.5–5.9 GB) is free. A run started on a busy laptop holds its findings, and the next 15-minute check reviews them without a new run until memory is free. The value is set from the label check's memory measurement.
 - ✅ **What the report shows:** Gemma's verdict with its evidence quote and the confidence change (e.g. 0.50 → 0.80), why the docs matter, and numbered first steps. Everything the model writes is escaped like other untrusted text. A project the model can't give a valid answer for in 2 runs is dropped.
 
 **M2 tuning:** `bench-llm` recommends `reviews_per_run` (about 13 on this laptop, at 44.8 s per review). ✅ Built: `docscout eval tests/fixtures/labeled_repos.csv --llm [--think off|borderline|on]` reviews the 50 labeled repos with code confidence of at least 0.4 (about 37 minutes at 45 s each), using the repo data `--reclassify` cached, so it makes no GitHub calls. Reviews are cached per repo, model and thinking setting, so a thinking comparison only reviews the borderline repos again. It reports precision and recall with and without the model, seconds per review, and the memory used, with a suggested `min_free_memory_gb`. In this check the model doesn't see the docs gaps, which a daily run gives it. ⏳ To run with other apps closed. **The label check is required, not optional:** precision and recall on the 58 labeled repos, with and without Gemma, become the evidence in the DEV post. If Gemma doesn't help, the prompt is tuned first.
@@ -404,7 +419,7 @@ hacktoberfest/
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
     db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅  llm_eval.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 175 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 176 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -418,6 +433,7 @@ hacktoberfest/
 | A temporary GitHub error ends a long run (**seen** on 12 Oct: one 404 crashed `discover`) | One retry on short-lived 404s; a failing repo is skipped and recorded; Ctrl+C keeps partial results ✅ |
 | A PR edits a generated spec | Generated-spec check redirects the suggestion to code annotations |
 | Wasted effort (already claimed, CLA, AI policy) | Claim check and requirement badges on the top 10 |
+| The small local model isn't a better judge than the code (**measured** 14 Oct) | Agreement rule fixed (52% → 81% recall); measured facts in the prompt; Gemma's clearest value is writing why the docs matter, first steps and drafts. A larger hosted open-weight model is one setting away |
 | Prompt injection pushes a repo up the ranking | Confidence raise capped at 0.8; code-only gates; sanitized output |
 | A malicious repo targets your machine | Alias-free YAML, in-memory archives, fixed notification text, sanitized report, safe fetcher (M4) |
 | The token expires and runs fail silently | Alerts for a missing or rejected token, broken settings and 3 failed runs in a row ✅ |

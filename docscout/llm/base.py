@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 ProjectType = Literal["serves_api", "api_tooling", "library", "spam", "other"]
 # Every API style the model may name, whether or not DocScout has an API type for it yet,
 # so it can say "this is GraphQL, not REST" even while only REST is enabled.
-ApiStyle = Literal["rest", "graphql", "grpc", "event", "rpc", "none"]
+ApiStyle = Literal["rest", "graphql", "grpc", "event", "rpc", "none", "unknown"]
 
 
 class LLMError(Exception):
@@ -47,7 +47,7 @@ class Review(BaseModel):
 
 
 REVIEW_SCHEMA: dict[str, Any] = Review.model_json_schema()
-PROMPT_VERSION = 2  # part of cached reviews' keys, so a changed prompt isn't measured with old answers
+PROMPT_VERSION = 3  # part of cached reviews' keys, so a changed prompt isn't measured with old answers
 
 
 class Draft(BaseModel):
@@ -77,26 +77,30 @@ class RepoContext:
     issues: list[str] = field(default_factory=list)
     # Labels of the API types the contributor is looking for, e.g. ["REST"].
     wanted_api_types: list[str] = field(default_factory=list)
+    # Facts DocScout's code measured in the repo's files, e.g. "owns an OpenAPI/Swagger spec".
+    checks: list[str] = field(default_factory=list)
 
 
 SYSTEM_PROMPT = """You review open-source GitHub repositories for someone who wants to contribute API documentation.
 They are looking for these kinds of API: {wanted}.
 
 Decide what kind of project the repository is:
-- serves_api: an application or service that exposes its own API that users call.
+- serves_api: an application or service that exposes its own API for other programs to call (HTTP endpoints, GraphQL, gRPC, webhooks). A web app with only a user interface is "other".
 - api_tooling: a tool for working with APIs (code generator, validator, mock server, test tool, API client app, framework).
 - library: a library or SDK that is imported into other code.
 - spam: promotional or keyword-stuffed repository.
 - other: anything else.
 
 Decide which style of API it exposes (api_style):
-- rest: HTTP endpoints addressed by URL and method (GET /users), often described by OpenAPI/Swagger.
+- rest: HTTP endpoints addressed by URL and method (GET /users), often described by OpenAPI/Swagger. If it has REST endpoints at all, even next to gRPC or GraphQL, answer rest.
 - graphql: a GraphQL schema and endpoint.
 - grpc: gRPC services defined in .proto files.
 - event: event or message APIs (webhooks, WebSocket, Kafka, MQTT), often described by AsyncAPI.
 - rpc: JSON-RPC or XML-RPC methods.
 - none: it does not expose an API of its own.
+- unknown: it seems to expose an API, but the data doesn't show which style.
 If documentation issues are listed, use them to decide which API they are about.
+"DocScout's checks" are facts measured from the repository's files (for example an OpenAPI spec it owns); give them more weight than wording in the README.
 
 Then write for the contributor:
 - "why": one or two sentences on who uses this API and what better documentation would let them do. Don't explain your classification here; that belongs in "evidence".
@@ -139,6 +143,8 @@ def build_messages(ctx: RepoContext, readme_chars: int = 1500) -> list[dict[str,
         parts.append("Documentation findings:\n" + "\n".join(f"- {_clean(f, 200)}" for f in ctx.findings[:10]))
     if ctx.issues:
         parts.append("Open documentation issues:\n" + "\n".join(f"- {_clean(i, 150)}" for i in ctx.issues[:5]))
+    if ctx.checks:
+        parts.append("DocScout's checks:\n" + "\n".join(f"- {_clean(c, 150)}" for c in ctx.checks[:10]))
     parts.append("README excerpt:\n" + _clean(ctx.readme_excerpt, readme_chars))
     user = "<repo_data>\n" + "\n\n".join(parts) + "\n</repo_data>"
     system = SYSTEM_PROMPT.format(wanted=", ".join(ctx.wanted_api_types) or "any")
@@ -180,19 +186,21 @@ def parse_review(content: str) -> Review:
         raise LLMError(f"invalid review JSON: {exc}") from exc
 
 
-def apply_review(code_confidence: float, review: Review, *, agrees: bool, raise_cap: float = 0.8) -> float:
-    """Combine the code classifier's confidence with the LLM's verdict.
+def apply_review(code_confidence: float, review: Review, *, verdict: str, raise_cap: float = 0.8) -> float:
+    """Combine the code classifier's confidence with the model's verdict.
 
-    ``agrees`` comes from the API type being checked (:meth:`ApiType.llm_agrees`).
-    Disagreement lowers confidence in proportion to how sure the LLM is. Agreement can
-    raise it, but never above ``raise_cap``; a value the code already set above the
-    cap is kept as is.
+    ``verdict`` comes from the API type being checked (:meth:`ApiType.llm_verdict`).
+    "agree" can raise confidence, but never above ``raise_cap`` (a value the code already
+    set above the cap is kept). "disagree" lowers it in proportion to how sure the model
+    is. "neutral" leaves it as the code set it.
     """
-    if agrees:
+    if verdict == "agree":
         if code_confidence >= raise_cap:
             return code_confidence
         return round(min(raise_cap, max(code_confidence, review.confidence)), 3)
-    return round(code_confidence * (1.0 - review.confidence), 3)
+    if verdict == "disagree":
+        return round(code_confidence * (1.0 - review.confidence), 3)
+    return code_confidence
 
 
 class LLMClient(Protocol):

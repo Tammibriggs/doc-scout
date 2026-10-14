@@ -59,7 +59,8 @@ min_outsider_merged_prs_180d = 0
 [classify]
 prefilter_below = 0.25          # skip repos whose metadata alone says "not an API" (saves API calls)
 llm_band = [0.4, 0.7]           # repos in this confidence band always get an LLM second opinion
-llm_raise_cap = 0.8             # the LLM may raise confidence up to this value, never higher
+llm_raise_cap = 0.8             # the model may raise confidence up to this value, never higher
+llm_veto_confidence = 0.7       # the model lowers confidence only when it says this surely that it's not an app with an API
 min_confidence = 0.6            # repos at or above this count as serving an API (tuned on the labeled sample)
 drop_below = 0.4                # below this, never reported; between this and min_confidence only if the LLM confirms (M2)
 
@@ -69,9 +70,9 @@ provider = "ollama"             # ollama (local) | openai_compatible (hosted, e.
 model = "gemma4:e2b"
 base_url = "http://localhost:11434"
 api_key_env = "DOCSCOUT_LLM_API_KEY"
-reviews_per_run = 13            # about 10 minutes at 45 s per review; `docscout bench-llm` measures yours
-think = "off"                   # off | borderline (only where the code is unsure) | on. Slower; see the plan's measurements
-min_free_memory_gb = 2.5        # a local model waits until this much memory is free, so the computer doesn't swap
+reviews_per_run = 11            # about 10 minutes at 51 s per review (measured); `docscout bench-llm` measures yours
+think = "off"                   # off | borderline | on. Measured: no more accurate, 2.6 times slower
+min_free_memory_gb = 6          # a local model waits until this much memory is free; gemma4:e2b used 5.5-5.9 GB
 num_ctx = 4096
 timeout_seconds = 300
 readme_chars = 1500

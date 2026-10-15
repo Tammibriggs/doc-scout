@@ -185,7 +185,7 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     _stop_on_sigterm()
     if args.if_due:
         return _run_if_due(cfg, sources)
-    limit = args.limit or int(cfg["discovery"]["daily_repo_budget"])
+    limit = int(cfg["discovery"]["daily_repo_budget"]) if args.limit is None else max(0, args.limit)
     store = Store(store_path())
     try:
         with lock.hold(lock_path()), _github(cfg) as gh:
@@ -637,7 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=_cmd_profile)
 
     p = sub.add_parser("run", help="find projects with API docs gaps and write a report")
-    p.add_argument("--limit", type=int, help="repos to check this time (default: [discovery] daily_repo_budget)")
+    p.add_argument("--limit", type=int, help="repos to check this time (default: [discovery] daily_repo_budget); 0 only reviews the projects waiting for the model")
     p.add_argument("--sources", help="comma-separated sources (default: [discovery] sources)")
     p.add_argument("--if-due", action="store_true", help="only run if today's run is due (what the daily schedule uses)")
     _add_profile_flags(p)

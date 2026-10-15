@@ -1,6 +1,7 @@
 import random
 import re
-from datetime import timedelta
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,44 @@ def test_report_files_are_never_overwritten(tmp_path, now):
     second = write(tmp_path, now, "two")
     assert (first.name, second.name) == ("2026-10-12.md", "2026-10-12_2.md")
     assert first.read_text() == "one" and (tmp_path / "latest.md").read_text() == "two"
+
+
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="needs time.tzset (Unix)")
+def test_report_file_is_named_after_your_day_not_utcs(tmp_path, monkeypatch):
+    # Seen 15 Oct: the daily run at 00:15 in Lagos wrote 2026-10-14_3.md.
+    monkeypatch.setenv("TZ", "Africa/Lagos")  # UTC+1, no daylight saving time
+    time.tzset()
+    try:
+        just_after_midnight = datetime(2026, 10, 14, 23, 15, tzinfo=timezone.utc)
+        assert write(tmp_path, just_after_midnight, "x").name == "2026-10-15.md"
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+
+
+def test_run_with_limit_0_only_reviews(tmp_path, monkeypatch):
+    # `--limit 0` used to fall back to the daily budget and start a full search.
+    from contextlib import nullcontext
+
+    from docscout import cli
+
+    class Called(Exception):
+        pass
+
+    def fake_run(gh, cfg, store, now, *, limit, **kw):
+        raise Called(limit)
+
+    monkeypatch.setattr(cli, "store_path", lambda: tmp_path / "docscout.db")
+    monkeypatch.setattr(cli, "lock_path", lambda: tmp_path / "run.lock")
+    monkeypatch.setattr(cli, "_github", lambda cfg: nullcontext())
+    monkeypatch.setattr(pipeline, "run", fake_run)
+    config = str(tmp_path / "config.toml")
+    with pytest.raises(Called) as called:
+        cli.main(["--config", config, "run", "--limit", "0"])
+    assert called.value.args == (0,)
+    with pytest.raises(Called) as called:
+        cli.main(["--config", config, "run"])
+    assert called.value.args == (int(load_defaults()["discovery"]["daily_repo_budget"]),)
 
 
 # ---------------------------------------------------------------------- storage

@@ -68,8 +68,9 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 ## Find projects to contribute to
 
 ```bash
-.venv/bin/docscout run              # checks up to 60 repos, Gemma reviews up to 13 (about 20 minutes), writes a report
+.venv/bin/docscout run              # checks up to 60 repos, Gemma reviews up to 11 (about 15 minutes), writes a report
 .venv/bin/docscout run --limit 10   # a quicker, smaller run
+.venv/bin/docscout run --limit 0    # only Gemma's reviews of projects still waiting for one (e.g. after a run with too little free memory)
 ```
 
 **The report** goes to `~/Documents/DocScout/reports/` (set `[report] dir` to change it):

@@ -142,7 +142,8 @@ def render(
     now: datetime,
     looking_for: str,
 ) -> str:
-    date = f"{now.day} {now.strftime('%b %Y')}"  # "%-d" isn't supported on Windows
+    local = now.astimezone()  # your day, not UTC's: a run just after midnight belongs to the new day
+    date = f"{local.day} {local.strftime('%b %Y')}"  # "%-d" isn't supported on Windows
     lines = [
         f"# DocScout · {date} · {len(findings)} new · {len(still_open)} still open",
         "",
@@ -190,7 +191,7 @@ def _footer(summary: RunSummary) -> str:
 def write(report_dir: Path, now: datetime, markdown: str) -> Path:
     """Save as YYYY-MM-DD.md (YYYY-MM-DD_2.md for a later run that day) and copy to latest.md."""
     report_dir.mkdir(parents=True, exist_ok=True)
-    stem = now.strftime("%Y-%m-%d")
+    stem = now.astimezone().strftime("%Y-%m-%d")  # the local day, as daily.check_due counts days
     path = report_dir / f"{stem}.md"
     number = 2
     while path.exists():

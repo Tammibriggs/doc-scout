@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from docscout.github import GitHub
-from docscout.sources import Candidate
+from docscout.find.github import GitHub
+from docscout.find.sources import Candidate
 
 SOURCE = "code_search"
 

@@ -87,7 +87,7 @@ So a docs site is a good ranking signal, but not a filter on its own.
 
 | Cause | Effect |
 |---|---|
-| Spec files are only found when "openapi" or "swagger" is in the **file name** ([rest.py](../../docscout/apitypes/rest.py) `definition_pattern`) | Missed 4 specs: dagu `api/v1/api.yaml`, jupyter_server `services/api/api.yaml`, traceroot `backend/rest/openapi/public.json`, ChurchCRM `docs/openapi/generated/*.yaml` |
+| Spec files are only found when "openapi" or "swagger" is in the **file name** ([rest.py](../../docscout/analyze/apitypes/rest.py) `definition_pattern`) | Missed 4 specs: dagu `api/v1/api.yaml`, jupyter_server `services/api/api.yaml`, traceroot `backend/rest/openapi/public.json`, ChurchCRM `docs/openapi/generated/*.yaml` |
 | An AI-agent instruction file (`.agents/skills/…`) counted as API docs | ChurchCRM's "prose docs" and their counts were wrong |
 | Issues labeled "help wanted" or "good first issue" with "api" in the title count as docs requests | A feature request (traceroot #2579) and a bug (mycelium #279) were shown as "maintainers asked for help" |
 | Specs exported by a framework (drf-spectacular) without a marker show as hand-written | modoboa's suggestion should have been "edit the code annotations" |

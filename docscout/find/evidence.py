@@ -1,7 +1,7 @@
 """Signals about a repo, and the generic "what role does this project play" evidence.
 
 Everything here works on text and file names only, so it treats every language and
-framework alike. API-type-specific evidence lives in :mod:`docscout.apitypes`.
+framework alike. API-type-specific evidence lives in :mod:`docscout.analyze.apitypes`.
 """
 
 from __future__ import annotations

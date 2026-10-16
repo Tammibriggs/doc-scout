@@ -13,9 +13,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from docscout.analyze.gaps import Gap, kind_label
-from docscout.db import Store, StoredFinding
-from docscout.review import model_label
-from docscout.sanitize import blob_url, clean, is_github_url, repo_url
+from docscout.run.db import Store, StoredFinding
+from docscout.llm.review import model_label
+from docscout.run.sanitize import blob_url, clean, is_github_url, repo_url
 
 WEEK = timedelta(days=7)
 FREE_PICKS = 5

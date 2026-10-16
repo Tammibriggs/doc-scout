@@ -28,9 +28,9 @@ def main(argv: list[str] | None = None, atlas: object | None = None) -> int:
     os.environ.setdefault("XDG_DATA_HOME", "/tmp/docscout-data")
 
     from docscout import cli
-    from docscout.config import data_dir
-    from docscout.db import Store
-    from docscout.health import utcnow
+    from docscout.settings.config import data_dir
+    from docscout.run.db import Store
+    from docscout.find.health import utcnow
     from docscout.hosted.picks import weekly_picks
 
     if atlas is None:

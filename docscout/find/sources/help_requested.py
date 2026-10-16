@@ -22,9 +22,9 @@ from collections.abc import Iterator
 from datetime import date
 from typing import Any
 
-from docscout.github import GitHub
-from docscout.scoring import is_docs_label
-from docscout.sources import Candidate
+from docscout.find.github import GitHub
+from docscout.analyze.scoring import is_docs_label
+from docscout.find.sources import Candidate
 
 SOURCE = "help_requested"
 INSIDERS = {"OWNER", "MEMBER", "COLLABORATOR"}

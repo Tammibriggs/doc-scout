@@ -11,11 +11,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from docscout.analyze.checks import Checks, paid_checks
-from docscout.db import StoredFinding
-from docscout.github import GitHub, GitHubError
+from docscout.run.db import StoredFinding
+from docscout.find.github import GitHub, GitHubError
 from docscout.llm import LLMClient
-from docscout.review import context_for
-from docscout.sanitize import block, clean, repo_url
+from docscout.llm.review import context_for
+from docscout.run.sanitize import block, clean, repo_url
 
 NEW_ISSUE = "new issue"
 

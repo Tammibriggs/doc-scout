@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from docscout.apitypes.openapi import Resolver, has_example, is_generated, parse_spec, score_spec
+from docscout.analyze.apitypes.openapi import Resolver, has_example, is_generated, parse_spec, score_spec
 
 SPECS = Path(__file__).parent / "fixtures" / "specs"
 

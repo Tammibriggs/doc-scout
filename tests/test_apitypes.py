@@ -5,12 +5,12 @@ from datetime import date
 import pytest
 from conftest import iso
 
-from docscout import apitypes
-from docscout.apitypes import REGISTRY, ApiType, ConfigError, enabled_types
-from docscout.apitypes.rest import RestApi
-from docscout.classify import classify
-from docscout.discover import source_candidates
-from docscout.evidence import Evidence, Signals
+from docscout.analyze import apitypes
+from docscout.analyze.apitypes import REGISTRY, ApiType, ConfigError, enabled_types
+from docscout.analyze.apitypes.rest import RestApi
+from docscout.find.classify import classify
+from docscout.find.discover import source_candidates
+from docscout.find.evidence import Evidence, Signals
 
 
 class FakeGraphQL(ApiType):

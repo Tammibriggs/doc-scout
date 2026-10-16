@@ -1,10 +1,10 @@
 from pathlib import Path
 
 from docscout.analyze.elsewhere import docs_elsewhere, doc_links, published_docs, sibling_repos
-from docscout.apitypes.base import DocsContext
-from docscout.apitypes.rest import RestApi
-from docscout.apitypes.rest_prose import analyze_docs, analyze_text
-from docscout.github import NotFound
+from docscout.analyze.apitypes.base import DocsContext
+from docscout.analyze.apitypes.rest import RestApi
+from docscout.analyze.apitypes.rest_prose import analyze_docs, analyze_text
+from docscout.find.github import NotFound
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -231,7 +231,7 @@ def test_framework_docs_links_and_docs_hosts_are_not_mistaken_for_project_docs()
 def test_implementing_a_specification_does_not_make_a_project_a_tool(now):
     from conftest import iso
 
-    from docscout.classify import classify
+    from docscout.find.classify import classify
 
     meta = {"full_name": "project-zot/zot", "created_at": iso(900), "topics": [],
             "description": "A production-ready vendor-neutral OCI image registry, based on the OCI Distribution Specification"}  # fmt: skip

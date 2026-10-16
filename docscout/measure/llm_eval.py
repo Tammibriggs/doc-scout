@@ -19,12 +19,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from docscout.apitypes import ApiType
-from docscout.config import Config
-from docscout.evaluate import Report, evaluate_rows
+from docscout.analyze.apitypes import ApiType
+from docscout.settings.config import Config
+from docscout.measure.evaluate import Report, evaluate_rows
 from docscout.llm import LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review, memory
 from docscout.llm.base import PROMPT_VERSION, review_with_retry
-from docscout.review import model_label, think_for
+from docscout.llm.review import model_label, think_for
 
 CACHE_VERSION = 1
 

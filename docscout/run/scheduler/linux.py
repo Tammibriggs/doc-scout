@@ -14,7 +14,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from docscout.scheduler import SchedulerError, ScheduleStatus
+from docscout.run.scheduler import SchedulerError, ScheduleStatus
 
 SERVICE = "docscout.service"
 TIMER = "docscout.timer"

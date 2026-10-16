@@ -20,14 +20,14 @@ import sys
 from pathlib import Path
 
 from docscout import __version__
-from docscout.config import Config, data_dir, load_config, log_dir, user_config_path
+from docscout.settings.config import Config, data_dir, load_config, log_dir, user_config_path
 from docscout.errors import ConfigError
 
 log = logging.getLogger("docscout")
 
 
 def _cmd_init(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout import setup_wizard
+    from docscout.settings import setup_wizard
 
     path = args.config or user_config_path()
     if args.yes:
@@ -50,8 +50,8 @@ def _cmd_init(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _cmd_set(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout import setup_wizard
-    from docscout.config import save_user_config
+    from docscout.settings import setup_wizard
+    from docscout.settings.config import save_user_config
 
     notifications = {
         key: value == "on"
@@ -82,9 +82,9 @@ def _cmd_set(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _save_and_show(cfg: Config, answers, path: Path) -> None:
-    from docscout import setup_wizard
-    from docscout.apitypes import enabled_types
-    from docscout.profile import describe
+    from docscout.settings import setup_wizard
+    from docscout.analyze.apitypes import enabled_types
+    from docscout.settings.profile import describe
 
     print()
     for message in setup_wizard.save(answers, cfg, path):
@@ -95,8 +95,8 @@ def _save_and_show(cfg: Config, answers, path: Path) -> None:
 
 
 def _cmd_profile(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout.apitypes import enabled_types
-    from docscout.profile import describe
+    from docscout.analyze.apitypes import enabled_types
+    from docscout.settings.profile import describe
 
     path = str(cfg.path) if cfg.path else None
     print(describe(cfg.values, enabled_types(cfg["api_types"]), has_token=bool(cfg.github_token), config_path=path))
@@ -105,9 +105,9 @@ def _cmd_profile(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _cmd_discover(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout.discover import LABELS, draw_sample, write_rejected, write_sample
-    from docscout.github import GitHub
-    from docscout.health import utcnow
+    from docscout.find.discover import LABELS, draw_sample, write_rejected, write_sample
+    from docscout.find.github import GitHub
+    from docscout.find.health import utcnow
 
     token = cfg.github_token
     sources = args.sources.split(",") if args.sources else list(cfg["discovery"]["sources"])
@@ -164,7 +164,7 @@ def _stop_on_sigterm() -> None:
 
 
 def _github(cfg: Config):
-    from docscout.github import GitHub
+    from docscout.find.github import GitHub
 
     if not cfg.github_token:
         print("No GitHub token found, so GitHub allows only 60 requests an hour. Run `docscout init` to add one.", file=sys.stderr)
@@ -172,12 +172,12 @@ def _github(cfg: Config):
 
 
 def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout import pipeline
-    from docscout.db import Store
-    from docscout.github import AuthError
-    from docscout.health import utcnow
+    from docscout.run import pipeline
+    from docscout.run.db import Store
+    from docscout.find.github import AuthError
+    from docscout.find.health import utcnow
 
-    from docscout import lock
+    from docscout.run import lock
 
     sources = args.sources.split(",") if args.sources else list(cfg["discovery"]["sources"])
     if not cfg.github_token and "code_search" in sources:
@@ -215,10 +215,10 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _run_if_due(cfg: Config, sources: list[str]) -> int:
-    from docscout import daily, notify
-    from docscout.db import Store
-    from docscout.github import GitHub
-    from docscout.health import utcnow
+    from docscout.run import daily, notify
+    from docscout.run.db import Store
+    from docscout.find.github import GitHub
+    from docscout.find.health import utcnow
 
     store = Store(store_path())
     try:
@@ -230,7 +230,7 @@ def _run_if_due(cfg: Config, sources: list[str]) -> int:
 
 
 def _schedule_line(cfg: Config, args: argparse.Namespace) -> tuple[list[str], object | None]:
-    from docscout import scheduler
+    from docscout.run import scheduler
 
     try:
         sched = scheduler.for_this_os()
@@ -248,9 +248,9 @@ def _schedule_line(cfg: Config, args: argparse.Namespace) -> tuple[list[str], ob
 
 
 def _cmd_status(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout import daily, lock
-    from docscout.db import Store
-    from docscout.health import utcnow
+    from docscout.run import daily, lock
+    from docscout.run.db import Store
+    from docscout.find.health import utcnow
 
     lines, sched = _schedule_line(cfg, args)
     print("\n".join(lines))
@@ -269,7 +269,7 @@ def _cmd_status(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _cmd_schedule(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout import notify, scheduler
+    from docscout.run import notify, scheduler
 
     if args.action == "status":
         return _cmd_status(cfg, args)
@@ -302,9 +302,9 @@ def _cmd_schedule(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _cmd_mark(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout.db import Store
-    from docscout.health import utcnow
-    from docscout.sources import github_full_name
+    from docscout.run.db import Store
+    from docscout.find.health import utcnow
+    from docscout.find.sources import github_full_name
 
     name = github_full_name(args.repo) or args.repo.strip().strip("/")
     if name.count("/") != 1:
@@ -321,8 +321,8 @@ def _cmd_mark(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _cmd_score(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout.apitypes.openapi import score_spec
-    from docscout.apitypes.rest_prose import analyze_docs
+    from docscout.analyze.apitypes.openapi import score_spec
+    from docscout.analyze.apitypes.rest_prose import analyze_docs
 
     target = Path(args.target)
     if target.is_file():
@@ -352,11 +352,11 @@ def _print_findings(findings) -> None:
 
 
 def _score_repo(cfg: Config, target: str) -> int:
-    from docscout import apitypes
-    from docscout.db import StoredFinding
-    from docscout.health import utcnow
-    from docscout.report import render_item
-    from docscout.sources import github_full_name
+    from docscout.analyze import apitypes
+    from docscout.run.db import StoredFinding
+    from docscout.find.health import utcnow
+    from docscout.run.report import render_item
+    from docscout.find.sources import github_full_name
 
     name = github_full_name(target) or target.strip().strip("/")
     if name.count("/") != 1:
@@ -389,9 +389,9 @@ def _score_repo(cfg: Config, target: str) -> int:
 
 def _check_repo(cfg: Config, gh, name: str, types, now, *, show: bool):
     """Health checks and docs analysis for one repo, as in a run; None if it wouldn't be reported."""
-    from docscout.discover import evaluate
-    from docscout.pipeline import analyze
-    from docscout.sources import Candidate
+    from docscout.find.discover import evaluate
+    from docscout.run.pipeline import analyze
+    from docscout.find.sources import Candidate
 
     ev = evaluate(gh, Candidate(name, "manual", {"full_name": name}), cfg, now, types)
     if show:
@@ -405,12 +405,13 @@ def _check_repo(cfg: Config, gh, name: str, types, now, *, show: bool):
 
 
 def _cmd_draft(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout import apitypes, review
-    from docscout.db import Store, StoredFinding
-    from docscout.draft import NEW_ISSUE, write_draft
-    from docscout.health import utcnow
+    from docscout.analyze import apitypes
+    from docscout.llm import review
+    from docscout.run.db import Store, StoredFinding
+    from docscout.llm.draft import NEW_ISSUE, write_draft
+    from docscout.find.health import utcnow
     from docscout.llm import LLMError, LLMUnavailable, memory
-    from docscout.sources import github_full_name
+    from docscout.find.sources import github_full_name
 
     name = github_full_name(args.repo) or args.repo.strip().strip("/")
     if name.count("/") != 1:
@@ -462,8 +463,8 @@ def _cmd_draft(cfg: Config, args: argparse.Namespace) -> int:
 
 def _review_one_repo(cfg: Config, finding, types_by_key) -> tuple | None:
     """The model's review of one finding, as in a run: (finding with the review, accepted), or None."""
-    from docscout import review
-    from docscout.db import StoredFinding
+    from docscout.llm import review
+    from docscout.run.db import StoredFinding
     from docscout.llm import LLMError, LLMUnavailable, memory
 
     label = review.model_label(str(cfg["llm"]["model"]))
@@ -488,16 +489,16 @@ def _review_one_repo(cfg: Config, finding, types_by_key) -> tuple | None:
 
 
 def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout.evaluate import TARGET_PRECISION, evaluate_rows, format_report, read_rows
+    from docscout.measure.evaluate import TARGET_PRECISION, evaluate_rows, format_report, read_rows
 
     rows = read_rows(Path(args.csv))
     report = evaluate_rows(rows)
     if args.with_llm:
         args.reclassify = True  # the model reviews the repo data reclassify caches
     if args.reclassify:
-        from docscout import apitypes
-        from docscout.health import utcnow
-        from docscout.reclassify import reclassify
+        from docscout.analyze import apitypes
+        from docscout.find.health import utcnow
+        from docscout.measure.reclassify import reclassify
 
         before = report.overall.precision
         types = apitypes.enabled_types(cfg["api_types"])
@@ -522,9 +523,11 @@ def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _eval_llm(cfg: Config, args: argparse.Namespace, rows: list) -> int:
-    from docscout import apitypes, llm_eval, review
+    from docscout.analyze import apitypes
+    from docscout.measure import llm_eval
+    from docscout.llm import review
     from docscout.llm import memory
-    from docscout.reclassify import load_cache
+    from docscout.measure.reclassify import load_cache
 
     label = review.model_label(str(cfg["llm"]["model"]))
     short = memory.shortage(cfg["llm"])
@@ -558,7 +561,7 @@ def _eval_llm(cfg: Config, args: argparse.Namespace, rows: list) -> int:
 
 
 def _cmd_bench_llm(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout import bench
+    from docscout.measure import bench
     from docscout.llm import make_client
 
     llm_cfg = dict(cfg["llm"])
@@ -713,9 +716,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _alert_config_error(exc: ConfigError) -> None:
-    from docscout import daily, notify
-    from docscout.db import Store
-    from docscout.health import utcnow
+    from docscout.run import daily, notify
+    from docscout.run.db import Store
+    from docscout.find.health import utcnow
 
     store = Store(store_path())
     try:

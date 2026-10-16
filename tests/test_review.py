@@ -8,13 +8,15 @@ from conftest import iso
 from test_daily import Clock, Notifications, run_if_due
 from test_report_pipeline import RunGitHub, fake_sources
 
-from docscout import apitypes, daily, pipeline, review
+from docscout.analyze import apitypes
+from docscout.run import daily, pipeline
+from docscout.llm import review
 from docscout.analyze.gaps import Finding, Gap
-from docscout.config import Config, load_defaults
-from docscout.db import Store
+from docscout.settings.config import Config, load_defaults
+from docscout.run.db import Store
 from docscout.errors import ConfigError
 from docscout.llm import LLMError, LLMUnavailable, Review, make_client, memory
-from docscout.scoring import opportunity_score
+from docscout.analyze.scoring import opportunity_score
 
 
 @pytest.fixture
@@ -238,8 +240,8 @@ class ClaimGitHub(RunGitHub):
 
 
 def test_draft_replies_on_the_help_issue_and_warns_if_someone_started(cfg, store, now):
-    from docscout.db import StoredFinding
-    from docscout.draft import write_draft
+    from docscout.run.db import StoredFinding
+    from docscout.llm.draft import write_draft
 
     issue = {"number": 12, "title": "Document the API", "outreach": ["help wanted"], "labels": ["docs"], "html_url": "x"}
     finding = StoredFinding("org/app", 60, {"api_type": "rest", "gap": {"summary": "s", "findings": []}, "repo": {},
@@ -253,8 +255,8 @@ def test_draft_replies_on_the_help_issue_and_warns_if_someone_started(cfg, store
 
 
 def test_draft_without_an_issue_opens_a_new_one(cfg, store, now):
-    from docscout.db import StoredFinding
-    from docscout.draft import NEW_ISSUE, write_draft
+    from docscout.run.db import StoredFinding
+    from docscout.llm.draft import NEW_ISSUE, write_draft
 
     finding = StoredFinding("org/app", 60, {"api_type": "rest", "gap": {}, "repo": {}, "issues": []}, 1)
     result = write_draft(Drafter("Hello"), None, finding, "REST")
@@ -275,7 +277,7 @@ def test_draft_prompt_names_the_issue_and_keeps_repo_text_as_data():
 
 
 def test_the_label_check_measures_the_model_and_caches_its_reviews(cfg, tmp_path):
-    from docscout import llm_eval
+    from docscout.measure import llm_eval
 
     rows = [
         {"full_name": "org/real", "label": "serves_api", "source": "x", "predicted_type": "other", "api_confidence": "0.5"},

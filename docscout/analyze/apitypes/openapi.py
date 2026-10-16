@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from docscout.analyze.gaps import Finding, counted
-from docscout.safe_yaml import UnsafeYAML, load_untrusted
+from docscout.analyze.safe_yaml import UnsafeYAML, load_untrusted
 
 HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
 MIN_OPERATIONS = 3  # smaller specs are usually examples or stubs, not the project's API

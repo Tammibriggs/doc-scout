@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Protocol
 
-from docscout.github import GitHub
-from docscout.sources import Candidate, interleave
+from docscout.find.github import GitHub
+from docscout.find.sources import Candidate, interleave
 
 SOURCE = "repo_search"
 PER_PAGE = 100
@@ -23,7 +23,7 @@ MAX_RESULTS = 1000  # GitHub returns at most this many results per query
 
 
 class Cursor(Protocol):
-    """Where each slice stopped; :class:`docscout.db.Store` provides it."""
+    """Where each slice stopped; :class:`docscout.run.db.Store` provides it."""
 
     def slice_position(self, key: str) -> tuple[int, int, str | None]: ...
     def save_slice(self, key: str, *, page: int, cycle: int) -> None: ...

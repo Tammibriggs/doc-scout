@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from docscout.discover import LABELS
+from docscout.find.discover import LABELS
 
 TARGET_PRECISION = 0.70
 SOURCE_MIN_PRECISION = 0.50

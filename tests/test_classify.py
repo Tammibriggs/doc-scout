@@ -1,7 +1,7 @@
 from conftest import iso
 
-from docscout.apitypes.rest import RestApi
-from docscout.classify import classify as _classify
+from docscout.analyze.apitypes.rest import RestApi
+from docscout.find.classify import classify as _classify
 
 REST = [RestApi()]
 

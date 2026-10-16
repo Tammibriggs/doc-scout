@@ -1,6 +1,6 @@
 """The Markdown report: what to fix, where, and why it's worth it.
 
-Every value that came from GitHub goes through :mod:`docscout.sanitize`; links are only
+Every value that came from GitHub goes through :mod:`docscout.run.sanitize`; links are only
 built from GitHub URLs DocScout constructs itself.
 """
 
@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from docscout.analyze.gaps import Gap, kind_label
-from docscout.db import StoredFinding
-from docscout.health import parse_time
-from docscout.sanitize import blob_url, code, link, repo_url, text
+from docscout.run.db import StoredFinding
+from docscout.find.health import parse_time
+from docscout.run.sanitize import blob_url, code, link, repo_url, text
 
 
 @dataclass

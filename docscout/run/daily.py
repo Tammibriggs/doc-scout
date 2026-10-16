@@ -24,13 +24,13 @@ from pathlib import Path
 
 import httpx
 
-from docscout import lock, pipeline
-from docscout.config import Config
-from docscout.db import Store
-from docscout.github import AuthError, GitHub
+from docscout.run import lock, pipeline
+from docscout.settings.config import Config
+from docscout.run.db import Store
+from docscout.find.github import AuthError, GitHub
 from docscout.llm import memory
-from docscout.notify import Notifier
-from docscout.review import ReviewOutcome, model_label
+from docscout.run.notify import Notifier
+from docscout.llm.review import ReviewOutcome, model_label
 
 log = logging.getLogger(__name__)
 

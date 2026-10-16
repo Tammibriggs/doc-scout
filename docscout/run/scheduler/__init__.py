@@ -49,7 +49,7 @@ def command(config_path: Path | None = None) -> list[str]:
 
 def for_this_os() -> Scheduler:
     if sys.platform.startswith("linux"):
-        from docscout.scheduler.linux import Systemd
+        from docscout.run.scheduler.linux import Systemd
 
         return Systemd()
     name = {"darwin": "macOS", "win32": "Windows"}.get(sys.platform, sys.platform)

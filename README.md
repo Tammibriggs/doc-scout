@@ -225,7 +225,7 @@ Every repo, whatever its source, goes through the same code-only health gate: no
 
 ## API types
 
-Everything specific to one kind of API lives in its own module under [docscout/apitypes/](docscout/apitypes/). Only `rest` exists today:
+Everything specific to one kind of API lives in its own module under [docscout/analyze/apitypes/](docscout/analyze/apitypes/). Only `rest` exists today:
 
 ```toml
 [api_types]
@@ -240,7 +240,7 @@ Each API type supplies:
 
 Discovery, the health gate, ranking and the LLM backends are shared. To add a type:
 1. Subclass `ApiType`.
-2. Register it in `docscout/apitypes/__init__.py`.
+2. Register it in `docscout/analyze/apitypes/__init__.py`.
 3. Add its config section.
 4. Check it on its own labeled sample (`discover`, then `eval`) before enabling it by default.
 
@@ -248,14 +248,31 @@ Discovery, the health gate, ranking and the LLM backends are shared. To add a ty
 
 ## Configuration
 
-Most people only need `docscout init` and `docscout set`, which write the `[profile]` and `[llm]` sections. Every other setting has a default in [docscout/default_config.toml](docscout/default_config.toml), such as search queries, health thresholds and the daily budget. To change one, add the key to your own `config.toml`, or pass `--config path/to/config.toml`.
+Most people only need `docscout init` and `docscout set`, which write the `[profile]` and `[llm]` sections. Every other setting has a default in [docscout/settings/default_config.toml](docscout/settings/default_config.toml), such as search queries, health thresholds and the daily budget. To change one, add the key to your own `config.toml`, or pass `--config path/to/config.toml`.
 
 To switch to a hosted model, set `provider = "openai_compatible"` together with `base_url`, `model` and the `DOCSCOUT_LLM_API_KEY` secret. Any OpenAI-compatible API works, for example OpenRouter, Groq, Together or OpenAI.
+
+## How the code is organized
+
+The `docscout` package is grouped by the stages a project goes through, in order:
+
+| Folder | What's in it |
+|---|---|
+| [`settings/`](docscout/settings/) | Your profile (`init`, `set`), the config loader and the defaults |
+| [`find/`](docscout/find/) | Where candidates come from ([`sources/`](docscout/find/sources/)), the GitHub client, the health checks and the classifier |
+| [`analyze/`](docscout/analyze/) | Measuring the docs gaps (specs, prose, docs published elsewhere), the claim and requirement checks, and the score. Each API type lives in [`apitypes/`](docscout/analyze/apitypes/) |
+| [`llm/`](docscout/llm/) | Gemma: the local (Ollama) and hosted clients, the review of each project, and the draft message to maintainers |
+| [`run/`](docscout/run/) | One run from start to report, daily runs and their schedule, the database, the lock and notifications |
+| [`measure/`](docscout/measure/) | Accuracy checks against the labeled repos (`docscout eval`) and the model benchmark (`bench-llm`) |
+| [`hosted/`](docscout/hosted/) | The hosted version: the website, the daily job on Render, MongoDB Atlas and Stripe |
+
+[`cli.py`](docscout/cli.py) holds every command. [`docs/PLAN.md`](docs/PLAN.md) records the decisions and measurements, and [`docs/comparison/`](docs/comparison/) compares DocScout with an AI agent given a skill.
 
 ## Development
 
 ```bash
-.venv/bin/pytest
+.venv/bin/pytest                     # the hosted version's tests run when its extras are installed:
+.venv/bin/pip install -e ".[dev,hosted]"
 ```
 
 ## Credits

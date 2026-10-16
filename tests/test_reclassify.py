@@ -2,10 +2,10 @@ from pathlib import Path
 
 from conftest import iso
 
-from docscout.apitypes.rest import RestApi
-from docscout.discover import LABELS
-from docscout.evaluate import evaluate_rows, read_rows
-from docscout.reclassify import _issue_numbers, reclassify
+from docscout.analyze.apitypes.rest import RestApi
+from docscout.find.discover import LABELS
+from docscout.measure.evaluate import evaluate_rows, read_rows
+from docscout.measure.reclassify import _issue_numbers, reclassify
 
 FIXTURE = Path(__file__).parent / "fixtures" / "labeled_repos.csv"
 

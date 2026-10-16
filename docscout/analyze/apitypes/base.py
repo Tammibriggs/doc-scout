@@ -17,11 +17,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from docscout.analyze.gaps import Gap
 from docscout.analyze.tree import OwnedFile, find_owned_files
-from docscout.evidence import Evidence, Signals, service_role
+from docscout.find.evidence import Evidence, Signals, service_role
 from docscout.llm.base import Review
 
 if TYPE_CHECKING:
-    from docscout.github import GitHub
+    from docscout.find.github import GitHub
 
 
 @dataclass

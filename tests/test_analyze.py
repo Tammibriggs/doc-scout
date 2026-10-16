@@ -1,8 +1,8 @@
 import pytest
 
 from docscout.analyze.tree import has_container_setup, has_contributing
-from docscout.apitypes.rest import RestApi, find_endpoints, mentions_rest_api
-from docscout.safe_yaml import UnsafeYAML, load_untrusted
+from docscout.analyze.apitypes.rest import RestApi, find_endpoints, mentions_rest_api
+from docscout.analyze.safe_yaml import UnsafeYAML, load_untrusted
 
 
 def blob(path, size=1000):

@@ -17,7 +17,7 @@ pytest.importorskip("pymongo")
 
 from starlette.testclient import TestClient  # noqa: E402
 
-from docscout.db import Store  # noqa: E402
+from docscout.run.db import Store  # noqa: E402
 from docscout.hosted import job  # noqa: E402
 from docscout.hosted.billing import BillingError, Stripe  # noqa: E402
 from docscout.hosted.picks import FREE_PICKS, weekly_picks  # noqa: E402
@@ -231,7 +231,8 @@ def test_only_a_complete_paid_session_counts_and_no_email_is_kept():
 
 
 def test_the_daily_job_keeps_docscouts_memory_in_atlas(tmp_path, now, monkeypatch):
-    from docscout import cli, config
+    from docscout import cli
+    from docscout.settings import config
 
     monkeypatch.setattr(config, "data_dir", lambda: tmp_path)
     seen_args = []

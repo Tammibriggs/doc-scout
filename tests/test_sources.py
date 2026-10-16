@@ -2,8 +2,8 @@ import io
 import tarfile
 from datetime import date
 
-from docscout.sources import github_full_name
-from docscout.sources import awesome_selfhosted, code_search, help_requested, repo_search
+from docscout.find.sources import github_full_name
+from docscout.find.sources import awesome_selfhosted, code_search, help_requested, repo_search
 
 
 def make_tarball(files: dict[str, str]) -> bytes:
@@ -124,8 +124,8 @@ GITEA = {"root/software/gitea.yml": "name: Gitea\nsource_code_url: https://githu
 def test_curated_list_falls_back_to_the_last_copy_and_otherwise_steps_aside(tmp_path):
     import pytest
 
-    from docscout.github import NotFound
-    from docscout.sources import SourceUnavailable
+    from docscout.find.github import NotFound
+    from docscout.find.sources import SourceUnavailable
 
     cache = tmp_path / "seed.json"
     fresh = awesome_selfhosted.load_seed(SeedGitHub(make_tarball(GITEA)), cache, max_age_days=7)

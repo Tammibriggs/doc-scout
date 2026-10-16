@@ -17,12 +17,12 @@ from typing import Any
 
 import httpx
 
-from docscout import profile as profile_mod
-from docscout.apitypes import REGISTRY, enabled_types
-from docscout.config import GITHUB_TOKEN_VARS, Config, save_secrets, save_user_config
+from docscout.settings import profile as profile_mod
+from docscout.analyze.apitypes import REGISTRY, enabled_types
+from docscout.settings.config import GITHUB_TOKEN_VARS, Config, save_secrets, save_user_config
 from docscout.errors import ConfigError
-from docscout.github import AuthError, GitHub
-from docscout.languages import parse_list
+from docscout.find.github import AuthError, GitHub
+from docscout.settings.languages import parse_list
 
 Prompt = Callable[[str], str]
 

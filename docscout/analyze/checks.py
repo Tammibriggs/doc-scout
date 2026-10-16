@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from docscout.analyze.tree import has_path
-from docscout.github import GitHub, GitHubError
+from docscout.find.github import GitHub, GitHubError
 
 _SENTENCE = re.compile(r"[^.!?\n]*(?:[.!?]|\n|$)")
 REQUIREMENTS = {

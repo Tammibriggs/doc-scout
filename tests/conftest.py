@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from docscout.config import Config, load_defaults
+from docscout.settings.config import Config, load_defaults
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 
@@ -51,7 +51,7 @@ class AgreeingModel:
 @pytest.fixture(autouse=True)
 def no_real_model(monkeypatch):
     """Tests never load a real model: reviews agree unless a test says otherwise, and memory looks plentiful."""
-    from docscout import review
+    from docscout.llm import review
     from docscout.llm import memory
 
     from docscout.llm.ollama import OllamaClient

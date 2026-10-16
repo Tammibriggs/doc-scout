@@ -1,6 +1,6 @@
 """API types DocScout can look for. Enable them in config with ``[api_types] enabled``.
 
-To add one: subclass :class:`~docscout.apitypes.base.ApiType` in a new module, add it to
+To add one: subclass :class:`~docscout.analyze.apitypes.base.ApiType` in a new module, add it to
 ``REGISTRY``, and give it an ``[api_types.<key>]`` section in ``default_config.toml``.
 Then measure it on its own labeled sample (``discover`` + ``eval``) before enabling it
 by default.
@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from docscout.apitypes.base import ApiType
-from docscout.apitypes.rest import RestApi
+from docscout.analyze.apitypes.base import ApiType
+from docscout.analyze.apitypes.rest import RestApi
 from docscout.errors import ConfigError
 
 REGISTRY: dict[str, type[ApiType]] = {RestApi.key: RestApi}

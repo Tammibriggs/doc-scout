@@ -14,10 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from docscout.apitypes import ApiType
-from docscout.classify import classify
-from docscout.github import GitHub, GitHubError
-from docscout.sources import awesome_selfhosted
+from docscout.analyze.apitypes import ApiType
+from docscout.find.classify import classify
+from docscout.find.github import GitHub, GitHubError
+from docscout.find.sources import awesome_selfhosted
 
 log = logging.getLogger(__name__)
 

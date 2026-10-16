@@ -204,7 +204,7 @@ All three sources are above 50%, so all stay on.
 **Where settings live:**
 - `docscout profile` shows the settings in plain sentences.
 - Settings are saved to `[profile]` and `[llm]` in the user's `config.toml`; secrets go to `secrets.env`, readable only by the user.
-- All other tuning lives in [default_config.toml](../docscout/default_config.toml) as "advanced".
+- All other tuning lives in [default_config.toml](../docscout/settings/default_config.toml) as "advanced".
 
 **What the profile controls:**
 - `api_types` decides which API types are enabled.
@@ -442,23 +442,25 @@ The model's reviews are stored in `findings.details`, so no separate `llm_review
 
 ## 16. Code layout
 
-✅ = exists today.
+✅ = exists today. Grouped by stage on 16 Oct (28 loose modules had made the package hard to explore); the code didn't change, only where it lives.
 ```
 hacktoberfest/
-  pyproject.toml ✅  LICENSE ✅  README.md ✅  docs/PLAN.md ✅  .github/workflows/ci.yml (M5: 3 OS × py3.11, 3.13)
+  pyproject.toml ✅  LICENSE ✅  README.md ✅  CLAUDE.md ✅  render.yaml ✅  deploy/render.toml ✅  .github/workflows/ci.yml (M5)
+  docs/ PLAN.md ✅  comparison/ METHOD.md ✅ RESULTS.md ✅ skill/SKILL.md ✅
   docscout/
-    cli.py ✅          # init set profile discover eval bench-llm · run score ignore done · status schedule (M3) · draft (M2) ✅
-    config.py ✅  profile.py ✅  languages.py ✅  setup_wizard.py ✅  errors.py ✅  safe_yaml.py ✅
-    github.py ✅  health.py ✅  classify.py ✅  evidence.py ✅  discover.py ✅  evaluate.py ✅  bench.py ✅
-    apitypes/ base.py ✅ rest.py ✅          # + spec scoring for REST (M1); graphql.py, grpc.py, … (later)
-    sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
-    analyze/ tree.py ✅  gaps.py ✅  elsewhere.py ✅  checks.py ✅      apitypes/ openapi.py ✅  rest_prose.py ✅
-    llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
-    db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅  llm_eval.py ✅ (M2)
-    scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-    hosted/ __init__.py ✅ picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
-  deploy/render.toml ✅  render.yaml ✅ (section 20)
-  tests/ ✅ 195 tests (185 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+    cli.py ✅  __main__.py ✅  errors.py ✅      # init set profile run status schedule draft done ignore score discover eval bench-llm
+    settings/ config.py ✅ profile.py ✅ languages.py ✅ setup_wizard.py ✅ default_config.toml ✅
+    find/     discover.py ✅ github.py ✅ health.py ✅ classify.py ✅ evidence.py ✅
+              sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
+    analyze/  tree.py ✅ gaps.py ✅ elsewhere.py ✅ checks.py ✅ scoring.py ✅ safe_yaml.py ✅
+              apitypes/ base.py ✅ rest.py ✅ openapi.py ✅ rest_prose.py ✅     # graphql.py, grpc.py, … (later)
+    llm/      base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ review.py ✅ draft.py ✅
+    run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅
+              scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)
+    measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
+    hosted/   picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
+    (M4: find/safe_fetch.py)
+  tests/ ✅ 196 tests (186 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

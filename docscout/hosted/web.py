@@ -29,7 +29,7 @@ from starlette.templating import Jinja2Templates
 from docscout.hosted import required_secret
 from docscout.hosted.billing import PRICE_CENTS, BillingError
 from docscout.hosted.picks import FREE_PICKS
-from docscout.sanitize import is_github_url
+from docscout.run.sanitize import is_github_url
 
 COOKIE = "docscout_pass"
 PASS_SECONDS = 31 * 24 * 3600  # a month's subscription, plus a day

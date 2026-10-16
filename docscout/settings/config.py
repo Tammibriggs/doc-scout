@@ -2,7 +2,7 @@
 
 Defaults live in ``default_config.toml`` inside the package. A user's ``config.toml``
 (in the platform config folder, or passed with ``--config``) is merged over them key by
-key, then the ``[profile]`` section is turned into internal settings (:mod:`docscout.profile`).
+key, then the ``[profile]`` section is turned into internal settings (:mod:`docscout.settings.profile`).
 Secrets come from environment variables first, then ``secrets.env`` in the config folder.
 """
 
@@ -20,7 +20,7 @@ from typing import Any
 
 import platformdirs
 
-from docscout import profile as profile_mod
+from docscout.settings import profile as profile_mod
 from docscout.errors import ConfigError
 
 APP_NAME = "docscout"
@@ -50,7 +50,7 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def load_defaults() -> dict[str, Any]:
-    text = resources.files("docscout").joinpath("default_config.toml").read_text(encoding="utf-8")
+    text = resources.files("docscout.settings").joinpath("default_config.toml").read_text(encoding="utf-8")
     return tomllib.loads(text)
 
 

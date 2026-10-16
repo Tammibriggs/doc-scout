@@ -8,14 +8,14 @@ import pytest
 from conftest import iso
 from test_discover_eval import GOOD_REPO, FakeGitHub
 
-from docscout import pipeline
-from docscout.config import Config, load_defaults
-from docscout.db import Store
-from docscout.github import AuthError, RateLimited
-from docscout.report import write
-from docscout.sanitize import code, link, text
-from docscout.scoring import issue_bonus, opportunity_score
-from docscout.sources import Candidate
+from docscout.run import pipeline
+from docscout.settings.config import Config, load_defaults
+from docscout.run.db import Store
+from docscout.find.github import AuthError, RateLimited
+from docscout.run.report import write
+from docscout.run.sanitize import code, link, text
+from docscout.analyze.scoring import issue_bonus, opportunity_score
+from docscout.find.sources import Candidate
 
 SPEC = (Path(__file__).parent / "fixtures" / "specs" / "bare.yaml").read_bytes()
 
@@ -128,7 +128,7 @@ def test_store_skips_handled_and_recent_repos(store, now):
 def test_database_upgrades_keep_earlier_history(tmp_path, now):
     import sqlite3
 
-    from docscout.db import MIGRATIONS
+    from docscout.run.db import MIGRATIONS
 
     path = tmp_path / "old.db"
     old = sqlite3.connect(path)  # a database from before the daily schedule existed
@@ -310,7 +310,7 @@ def test_checks_quote_requirements_and_ignore_unrelated_ai_mentions():
 
 
 def test_a_failing_source_is_skipped_and_noted(cfg, store, now, monkeypatch):
-    from docscout.sources import SourceUnavailable
+    from docscout.find.sources import SourceUnavailable
 
     def source(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):
         if name == "awesome_selfhosted":

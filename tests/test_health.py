@@ -1,6 +1,6 @@
 from conftest import iso
 
-from docscout.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats
+from docscout.find.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats
 
 HEALTH_CFG = {"star_ranges": [(20, 200), (200, 1000), (1000, 5000)], "pushed_within_days": 60, "min_human_committers_90d": 2, "min_outsider_merged_prs_180d": 1}
 

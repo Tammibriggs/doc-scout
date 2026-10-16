@@ -16,9 +16,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-from docscout.apitypes import ApiType
-from docscout.evidence import build_signals, role_hits
-from docscout.health import parse_time
+from docscout.analyze.apitypes import ApiType
+from docscout.find.evidence import build_signals, role_hits
+from docscout.find.health import parse_time
 
 NEUTRAL = 0.4
 # Confidence from which a repo counts as serving an API. On the 58 labeled repos (13 Oct), 0.6

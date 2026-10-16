@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from docscout.apitypes.rest import RestApi
+from docscout.analyze.apitypes.rest import RestApi
 from docscout.llm.base import LLMError, RepoContext, Review, apply_review, build_messages, parse_review
 from docscout.llm.ollama import OllamaClient
 from docscout.llm.openai_compat import OpenAICompatClient
@@ -174,7 +174,7 @@ def test_ollama_not_running_or_model_missing_explains_the_fix():
 
 
 def test_benchmark_stops_at_the_first_setup_problem():
-    from docscout import bench
+    from docscout.measure import bench
     from docscout.llm.base import LLMUnavailable
 
     class Missing:

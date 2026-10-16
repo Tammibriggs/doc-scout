@@ -18,10 +18,10 @@ from typing import Any
 
 import httpx
 
-from docscout.github import AuthError, GitHub, GitHubError, RateLimited
-from docscout.health import parse_time
-from docscout.safe_yaml import UnsafeYAML, load_untrusted
-from docscout.sources import Candidate, SourceUnavailable, github_full_name
+from docscout.find.github import AuthError, GitHub, GitHubError, RateLimited
+from docscout.find.health import parse_time
+from docscout.analyze.safe_yaml import UnsafeYAML, load_untrusted
+from docscout.find.sources import Candidate, SourceUnavailable, github_full_name
 
 log = logging.getLogger(__name__)
 

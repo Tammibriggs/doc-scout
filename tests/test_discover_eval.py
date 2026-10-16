@@ -3,10 +3,10 @@ import random
 
 from conftest import iso
 
-from docscout.discover import draw_sample, evaluate, write_sample
-from docscout.evaluate import evaluate_csv, format_report
-from docscout.github import RateLimited
-from docscout.sources import Candidate
+from docscout.find.discover import draw_sample, evaluate, write_sample
+from docscout.measure.evaluate import evaluate_csv, format_report
+from docscout.find.github import RateLimited
+from docscout.find.sources import Candidate
 
 GOOD_REPO = {
     "full_name": "org/app",
@@ -82,7 +82,7 @@ def test_obvious_tooling_rejected_without_any_api_call(cfg, now):
 
 
 def test_rate_limit_keeps_partial_sample(cfg, now, monkeypatch):
-    import docscout.discover as discover
+    import docscout.find.discover as discover
 
     def fake_source(name, gh, cfg, rng, today, api_types, policy=None):
         yield Candidate("org/one", name, dict(GOOD_REPO))
@@ -153,8 +153,8 @@ def test_issue_from_outsider_without_outreach_label_keeps_the_strict_gate(cfg, n
 
 
 def test_a_failing_repo_is_skipped_and_sampling_continues(cfg, now, monkeypatch):
-    import docscout.discover as discover
-    from docscout.github import NotFound
+    import docscout.find.discover as discover
+    from docscout.find.github import NotFound
 
     class FlakyGitHub(FakeGitHub):
         def list_closed_pulls(self, name):
@@ -175,7 +175,7 @@ def test_a_failing_repo_is_skipped_and_sampling_continues(cfg, now, monkeypatch)
 
 
 def test_ctrl_c_keeps_what_was_gathered(cfg, now, monkeypatch):
-    import docscout.discover as discover
+    import docscout.find.discover as discover
 
     def fake_source(name, gh, cfg, rng, today, api_types, policy=None):
         yield Candidate("org/one", name, dict(GOOD_REPO))

@@ -11,10 +11,10 @@ import pytest
 from test_discover_eval import GOOD_REPO
 from test_report_pipeline import RunGitHub, fake_sources
 
-from docscout import daily, lock, notify, pipeline
-from docscout.config import Config, load_defaults
-from docscout.db import Store
-from docscout.sources import Candidate, repo_search
+from docscout.run import daily, lock, notify, pipeline
+from docscout.settings.config import Config, load_defaults
+from docscout.run.db import Store
+from docscout.find.sources import Candidate, repo_search
 
 UTC = timezone.utc
 
@@ -276,7 +276,7 @@ def test_only_one_run_at_a_time(tmp_path, cfg, store, now):
 @pytest.mark.skipif(os.name == "nt", reason="kill -9 is tested on Unix; Windows comes in M5")
 def test_a_killed_run_never_blocks_the_next_one(tmp_path):
     path = tmp_path / "run.lock"
-    holder = "import sys, time\nfrom pathlib import Path\nfrom docscout import lock\nheld = lock.hold(Path(sys.argv[1]))\nheld.__enter__()\nprint('held', flush=True)\ntime.sleep(60)\n"
+    holder = "import sys, time\nfrom pathlib import Path\nfrom docscout.run import lock\nheld = lock.hold(Path(sys.argv[1]))\nheld.__enter__()\nprint('held', flush=True)\ntime.sleep(60)\n"
     proc = subprocess.Popen([sys.executable, "-c", holder, str(path)], stdout=subprocess.PIPE, text=True)
     try:
         assert proc.stdout.readline().strip() == "held"
@@ -321,8 +321,8 @@ def test_repo_search_moves_on_through_pages_and_slices_across_days(store, now, m
 
 
 def test_daily_runs_use_the_cursor(cfg, store, now, monkeypatch):
-    from docscout import apitypes
-    from docscout.discover import source_candidates
+    from docscout.analyze import apitypes
+    from docscout.find.discover import source_candidates
 
     seen = []
     monkeypatch.setattr(repo_search, "sweep", lambda *a, **k: iter(seen.append(k["per_run"]) or []))
@@ -334,7 +334,7 @@ def test_daily_runs_use_the_cursor(cfg, store, now, monkeypatch):
 
 
 def test_systemd_units_quote_odd_paths(tmp_path):
-    from docscout.scheduler.linux import _exec_start, quote, service_text
+    from docscout.run.scheduler.linux import _exec_start, quote, service_text
 
     assert quote("/usr/bin/python3") == "/usr/bin/python3"
     assert quote("/home/a b/50%$x") == '"/home/a b/50%%$$x"'
@@ -357,8 +357,8 @@ class FakeSystemctl:
 
 
 def test_schedule_install_status_and_uninstall(tmp_path):
-    from docscout.scheduler import SchedulerError, command
-    from docscout.scheduler.linux import Systemd
+    from docscout.run.scheduler import SchedulerError, command
+    from docscout.run.scheduler.linux import Systemd
 
     systemctl = FakeSystemctl()
     sched = Systemd(runner=systemctl, directory=tmp_path / "units")
@@ -391,7 +391,7 @@ def test_schedule_install_status_and_uninstall(tmp_path):
 
 
 def test_scheduling_on_other_systems_says_when_it_comes(monkeypatch):
-    from docscout import scheduler
+    from docscout.run import scheduler
 
     monkeypatch.setattr(sys, "platform", "darwin")
     with pytest.raises(scheduler.Unsupported, match="macOS come in a later version"):

@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from docscout.github import AuthError, GitHub, RateLimited
+from docscout.find.github import AuthError, GitHub, RateLimited
 
 
 class FakeClock:
@@ -102,7 +102,7 @@ def test_short_lived_404_after_repo_fetch_is_retried_once():
 
 
 def test_lasting_404_still_raises_and_plain_lookups_are_not_retried():
-    from docscout.github import NotFound
+    from docscout.find.github import NotFound
 
     calls = []
 
@@ -165,7 +165,7 @@ def test_pr_and_commit_lists_use_small_graphql_answers_in_the_rest_shape():
 
 
 def test_graphql_not_found_is_retried_once_and_rate_limits_wait():
-    from docscout.github import NotFound
+    from docscout.find.github import NotFound
 
     clock = FakeClock()
     missing = httpx.Response(200, json={"data": {"repository": None}, "errors": [{"type": "NOT_FOUND", "message": "Could not resolve"}]})
@@ -201,7 +201,7 @@ def test_a_second_page_of_prs_only_when_the_first_is_all_recent():
 
 
 def test_issue_search_and_owner_repos_come_from_graphql_with_only_the_fields_used():
-    from docscout.sources import help_requested
+    from docscout.find.sources import help_requested
 
     issue = {"number": 12, "title": "Document the API", "url": "https://github.com/org/app/issues/12", "authorAssociation": "NONE",
              "author": {"login": "ana", "__typename": "User"}, "labels": {"nodes": [{"name": "docs"}]},

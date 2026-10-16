@@ -5,7 +5,7 @@ stage-1 classifier (free) → repo metadata (≤1 call) → PR and commit histor
 → file tree and README (2 calls).
 
 Everything specific to one kind of API comes from the enabled API types
-(:mod:`docscout.apitypes`); this module only orchestrates.
+(:mod:`docscout.analyze.apitypes`); this module only orchestrates.
 """
 
 from __future__ import annotations
@@ -21,15 +21,15 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from docscout import apitypes
+from docscout.analyze import apitypes
 from docscout.analyze.tree import has_contributing
-from docscout.apitypes import ApiType
-from docscout.classify import Classification, classify
-from docscout.config import Config, data_dir
-from docscout.github import AuthError, GitHub, GitHubError, NotFound, RateLimited
-from docscout.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats, star_range_reason, utcnow
-from docscout.profile import LanguagePolicy, language_policy
-from docscout.sources import Candidate, awesome_selfhosted, code_search, help_requested, repo_search
+from docscout.analyze.apitypes import ApiType
+from docscout.find.classify import Classification, classify
+from docscout.settings.config import Config, data_dir
+from docscout.find.github import AuthError, GitHub, GitHubError, NotFound, RateLimited
+from docscout.find.health import PRStats, gate_activity, gate_metadata, health_score, pr_stats, star_range_reason, utcnow
+from docscout.settings.profile import LanguagePolicy, language_policy
+from docscout.find.sources import Candidate, awesome_selfhosted, code_search, help_requested, repo_search
 
 log = logging.getLogger(__name__)
 
@@ -270,7 +270,7 @@ def draw_sample(
         for name in sources:
             summary = SourceSummary(name)
             sample.summaries.append(summary)
-            from docscout.pipeline import guarded  # late import: pipeline imports this module
+            from docscout.run.pipeline import guarded  # late import: pipeline imports this module
 
             for cand in guarded(name, source_candidates(name, gh, cfg, rng, now.date(), api_types, policy), sample.notes):
                 key = cand.full_name.lower()

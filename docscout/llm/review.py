@@ -20,13 +20,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from docscout.apitypes import ApiType
-from docscout.config import Config
-from docscout.db import Store, StoredFinding
+from docscout.analyze.apitypes import ApiType
+from docscout.settings.config import Config
+from docscout.run.db import Store, StoredFinding
 from docscout.llm import LLMClient, LLMError, LLMUnavailable, RepoContext, apply_review, make_client
 from docscout.llm import memory
 from docscout.llm.base import review_with_retry
-from docscout.scoring import opportunity_score
+from docscout.analyze.scoring import opportunity_score
 
 log = logging.getLogger(__name__)
 

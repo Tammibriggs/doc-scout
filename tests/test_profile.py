@@ -6,15 +6,15 @@ from datetime import date
 import pytest
 from test_discover_eval import GOOD_REPO, FakeGitHub
 
-from docscout import setup_wizard
-from docscout.apitypes import REGISTRY, ApiType, enabled_types
-from docscout.apitypes.rest import RestApi
-from docscout.config import Config, load_config, load_defaults, save_secrets, save_user_config
-from docscout.discover import evaluate, source_candidates
+from docscout.settings import setup_wizard
+from docscout.analyze.apitypes import REGISTRY, ApiType, enabled_types
+from docscout.analyze.apitypes.rest import RestApi
+from docscout.settings.config import Config, load_config, load_defaults, save_secrets, save_user_config
+from docscout.find.discover import evaluate, source_candidates
 from docscout.errors import ConfigError
-from docscout.languages import normalize, parse_list
-from docscout.profile import describe, language_policy
-from docscout.sources import Candidate
+from docscout.settings.languages import normalize, parse_list
+from docscout.settings.profile import describe, language_policy
+from docscout.find.sources import Candidate
 
 
 def make_cfg(tmp_path, **profile):
@@ -32,7 +32,7 @@ class LibraryDocs(ApiType):
     language_mode = "require"
 
     def evidence(self, signals):
-        from docscout.evidence import Evidence
+        from docscout.find.evidence import Evidence
 
         return Evidence()
 

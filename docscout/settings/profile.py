@@ -12,10 +12,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from docscout.errors import ConfigError
-from docscout.languages import Language, parse_list, search_qualifiers
+from docscout.settings.languages import Language, parse_list, search_qualifiers
 
 if TYPE_CHECKING:
-    from docscout.apitypes import ApiType
+    from docscout.analyze.apitypes import ApiType
 
 # (min stars, max stars or None for no upper limit)
 SIZE_RANGES: dict[str, tuple[int, int | None]] = {

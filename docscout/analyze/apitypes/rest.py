@@ -22,11 +22,11 @@ from collections.abc import Callable
 from docscout.analyze.elsewhere import docs_elsewhere, published_docs
 from docscout.analyze.gaps import Gap
 from docscout.analyze.tree import OwnedFile, find_owned_files, is_owned_path
-from docscout.apitypes.base import ApiType, DocsContext
-from docscout.apitypes.openapi import score_spec
-from docscout.apitypes.rest_prose import COMPLETE, analyze_docs, find_endpoints, mentions_rest_api
-from docscout.evidence import Evidence, Signals
-from docscout.github import GitHubError
+from docscout.analyze.apitypes.base import ApiType, DocsContext
+from docscout.analyze.apitypes.openapi import score_spec
+from docscout.analyze.apitypes.rest_prose import COMPLETE, analyze_docs, find_endpoints, mentions_rest_api
+from docscout.find.evidence import Evidence, Signals
+from docscout.find.github import GitHubError
 
 log = logging.getLogger(__name__)
 

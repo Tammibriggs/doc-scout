@@ -19,22 +19,22 @@ from typing import Any
 
 import httpx
 
-from docscout import apitypes
+from docscout.analyze import apitypes
 from docscout.analyze.checks import Checks, free_checks, paid_checks
 from docscout.analyze.gaps import Gap, effort_label
-from docscout.apitypes import ApiType
-from docscout.apitypes.base import DocsContext
-from docscout.config import Config
-from docscout.db import Store, StoredFinding
-from docscout.discover import Evaluated, evaluate, source_candidates
-from docscout.config import data_dir
-from docscout.github import AuthError, GitHub, GitHubError, RateLimited
-from docscout.profile import language_policy, one_line
-from docscout.report import RunSummary, render, write
-from docscout import review as reviews_mod
-from docscout.review import ReviewOutcome, Reviewer, model_label, potential_confidence, review_waiting
-from docscout.scoring import Score, opportunity_score
-from docscout.sources import SourceUnavailable, awesome_selfhosted, interleave
+from docscout.analyze.apitypes import ApiType
+from docscout.analyze.apitypes.base import DocsContext
+from docscout.settings.config import Config
+from docscout.run.db import Store, StoredFinding
+from docscout.find.discover import Evaluated, evaluate, source_candidates
+from docscout.settings.config import data_dir
+from docscout.find.github import AuthError, GitHub, GitHubError, RateLimited
+from docscout.settings.profile import language_policy, one_line
+from docscout.run.report import RunSummary, render, write
+from docscout.llm import review as reviews_mod
+from docscout.llm.review import ReviewOutcome, Reviewer, model_label, potential_confidence, review_waiting
+from docscout.analyze.scoring import Score, opportunity_score
+from docscout.find.sources import SourceUnavailable, awesome_selfhosted, interleave
 
 log = logging.getLogger(__name__)
 

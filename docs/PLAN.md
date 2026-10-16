@@ -96,7 +96,16 @@ All three sources are above 50%, so all stay on.
   - bug and feature issues counted as docs requests;
   - a docs site treated as a reason not to report.
 
-  ✅ All four fixed on 16 Oct (sections 8 and 9). On the 13 graded projects, DocScout now finds the spec of all 10 it reports, and none falls back to "check manually". ⏳ A rerun of the same search (with the original date, so it samples the same repos) is to be graded.
+  ✅ All four fixed on 16 Oct (sections 8 and 9). On the 13 graded projects, DocScout now finds the spec of all 10 it reports, and none falls back to "check manually".
+- **Round 2 (16 Oct, after the fixes; new projects, fully blind):**
+  - DocScout: 4 picks, 3 of which you'd act on, with 81% of claims right; 8.5 minutes and no tokens.
+  - The agent: 10 picks, 6 of which you'd act on, with 96% of claims right; 46 minutes and 324k tokens.
+  - Gemma agreed with your "serves an API" grade on all 4 (2 of 4 in round 1).
+  - Remaining misses:
+    - a swag-generated spec shown as hand-written;
+    - API docs in a GitHub wiki not read;
+    - another product's docs repo counted;
+    - the only rejected pick was the unverified "no docs found" kind.
 
 ## 3. Success criteria
 

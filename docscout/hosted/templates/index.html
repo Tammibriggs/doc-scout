@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocScout: API docs you can improve</title>
+<meta name="description" content="Open-source projects whose API docs need a writer, checked every day and reviewed by Gemma.">
+<style>
+  :root {
+    --bg: #fbfaf7; --card: #ffffff; --text: #1d1b16; --muted: #5d584d; --line: #e4dfd3;
+    --accent: #1f5f8b; --accent-text: #ffffff; --note: #f3efe2; --warn: #8a4b00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15140f; --card: #1e1c16; --text: #ece7da; --muted: #a9a293; --line: #36322a;
+      --accent: #6fb3e0; --accent-text: #0b1a24; --note: #262318; --warn: #f0b36a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main, header, footer { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 48px; padding-bottom: 8px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 1.25rem; margin: 0; }
+  h3 { font-size: 0.95rem; margin: 18px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  p { margin: 0 0 12px; }
+  a { color: var(--accent); }
+  .lede { color: var(--muted); font-size: 1.05rem; }
+  .meta { color: var(--muted); font-size: 0.9rem; }
+  .notice { background: var(--note); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  ol.picks { list-style: none; padding: 0; margin: 24px 0; }
+  .pick { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; margin-bottom: 18px; }
+  .pick header { padding: 0; max-width: none; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .rank { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pick ul, .pick ol { margin: 4px 0 8px; padding-left: 22px; }
+  .pick li { margin: 2px 0; }
+  code { font-size: 0.88em; overflow-wrap: anywhere; }
+  .warn { color: var(--warn); }
+  .paywall { background: var(--card); border: 2px solid var(--accent); border-radius: 10px; padding: 24px 22px; margin: 8px 0 32px; text-align: center; }
+  .paywall h2 { margin-bottom: 8px; }
+  button { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+           padding: 12px 22px; cursor: pointer; margin-top: 8px; }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .small { font-size: 0.85rem; color: var(--muted); }
+  footer { padding-top: 8px; padding-bottom: 48px; border-top: 1px solid var(--line); margin-top: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>API docs you can improve</h1>
+  <p class="lede">Open-source projects whose REST API documentation needs a writer, found every day by DocScout and reviewed by Gemma. Each pick says what's missing, where to start, and whether the maintainers merge outside pull requests.</p>
+  {% if updated %}<p class="meta">Updated {{ updated.strftime("%-d %B %Y, %H:%M UTC") }} · {{ total }} pick{{ "" if total == 1 else "s" }} this week</p>{% endif %}
+  {% if subscribed %}<p class="meta">Subscribed: every pick is shown.</p>{% endif %}
+</header>
+<main>
+  {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+
+  {% if not picks %}
+  <p class="notice">This week's picks are on their way. DocScout checks projects once a day; come back tomorrow.</p>
+  {% endif %}
+
+  <ol class="picks">
+  {% for p in picks %}
+    <li class="pick">
+      <header>
+        <span class="rank">{{ p.rank }}.</span>
+        <h2>{% if p.url %}<a href="{{ p.url }}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}</h2>
+        <span class="meta">{% if p.stars is not none %}★ {{ p.stars }}{% endif %}{% if p.language %} · {{ p.language }}{% endif %} · score {{ p.score }}</span>
+      </header>
+      {% if p.description %}<p class="meta">{{ p.description }}</p>{% endif %}
+
+      <h3>The gap</h3>
+      <p><strong>{{ p.gap_heading }}:</strong>
+        {% if p.gap_file %}{% if p.gap_file_url %}<a href="{{ p.gap_file_url }}"><code>{{ p.gap_file }}</code></a>{% else %}<code>{{ p.gap_file }}</code>{% endif %} ({{ p.gap_summary }}){% else %}{{ p.gap_summary }}{% endif %}</p>
+      {% if p.findings %}<ul>{% for f in p.findings %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+      {% if p.suggestion %}<p>{{ p.suggestion }}</p>{% endif %}
+      {% if p.published %}<p class="meta">Docs published: {{ p.published | join(" · ") }}</p>{% endif %}
+      {% if p.check_manually %}<p class="meta">Check manually: {{ p.check_manually | join(" · ") }}</p>{% endif %}
+
+      {% if p.why or p.first_steps %}
+      <h3>{{ p.model or "Gemma" }}'s take</h3>
+      {% if p.why %}<p>{{ p.why }}</p>{% endif %}
+      {% if p.first_steps %}<ol>{% for s in p.first_steps %}<li>{{ s }}</li>{% endfor %}</ol>{% endif %}
+      {% endif %}
+
+      <h3>Before you start</h3>
+      <ul>
+        {% if p.claimed %}{% for c in p.claimed %}<li class="warn">{{ c }}</li>{% endfor %}{% else %}<li>Nobody seems to be working on it yet.</li>{% endif %}
+        {% for r in p.requirements %}<li class="warn">{{ r }}</li>{% endfor %}
+        {% if p.local_setup %}<li>Running it locally: {{ p.local_setup }}</li>{% endif %}
+        {% for i in p.issues %}<li>Maintainers asked for help: {% if i.url %}<a href="{{ i.url }}">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</li>{% endfor %}
+      </ul>
+    </li>
+  {% endfor %}
+  </ol>
+
+  {% if hidden > 0 %}
+  <section class="paywall" aria-labelledby="more">
+    <h2 id="more">{{ hidden }} more pick{{ "" if hidden == 1 else "s" }} this week</h2>
+    <p>Subscribe to see every pick, refreshed daily, with Gemma's first steps for each.</p>
+    <form method="post" action="/subscribe"><button type="submit">See every pick: {{ price }}/month</button></form>
+    {% if test_mode %}<p class="small">Test mode: no real charge. Use card 4242 4242 4242 4242, any future date and any CVC.</p>{% endif %}
+  </section>
+  {% endif %}
+</main>
+<footer>
+  <p class="small">DocScout is open source. Gemma 4 reviews every project, and the gap counts come from reading the specs and docs themselves, never from guessing. Prefer to run it on your own computer for free? The {% if source_url %}<a href="{{ source_url }}">command-line version</a>{% else %}command-line version{% endif %} does the same.</p>
+</footer>
+</body>
+</html>

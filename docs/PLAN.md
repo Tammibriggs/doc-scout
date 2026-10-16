@@ -18,6 +18,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | **M2. Gemma required** (branch `m2-llm`, built in a separate worktree) | ✅ First, fewer noisy items (section 9). Then ✅: **Gemma reviews every repo that passes the health checks** (up to `reviews_per_run` a day, most promising first): it decides whether the project really has an API worth documenting, with the 0.8 cap, and writes why it matters plus up to 3 first steps. **Only reviewed repos are reported.** Unreviewed ones are held, not dropped, and reviewed later. A memory check runs before loading the model. `docscout draft owner/repo` writes a first message to the maintainers for a project you've chosen. **Measured on the 58 labels**, with and without Gemma, and with thinking off and on. **Compared with an AI agent given a skill** (section 2), which led to the fixes of 16 Oct. ✅ Merged into `main` on 16 Oct. ⏳ Still to check: you rate at least 7 of 10 of Gemma's first steps as useful (section 18) | | Wed 14 – Fri 16 Oct |
 | Unattended test | ✅ Passed. **2 days** from `docscout schedule install`: no manual starts, survives a reboot and going offline. Result: 5 scheduled runs (13–16 Oct), 2 restarts and 1 lost connection, all recovered without manual starts. M2 was built in a separate worktree, so the daily runs kept using the M3 code | | Tue 13 – Thu 15 Oct |
 | Polish and wrap-up | ✅ `m1-report`, `m3-daily` and `m2-llm` merged into `main` on 16 Oct (a fast-forward: each branch builds on the one before). From then on, the daily runs use the Gemma version. README, demo report | | Thu 15 Oct (Fri 16 buffer) |
+| **Hosted version** (branch `hosted`) | ✅ Built (16 Oct), section 20: a website that shows this week's top 5 picks free and the rest for $3 a month (Stripe Checkout, test mode); a daily Render cron job running DocScout with Gemma 4 31B on Google's API; MongoDB Atlas for DocScout's memory, the picks and the subscriptions. ⏳ Deploy once the accounts exist; Gemma 4 31B measured on the 58 labels | | Fri 16 – Sat 17 Oct |
 | Challenge submission | Demo video; a real docs contribution made with a DocScout pick (the "first user"); the DEV post, written in your own voice | | Fri 16 – Sun 18 Oct |
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
@@ -455,7 +456,9 @@ hacktoberfest/
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
     db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅  llm_eval.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 184 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+    hosted/ __init__.py ✅ picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
+  deploy/render.toml ✅  render.yaml ✅ (section 20)
+  tests/ ✅ 195 tests (185 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -505,3 +508,40 @@ hacktoberfest/
 ## 19. Later (after M5)
 
 Re-checking still-open items for changes (docs fixed by someone else, a PR merged); pre-contribution message drafts; learning from merged or rejected PRs; running the LLM only when plugged in or idle; new API types (GraphQL, gRPC, AsyncAPI, OpenRPC, library/SDK docs via help requests); Up For Grabs as a seed; GitLab and Codeberg; a dashboard; Spectral lint; standalone executables.
+
+## 20. Hosted version (16 Oct)
+
+For writers who'd rather not run anything: no terminal, and no 6 GB of free memory, which Gemma pushed this laptop to its limit for in every comparison run. It also serves the challenge's "something someone would actually pay for".
+
+**Built on branch `hosted`:**
+- **Daily job** (`docscout.hosted.job`, a Render cron job): load DocScout's database from Atlas, `docscout run` with [deploy/render.toml](../deploy/render.toml), publish this week's picks, save the database back. The save also happens after a failed run.
+- **Model:** Gemma 4 31B (`gemma-4-31b-it`) through Google's OpenAI-compatible Gemini API endpoint, on the free tier. Google lists `gemma-4-31b-it` and `gemma-4-26b-a4b-it` for the key. Under load it answered 500 or 503 to about half the requests (16 Oct), so busy answers (429, 5xx) are retried after 5, 20 and 60 s, or after the provider's `Retry-After`. Only schema mode returned clean JSON; JSON mode on the 26B returned its "thoughts".
+- **MongoDB Atlas** (free tier):
+  - DocScout's SQLite file, in GridFS, newest 3 versions kept. Render cron jobs can't keep files or attach disks;
+  - this week's picks: one document;
+  - subscriptions: no names or email addresses kept.
+- **Website** (`docscout.hosted.web`, Starlette and Jinja2, a Render web service):
+  - this week's picks, every project reported in the last 7 days and still open;
+  - the top 5 free, the rest after a Stripe Checkout subscription;
+  - the paywall is enforced on the server, so the page holds only what the visitor may see;
+  - no JavaScript, and a Content-Security-Policy that allows no scripts;
+  - text escaped, and links only to GitHub URLs DocScout trusts.
+- **Subscriber pass:** an HMAC-signed, HttpOnly cookie for 31 days, issued only after Stripe confirms the session is complete and paid.
+
+**Decisions:**
+- **Render, not DigitalOcean.** The $50 Hacktoberfest credit covers it. DigitalOcean's cheapest fit was about $48 a month, and signing up asked for more than the plan. On Render:
+  - the cron job is the agent's runtime ("your project's AI runtime");
+  - the website is "an agent's front end".
+- **Google AI Studio for Gemma.** It's free with no card, and it's Google serving Gemma. DigitalOcean's Inference also serves Gemma 4 ($0.18 / $0.50 per million input / output tokens), but the account wanted a charge. OpenRouter (`google/gemma-4-31b-it:free`) is the fallback: one setting.
+- **Price: $3 a month, not weekly.** Card fees (about $0.30 plus about 3% per charge) leave about $2.60 of $3, and weekly billing would pay the fixed fee four times.
+- **5 free picks a week.** The pool is about 4–10 good picks a day, so a weekly list makes "5 free" meaningful.
+
+**Cost:**
+- Render: a cron job (billed per second, $1 minimum a month) plus the web service. Use the paid plan during judging so visitors don't wait about a minute for a sleeping free service; switch to free after.
+- Gemma and Atlas: $0 on the free tiers.
+
+**Prize categories it genuinely uses:** Render, Gemma, MongoDB Atlas, and a .tech domain once claimed.
+
+**⏳ Still to do:**
+- Gemma 4 31B on the 58 labels;
+- deploy: the accounts, the public GitHub repo, and a real end-to-end test payment in test mode.

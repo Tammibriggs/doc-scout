@@ -312,3 +312,15 @@ class Store:
             (before_run, limit),
         ).fetchall()
         return [StoredFinding(r["full_name"], r["score"], json.loads(r["details"]), r["run_id"]) for r in rows]
+
+    def reported_since(self, since: datetime) -> list[StoredFinding]:
+        """The latest finding of each repo reported since ``since`` and still open, best first
+        (the hosted website's weekly list)."""
+        rows = self.conn.execute(
+            """SELECT r.full_name, f.score, f.details, f.run_id FROM findings f JOIN repos r ON r.key = f.repo_key
+               WHERE r.status = 'reported' AND r.last_reported >= ?
+                 AND f.id = (SELECT MAX(id) FROM findings WHERE repo_key = f.repo_key)
+               ORDER BY f.score DESC""",
+            (_iso(since),),
+        ).fetchall()
+        return [StoredFinding(r["full_name"], r["score"], json.loads(r["details"]), r["run_id"]) for r in rows]

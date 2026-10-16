@@ -18,6 +18,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# The hosted version (docscout.hosted): website, daily job on Render, MongoDB Atlas.
+hosted = ["starlette>=1.8", "jinja2>=3.1", "uvicorn>=0.54", "pymongo>=4.19"]
 
 [project.scripts]
 docscout = "docscout.cli:main"
@@ -29,7 +31,7 @@ docscout-bg = "docscout.cli:main_bg"
 include = ["docscout*"]
 
 [tool.setuptools.package-data]
-docscout = ["default_config.toml"]
+docscout = ["default_config.toml", "hosted/templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

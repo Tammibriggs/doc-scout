@@ -1,0 +1,22 @@
+# DocScout settings for the hosted daily job (docscout.hosted.job on Render).
+# Secrets aren't here: GITHUB_TOKEN, DOCSCOUT_LLM_API_KEY and MONGODB_URI come from
+# Render's environment variables.
+
+[profile]
+api_types = ["rest"]
+languages = []
+language_filter = "auto"
+project_sizes = ["small", "medium", "large"]
+
+[llm]
+# Gemma 4 31B through Google's OpenAI-compatible Gemini API endpoint.
+provider = "openai_compatible"
+model = "gemma-4-31b-it"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+
+[report]
+dir = "/tmp/docscout-reports"   # the website reads the picks from Atlas, not these files
+
+[notifications]
+run_started = false             # no desktop on a server
+run_finished = false

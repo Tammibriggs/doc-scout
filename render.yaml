@@ -1,0 +1,42 @@
+# Render Blueprint for DocScout's hosted version: the website and the daily job.
+# Secrets (sync: false) are entered in Render's dashboard when the Blueprint is created.
+services:
+  - type: web
+    name: docscout-web
+    runtime: python
+    plan: starter            # the free plan works too, but sleeps after 15 minutes without visitors
+    buildCommand: pip install ".[hosted]"
+    startCommand: uvicorn --factory docscout.hosted.web:from_env --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.2"
+      - key: MONGODB_URI
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: PUBLIC_URL      # e.g. https://docscout.tech
+        sync: false
+      - key: SOURCE_URL      # the public GitHub repo
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+
+  - type: cron
+    name: docscout-daily
+    runtime: python
+    plan: starter
+    schedule: "15 4 * * *"   # 04:15 UTC every day
+    buildCommand: pip install ".[hosted]"
+    startCommand: python -m docscout.hosted.job
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.2"
+      - key: DOCSCOUT_CONFIG
+        value: deploy/render.toml
+      - key: MONGODB_URI
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: DOCSCOUT_LLM_API_KEY
+        sync: false

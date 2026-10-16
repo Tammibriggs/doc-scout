@@ -7,7 +7,8 @@
 4. Copy the database back, even after a failed or cut-off run, since DocScout saves its
    progress as it goes.
 
-Secrets come from the environment: ``MONGODB_URI``, ``GITHUB_TOKEN`` and ``DOCSCOUT_LLM_API_KEY``.
+Secrets come from the environment (Render's settings) or DocScout's secrets.env: ``MONGODB_URI``,
+``GITHUB_TOKEN`` and ``DOCSCOUT_LLM_API_KEY``.
 """
 
 from __future__ import annotations
@@ -33,9 +34,10 @@ def main(argv: list[str] | None = None, atlas: object | None = None) -> int:
     from docscout.hosted.picks import weekly_picks
 
     if atlas is None:
+        from docscout.hosted import required_secret
         from docscout.hosted.atlas import Atlas
 
-        atlas = Atlas(os.environ["MONGODB_URI"])
+        atlas = Atlas(required_secret("MONGODB_URI"))
     config = os.environ.get("DOCSCOUT_CONFIG", str(DEFAULT_CONFIG))
     db_path = data_dir() / "docscout.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)

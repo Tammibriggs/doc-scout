@@ -26,6 +26,7 @@ from starlette.responses import PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 from starlette.templating import Jinja2Templates
 
+from docscout.hosted import required_secret
 from docscout.hosted.billing import PRICE_CENTS, BillingError
 from docscout.hosted.picks import FREE_PICKS
 from docscout.sanitize import is_github_url
@@ -123,13 +124,13 @@ def from_env() -> Starlette:
     from docscout.hosted.atlas import Atlas
     from docscout.hosted.billing import Stripe
 
-    key = os.environ["STRIPE_SECRET_KEY"]
+    key = required_secret("STRIPE_SECRET_KEY")
     stripe = Stripe(key)
     stripe.test_mode = not key.startswith("sk_live_")  # type: ignore[attr-defined]
     return create_app(
-        Atlas(os.environ["MONGODB_URI"]),
+        Atlas(required_secret("MONGODB_URI")),
         stripe,
-        secret=os.environ["SESSION_SECRET"],
-        public_url=os.environ["PUBLIC_URL"],
-        source_url=os.environ.get("SOURCE_URL"),
+        secret=required_secret("SESSION_SECRET"),
+        public_url=os.environ.get("PUBLIC_URL", "http://localhost:8000"),
+        source_url=os.environ.get("SOURCE_URL", "https://github.com/Tammibriggs/doc-scout"),
     )

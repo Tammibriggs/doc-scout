@@ -9,3 +9,13 @@
 
 Install with ``pip install -e ".[hosted]"``. The command-line tool doesn't need any of it.
 """
+
+
+def required_secret(name: str) -> str:
+    """From the environment (Render's settings) or DocScout's secrets.env (a local test)."""
+    from docscout.config import load_config
+
+    value = load_config().secret(name)
+    if not value:
+        raise RuntimeError(f"{name} isn't set: add it to the service's environment, or to DocScout's secrets.env for a local test.")
+    return value

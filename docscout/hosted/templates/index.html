@@ -3,109 +3,237 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DocScout: API docs you can improve</title>
-<meta name="description" content="Open-source projects whose API docs need a writer, checked every day and reviewed by Gemma.">
+<title>DocScout: API docs that need a writer</title>
+<meta name="description" content="Open-source projects whose API docs need a writer. Checked every day, reviewed by Gemma, with what's missing and where to start.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d5afe'/%3E%3Ccircle cx='14' cy='14' r='6.5' fill='none' stroke='white' stroke-width='3'/%3E%3Cpath d='M19 19l6 6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
-    --bg: #fbfaf7; --card: #ffffff; --text: #1d1b16; --muted: #5d584d; --line: #e4dfd3;
-    --accent: #1f5f8b; --accent-text: #ffffff; --note: #f3efe2; --warn: #8a4b00;
+    --bg: #f7f6f2; --surface: #ffffff; --surface-2: #f1f0eb; --text: #1f2330; --muted: #5f6472; --line: #e2e0d8;
+    --brand: #3d5afe; --brand-soft: #e8ecff; --brand-text: #ffffff;
+    --green: #1e7a4c; --green-soft: #e3f4ea; --blue: #1f5fa8; --blue-soft: #e4effb; --amber: #8a5300; --amber-soft: #fbefd9;
+    --shadow: 0 1px 2px rgba(20, 22, 30, .06), 0 6px 20px rgba(20, 22, 30, .06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #15140f; --card: #1e1c16; --text: #ece7da; --muted: #a9a293; --line: #36322a;
-      --accent: #6fb3e0; --accent-text: #0b1a24; --note: #262318; --warn: #f0b36a;
+      --bg: #12141b; --surface: #1b1e27; --surface-2: #232733; --text: #e8e9ee; --muted: #a2a7b5; --line: #2e3240;
+      --brand: #8c9eff; --brand-soft: #262c4d; --brand-text: #0e1230;
+      --green: #7fd6a4; --green-soft: #1d3328; --blue: #8ec1f5; --blue-soft: #1c2b3d; --amber: #f3c27a; --amber-soft: #3a2e1a;
+      --shadow: none;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main, header, footer { max-width: 760px; margin: 0 auto; padding: 0 16px; }
-  header { padding-top: 48px; padding-bottom: 8px; }
-  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; }
-  h2 { font-size: 1.25rem; margin: 0; }
-  h3 { font-size: 0.95rem; margin: 18px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-  p { margin: 0 0 12px; }
-  a { color: var(--accent); }
-  .lede { color: var(--muted); font-size: 1.05rem; }
-  .meta { color: var(--muted); font-size: 0.9rem; }
-  .notice { background: var(--note); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
-  ol.picks { list-style: none; padding: 0; margin: 24px 0; }
-  .pick { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; margin-bottom: 18px; }
-  .pick header { padding: 0; max-width: none; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
-  .rank { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .pick ul, .pick ol { margin: 4px 0 8px; padding-left: 22px; }
-  .pick li { margin: 2px 0; }
-  code { font-size: 0.88em; overflow-wrap: anywhere; }
-  .warn { color: var(--warn); }
-  .paywall { background: var(--card); border: 2px solid var(--accent); border-radius: 10px; padding: 24px 22px; margin: 8px 0 32px; text-align: center; }
-  .paywall h2 { margin-bottom: 8px; }
-  button { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
-           padding: 12px 22px; cursor: pointer; margin-top: 8px; }
-  button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .small { font-size: 0.85rem; color: var(--muted); }
-  footer { padding-top: 8px; padding-bottom: 48px; border-top: 1px solid var(--line); margin-top: 24px; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand); text-underline-offset: 2px; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+
+  /* Top bar */
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; color: var(--text); text-decoration: none; }
+  .logo-mark { width: 32px; height: 32px; }
+  .top a.plain { color: var(--muted); font-size: .95rem; }
+
+  /* Hero */
+  .hero { padding: 36px 0 12px; }
+  .hero h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 14px; letter-spacing: -.01em; }
+  .hero p { font-size: 1.12rem; color: var(--muted); max-width: 640px; margin: 0 0 18px; }
+  .stat { display: inline-flex; align-items: center; gap: 8px; background: var(--brand-soft); color: var(--brand); font-weight: 600;
+          padding: 6px 14px; border-radius: 999px; font-size: .92rem; }
+  .stat .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+  /* How it works */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 32px 0 8px; padding: 0; list-style: none; }
+  .steps li { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .steps svg { width: 26px; height: 26px; color: var(--brand); }
+  .steps strong { display: block; margin: 6px 0 2px; }
+  .steps span { color: var(--muted); font-size: .93rem; }
+  @media (max-width: 680px) { .steps { grid-template-columns: 1fr; } }
+
+  /* Section heading */
+  .section-head { margin: 40px 0 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .section-head h2 { margin: 0; font-size: 1.4rem; }
+  .section-head span { color: var(--muted); font-size: .93rem; }
+
+  /* Pick cards */
+  .picks { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; box-shadow: var(--shadow); }
+  .card-head { display: flex; gap: 14px; align-items: flex-start; }
+  .rank { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--brand-soft); color: var(--brand);
+          display: grid; place-items: center; font-weight: 700; font-size: .95rem; }
+  .card h3 { margin: 2px 0 2px; font-size: 1.15rem; line-height: 1.3; overflow-wrap: anywhere; }
+  .card h3 a { color: var(--text); text-decoration: none; }
+  .card h3 a:hover { color: var(--brand); text-decoration: underline; }
+  .desc { color: var(--muted); margin: 0; font-size: .95rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+  .chip { font-size: .8rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+  .chip.green { background: var(--green-soft); color: var(--green); }
+  .chip.blue { background: var(--blue-soft); color: var(--blue); }
+  .chip.amber { background: var(--amber-soft); color: var(--amber); }
+  .todo { margin: 16px 0 0; padding: 14px 16px; background: var(--surface-2); border-radius: 12px; }
+  .todo .label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 4px; }
+  .todo p { margin: 0; }
+  .todo .file { font-size: .9rem; color: var(--muted); margin-top: 4px; }
+  code { font: .86em ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+  .gemma { display: flex; gap: 10px; margin: 14px 0 0; }
+  .gemma svg { flex: none; width: 22px; height: 22px; color: var(--brand); margin-top: 2px; }
+  .gemma p { margin: 0; }
+  .gemma .who { font-weight: 700; }
+  details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--brand); list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸"; transition: transform .15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  .more h4 { margin: 14px 0 4px; font-size: .95rem; }
+  .more ul, .more ol { margin: 4px 0; padding-left: 22px; }
+  .more li { margin: 3px 0; }
+  .more .warn { color: var(--amber); }
+
+  /* Offer */
+  .offer { margin: 22px 0 8px; background: var(--surface); border: 2px solid var(--brand); border-radius: 18px; padding: 26px; box-shadow: var(--shadow);
+           display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: center; }
+  .offer h2 { margin: 0 0 6px; font-size: 1.35rem; }
+  .offer ul { margin: 10px 0 0; padding: 0; list-style: none; }
+  .offer li { padding-left: 26px; position: relative; margin: 6px 0; }
+  .offer li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+  .price { text-align: center; }
+  .price .amount { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+  .price .per { color: var(--muted); }
+  button { font: inherit; font-weight: 700; background: var(--brand); color: var(--brand-text); border: 0; border-radius: 12px;
+           padding: 13px 22px; cursor: pointer; margin-top: 14px; width: 100%; }
+  button:hover { filter: brightness(1.08); }
+  .test { font-size: .82rem; color: var(--muted); margin: 10px 0 0; }
+  @media (max-width: 680px) { .offer { grid-template-columns: 1fr; } }
+
+  .notice { background: var(--amber-soft); color: var(--amber); border-radius: 12px; padding: 12px 16px; margin: 18px 0 0; font-weight: 600; }
+  .notice.ok { background: var(--green-soft); color: var(--green); }
+  .empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 16px; padding: 28px; text-align: center; color: var(--muted); }
+  footer { margin: 48px 0 0; padding: 26px 0 46px; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
+  footer p { margin: 0 0 8px; max-width: 640px; }
 </style>
 </head>
 <body>
-<header>
-  <h1>API docs you can improve</h1>
-  <p class="lede">Open-source projects whose REST API documentation needs a writer, found every day by DocScout and reviewed by Gemma. Each pick says what's missing, where to start, and whether the maintainers merge outside pull requests.</p>
-  {% if updated %}<p class="meta">Updated {{ updated.strftime("%-d %B %Y, %H:%M UTC") }} · {{ total }} pick{{ "" if total == 1 else "s" }} this week</p>{% endif %}
-  {% if subscribed %}<p class="meta">Subscribed: every pick is shown.</p>{% endif %}
-</header>
-<main>
-  {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+<div class="wrap">
+  <nav class="top" aria-label="Site">
+    <a class="logo" href="/">
+      <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#3d5afe"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="#fff" stroke-width="3"/><path d="M19 19l6 6" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+      DocScout
+    </a>
+    {% if source_url %}<a class="plain" href="{{ source_url }}">Run it yourself, free</a>{% endif %}
+  </nav>
 
-  {% if not picks %}
-  <p class="notice">This week's picks are on their way. DocScout checks projects once a day; come back tomorrow.</p>
-  {% endif %}
+  <header class="hero">
+    <h1>Find open-source API docs that need a writer</h1>
+    <p>Every day DocScout checks open-source projects and Gemma reviews the most promising ones. You get a short list of projects whose REST API docs have real gaps, maintainers who merge outside help, and a first step to take.</p>
+    {% if total %}<span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} this week{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span>{% endif %}
+    {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+    {% if subscribed %}<p class="notice ok" role="status">Subscribed: every pick is shown. Thanks for supporting DocScout!</p>{% endif %}
 
-  <ol class="picks">
-  {% for p in picks %}
-    <li class="pick">
-      <header>
-        <span class="rank">{{ p.rank }}.</span>
-        <h2>{% if p.url %}<a href="{{ p.url }}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}</h2>
-        <span class="meta">{% if p.stars is not none %}★ {{ p.stars }}{% endif %}{% if p.language %} · {{ p.language }}{% endif %} · score {{ p.score }}</span>
-      </header>
-      {% if p.description %}<p class="meta">{{ p.description }}</p>{% endif %}
+    <ol class="steps" aria-label="How it works">
+      <li>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <strong>It looks</strong><span>Self-hosted apps, GitHub searches and maintainers asking for docs help.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6"/></svg>
+        <strong>It measures</strong><span>It reads each API spec and docs page, and counts what's missing.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+        <strong>Gemma explains</strong><span>Why the docs matter to users, and the first steps for a small pull request.</span>
+      </li>
+    </ol>
+  </header>
 
-      <h3>The gap</h3>
-      <p><strong>{{ p.gap_heading }}:</strong>
-        {% if p.gap_file %}{% if p.gap_file_url %}<a href="{{ p.gap_file_url }}"><code>{{ p.gap_file }}</code></a>{% else %}<code>{{ p.gap_file }}</code>{% endif %} ({{ p.gap_summary }}){% else %}{{ p.gap_summary }}{% endif %}</p>
-      {% if p.findings %}<ul>{% for f in p.findings %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
-      {% if p.suggestion %}<p>{{ p.suggestion }}</p>{% endif %}
-      {% if p.published %}<p class="meta">Docs published: {{ p.published | join(" · ") }}</p>{% endif %}
-      {% if p.check_manually %}<p class="meta">Check manually: {{ p.check_manually | join(" · ") }}</p>{% endif %}
+  <main>
+    <div class="section-head">
+      <h2>This week's picks</h2>
+      {% if hidden > 0 %}<span>The top {{ picks | length }} are free. Subscribers see all {{ total }}.</span>{% endif %}
+    </div>
 
-      {% if p.why or p.first_steps %}
-      <h3>{{ p.model or "Gemma" }}'s take</h3>
-      {% if p.why %}<p>{{ p.why }}</p>{% endif %}
-      {% if p.first_steps %}<ol>{% for s in p.first_steps %}<li>{{ s }}</li>{% endfor %}</ol>{% endif %}
-      {% endif %}
+    {% if not picks %}
+    <p class="empty">This week's picks are on their way. DocScout checks projects once a day, so come back tomorrow.</p>
+    {% endif %}
 
-      <h3>Before you start</h3>
-      <ul>
-        {% if p.claimed %}{% for c in p.claimed %}<li class="warn">{{ c }}</li>{% endfor %}{% else %}<li>Nobody seems to be working on it yet.</li>{% endif %}
-        {% for r in p.requirements %}<li class="warn">{{ r }}</li>{% endfor %}
-        {% if p.local_setup %}<li>Running it locally: {{ p.local_setup }}</li>{% endif %}
-        {% for i in p.issues %}<li>Maintainers asked for help: {% if i.url %}<a href="{{ i.url }}">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</li>{% endfor %}
-      </ul>
-    </li>
-  {% endfor %}
-  </ol>
+    <ol class="picks">
+    {% for p in picks %}
+      <li class="card pick">
+        <div class="card-head">
+          <span class="rank" aria-label="Rank {{ p.rank }}">{{ p.rank }}</span>
+          <div>
+            <h3>{% if p.url %}<a href="{{ p.url }}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}</h3>
+            {% if p.description %}<p class="desc">{{ p.description }}</p>{% endif %}
+          </div>
+        </div>
 
-  {% if hidden > 0 %}
-  <section class="paywall" aria-labelledby="more">
-    <h2 id="more">{{ hidden }} more pick{{ "" if hidden == 1 else "s" }} this week</h2>
-    <p>Subscribe to see every pick, refreshed daily, with Gemma's first steps for each.</p>
-    <form method="post" action="/subscribe"><button type="submit">See every pick: {{ price }}/month</button></form>
-    {% if test_mode %}<p class="small">Test mode: no real charge. Use card 4242 4242 4242 4242, any future date and any CVC.</p>{% endif %}
-  </section>
-  {% endif %}
-</main>
-<footer>
-  <p class="small">DocScout is open source. Gemma 4 reviews every project, and the gap counts come from reading the specs and docs themselves, never from guessing. Prefer to run it on your own computer for free? The {% if source_url %}<a href="{{ source_url }}">command-line version</a>{% else %}command-line version{% endif %} does the same.</p>
-</footer>
+        <ul class="chips" aria-label="At a glance">
+          {% if p.language %}<li class="chip">{{ p.language }}</li>{% endif %}
+          {% if p.stars is not none %}<li class="chip">★ {{ "{:,}".format(p.stars) }}</li>{% endif %}
+          {% if p.effort %}<li class="chip">{{ p.effort }}</li>{% endif %}
+          {% if p.published %}<li class="chip green">Docs published</li>{% endif %}
+          {% if p.issues %}<li class="chip blue">Maintainers asked for help</li>{% endif %}
+          {% if p.claimed %}<li class="chip amber">Someone may be on it</li>{% else %}<li class="chip green">Not claimed</li>{% endif %}
+          {% if p.outside_prs %}<li class="chip">{{ p.outside_prs }} outside PR{{ "" if p.outside_prs == 1 else "s" }} merged lately</li>{% endif %}
+        </ul>
+
+        <div class="todo">
+          <p class="label">What needs doing</p>
+          <p>{{ p.headline }}</p>
+          <p class="file">{{ p.gap_heading }}{% if p.gap_file %}: {% if p.gap_file_url %}<a href="{{ p.gap_file_url }}"><code>{{ p.gap_file }}</code></a>{% else %}<code>{{ p.gap_file }}</code>{% endif %}{% endif %}</p>
+        </div>
+
+        {% if p.why %}
+        <div class="gemma">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>
+          <p><span class="who">{{ p.model or "Gemma" }}:</span> {{ p.why }}</p>
+        </div>
+        {% endif %}
+
+        <details>
+          <summary>Where to start</summary>
+          <div class="more">
+            {% if p.first_steps %}<h4>First steps</h4><ol>{% for s in p.first_steps %}<li>{{ s }}</li>{% endfor %}</ol>{% endif %}
+            {% if p.findings %}<h4>The gaps DocScout counted</h4><ul>{% for f in p.findings %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+            {% if p.suggestion %}<p>{{ p.suggestion }}</p>{% endif %}
+            <h4>Before you start</h4>
+            <ul>
+              {% for c in p.claimed %}<li class="warn">{{ c }}</li>{% endfor %}
+              {% for r in p.requirements %}<li class="warn">{{ r }}</li>{% endfor %}
+              {% for i in p.issues %}<li>Maintainers asked for help: {% if i.url %}<a href="{{ i.url }}">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</li>{% endfor %}
+              {% for d in p.published %}<li>{{ d }}</li>{% endfor %}
+              {% for d in p.check_manually %}<li>Check manually: {{ d }}</li>{% endfor %}
+              {% if p.local_setup %}<li>Running it locally: {{ p.local_setup }}</li>{% endif %}
+            </ul>
+          </div>
+        </details>
+      </li>
+    {% endfor %}
+    </ol>
+
+    {% if hidden > 0 %}
+    <section class="offer" aria-labelledby="offer-title">
+      <div>
+        <h2 id="offer-title">{{ hidden }} more project{{ "" if hidden == 1 else "s" }} this week</h2>
+        <p class="desc">Subscribe to see every pick DocScout and Gemma find.</p>
+        <ul>
+          <li>Every pick, refreshed every day</li>
+          <li>Gemma's first steps for each project</li>
+          <li>Nothing to install, and cancel anytime</li>
+        </ul>
+      </div>
+      <div class="price">
+        <div class="amount">{{ price }}</div>
+        <div class="per">per month</div>
+        <form method="post" action="/subscribe"><button type="submit">See every pick</button></form>
+        {% if test_mode %}<p class="test">Test mode: no real charge. Card 4242 4242 4242 4242, any future date, any CVC.</p>{% endif %}
+      </div>
+    </section>
+    {% endif %}
+  </main>
+
+  <footer>
+    <p>Made for technical writers who want to contribute to open source. The counts come from reading each project's specs and docs, and Gemma 4 explains why they matter.</p>
+    <p>Prefer to run it yourself? The {% if source_url %}<a href="{{ source_url }}">command-line version</a>{% else %}command-line version{% endif %} is open source and free.</p>
+  </footer>
+</div>
 </body>
 </html>

@@ -55,11 +55,11 @@ def test_docs_published_as_pages_raise_the_score_and_docker_is_not_a_docs_label(
 
 
 def test_untrusted_text_cannot_inject_markdown_links_or_controls():
-    evil = "Click [here](https://evil.example)\n# Heading <img src=x onerror=alert(1)> ‮\x1b[31m"
+    evil = "Click [here](https://evil.example)\n# Heading <img src=x onerror=alert(1)> \u202e\x1b[31m"
     out = text(evil)
     assert re.search(r"(?<!\\)[<>\[\]()#`]", out) is None  # every Markdown/HTML special character is escaped
     assert "\n" not in out
-    assert "‮" not in out and "\x1b" not in out
+    assert "\u202e" not in out and "\x1b" not in out
     assert code("a`b") == "`a'b`"
     assert link("x", "https://evil.example/a") == "x"
     assert link("x", "https://github.com/org/app/issues/12") == "[x](https://github.com/org/app/issues/12)"

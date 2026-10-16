@@ -54,7 +54,7 @@ def report(store, now, name, *, score=50.0, status="reported", **kw):
 def sample_picks(n):
     return [{"rank": i, "full_name": f"org/app{i}", "url": f"https://github.com/org/app{i}", "score": 90 - i, "stars": 100, "language": "Go",
              "description": None, "gap_heading": "REST API spec with gaps", "gap_summary": "OpenAPI 3.1", "gap_file": None, "gap_file_url": None,
-             "findings": [], "suggestion": None, "published": [], "check_manually": [], "model": "Gemma", "why": None, "first_steps": [],
+             "findings": [], "headline": "OpenAPI 3.1", "effort": "Medium job", "outside_prs": 4, "suggestion": None, "published": [], "check_manually": [], "model": "Gemma", "why": None, "first_steps": [],
              "claimed": [], "requirements": [], "local_setup": None, "issues": []} for i in range(1, n + 1)]
 
 
@@ -105,7 +105,7 @@ def client(atlas, stripe=None, now=1_800_000_000.0):
 
 def test_weekly_picks_are_this_weeks_open_reports_with_only_trusted_links(tmp_path, now):
     store = Store(tmp_path / "docscout.db")
-    report(store, now, "org/best", score=80, html_url="https://evil.example/phish", description="Line one\x1b[31m‮ hidden")
+    report(store, now, "org/best", score=80, html_url="https://evil.example/phish", description=":baby: Line one\x1b[31m\u202e hidden")
     report(store, now, "org/second", score=40)
     report(store, now - timedelta(days=8), "org/old")  # reported last week
     report(store, now, "org/waiting", status="new")  # not reported yet
@@ -128,8 +128,8 @@ def test_weekly_picks_are_this_weeks_open_reports_with_only_trusted_links(tmp_pa
 def test_visitors_see_the_top_picks_and_an_offer_for_the_rest():
     resp = client(FakeAtlas(sample_picks(7))).get("/")
     assert resp.status_code == 200
-    assert resp.text.count('class="pick"') == FREE_PICKS
-    assert "2 more picks this week" in resp.text and 'action="/subscribe"' in resp.text
+    assert resp.text.count('class="card pick"') == FREE_PICKS
+    assert "2 more projects this week" in resp.text and 'action="/subscribe"' in resp.text
     assert "org/app5" in resp.text and "org/app6" not in resp.text  # the rest never reach the page
     assert "4242 4242 4242 4242" in resp.text  # test mode is labeled
     csp = resp.headers["content-security-policy"]
@@ -142,7 +142,7 @@ def test_text_from_github_is_escaped():
     resp = client(FakeAtlas(picks)).get("/")
     assert "<script>alert" not in resp.text and "&lt;script&gt;alert(1)&lt;/script&gt;" in resp.text
     assert "<img src=x" not in resp.text
-    assert 'href="None"' not in resp.text and "<a href" not in resp.text.split('class="pick"')[1].split("</li>")[0]
+    assert 'href="None"' not in resp.text and "<a href" not in resp.text.split('class="card pick"')[1].split("</li>")[0]
 
 
 def test_a_paid_checkout_unlocks_every_pick():
@@ -155,7 +155,7 @@ def test_a_paid_checkout_unlocks_every_pick():
     assert "HttpOnly" in back.headers["set-cookie"] and "Secure" in back.headers["set-cookie"]
     assert "cs_test_paid0000000001" in atlas.subscriptions
     page = c.get("/")
-    assert page.text.count('class="pick"') == 7 and "more pick" not in page.text and "every pick is shown" in page.text
+    assert page.text.count('class="card pick"') == 7 and "more project" not in page.text and "every pick is shown" in page.text
 
 
 def test_unpaid_or_forged_returns_unlock_nothing():
@@ -166,7 +166,7 @@ def test_unpaid_or_forged_returns_unlock_nothing():
     assert "go through, so nothing was charged" in c.get("/?payment=failed").text
     forged = client(atlas)
     forged.cookies.set(COOKIE, "cs_test_x.9999999999.deadbeef")
-    assert forged.get("/").text.count('class="pick"') == FREE_PICKS
+    assert forged.get("/").text.count('class="card pick"') == FREE_PICKS
 
 
 def test_a_pass_is_valid_only_until_it_expires():

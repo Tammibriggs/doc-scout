@@ -520,7 +520,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - DocScout's SQLite file, in GridFS, newest 3 versions kept. Render cron jobs can't keep files or attach disks;
   - this week's picks: one document;
   - subscriptions: no names or email addresses kept.
-- **Website** (`docscout.hosted.web`, Starlette and Jinja2, a Render web service):
+- **Website** (`docscout.hosted.web`, Starlette and Jinja2, a Render web service). Redesigned on 16 Oct after "a wall of text": a short welcome, 3 how-it-works steps, cards with labels (language, stars, effort, docs published, help requested, not claimed, outside PRs merged), "What needs doing" and Gemma's note up front, the details folded away (`<details>`, no JavaScript):
   - this week's picks, every project reported in the last 7 days and still open;
   - the top 5 free, the rest after a Stripe Checkout subscription;
   - the paywall is enforced on the server, so the page holds only what the visitor may see;
@@ -540,7 +540,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 - Render: a cron job (billed per second, $1 minimum a month) plus the web service. Use the paid plan during judging so visitors don't wait about a minute for a sleeping free service; switch to free after.
 - Gemma and Atlas: $0 on the free tiers.
 
-**Prize categories it genuinely uses:** Render, Gemma, MongoDB Atlas, and a .tech domain once claimed.
+**Prize categories it genuinely uses:** Render, Gemma and MongoDB Atlas. The .tech domain category was dropped: the promo code was no longer available (16 Oct).
 
 **⏳ Still to do:**
 - Gemma 4 31B on the 58 labels;

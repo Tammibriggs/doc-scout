@@ -85,6 +85,19 @@ All three sources are above 50%, so all stay on.
 - **Prompt v3 was worse, so it was reverted.** It defined `serves_api` more precisely, offered style `unknown`, and passed Gemma the code's measured facts (owned spec, endpoints in the README). Gemma then copied the code instead of judging: its evidence quotes became "DocScout's checks: owns an OpenAPI/Swagger spec…", and it agreed with the code's false positives. Back to prompt v2 with the new rule: 12 mistakes, like code alone, but 3 fewer wrong picks (6 instead of 9) and 3 more missed apps. For a contributor, a wrong pick wastes time; a missed one costs little.
 - **Memory got worse:** during the v3 run free memory reached 0.0 GB (6.7 GB free before), so the laptop swapped. Running 11 reviews a day unattended on 7.8 GB is heavy. ⏳ Decide: fewer daily reviews, or a hosted open-weight model.
 
+**Compared with an AI agent given a skill (14–15 Oct)** ([method](comparison/METHOD.md), [results](comparison/RESULTS.md)). The agent was Claude Opus with a skill that holds everything DocScout learned.
+- **Labels:** the agent reached 88% precision and 97% recall, against DocScout's 81% / 81%.
+- **One search:** the agent found 10 picks, 4 of which you'd act on, and 79 of its 81 claims were right. DocScout found 2 picks, 1 of which you'd act on, and 10 of its 20 claims were right.
+- **Cost:** the agent took 2 hours and 376k tokens; DocScout took 7.5 minutes and no tokens.
+- **What you want:** projects whose docs are published as pages (a docs site, or at least the README), not an API reference that appears only after installing the app. All 6 projects you'd act on have a docs site; so do 3 of the 7 you wouldn't.
+- **DocScout's misses are mostly code checks:**
+  - specs found only by file name, which missed 4;
+  - an AI-agent skill file counted as docs;
+  - bug and feature issues counted as docs requests;
+  - a docs site treated as a reason not to report.
+
+  ⏳ Decide which to fix before the submission.
+
 ## 3. Success criteria
 
 | Metric | Target | Checked in |

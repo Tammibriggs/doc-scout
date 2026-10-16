@@ -534,6 +534,8 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - this week's picks, every project reported in the last 7 days and still open;
   - the top 5 free, the rest after a Stripe Checkout subscription;
   - the paywall is enforced on the server, so the page holds only what the visitor may see;
+  - subscribers page through the list, 10 picks a page (server-side pages: infinite scrolling would need JavaScript);
+  - the page states Gemma's role plainly: it reviews every candidate and turns away the ones that aren't real apps with an API, which raised precision from 76% to 85%.
   - no JavaScript, and a Content-Security-Policy that allows no scripts;
   - text escaped, and links only to GitHub URLs DocScout trusts.
 - **Subscriber pass:** an HMAC-signed, HttpOnly cookie for 31 days, issued only after Stripe confirms the session is complete and paid.
@@ -551,6 +553,8 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 - Gemma and Atlas: $0 on the free tiers.
 
 **Prize categories it genuinely uses:** Render, Gemma and MongoDB Atlas. The .tech domain category was dropped: the promo code was no longer available (16 Oct).
+
+**Rehearsal (16 Oct), on this laptop against the real Atlas and Stripe test mode:** 42 picks published; 5 shown free; Checkout opened and the test card paid; the return link unlocked all 42. Atlas recorded the subscription with Stripe's IDs only (no email).
 
 **⏳ Still to do:**
 - ✅ Gemma 4 31B on the 58 labels: 85% precision, 90% recall (section 2);

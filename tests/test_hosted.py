@@ -158,6 +158,19 @@ def test_a_paid_checkout_unlocks_every_pick():
     assert page.text.count('class="card pick"') == 7 and "more project" not in page.text and "every pick is shown" in page.text
 
 
+def test_subscribers_page_through_every_pick():
+    c = client(FakeAtlas(sample_picks(23)))
+    c.cookies.set(COOKIE, sign_pass("cs_test_paid0000000001", 2_000_000_000, SECRET))
+    first = c.get("/").text
+    assert first.count('class="card pick"') == 10 and "Page 1 of 3" in first and 'href="/?page=2#picks"' in first
+    last = c.get("/?page=3").text
+    assert last.count('class="card pick"') == 3 and "org/app21" in last and "org/app20" not in last
+    assert "Page 3 of 3" in c.get("/?page=99").text  # past the end: the last page
+    assert "Page 1 of 3" in c.get("/?page=-2").text and "Page 1 of 3" in c.get("/?page=abc").text
+    visitor = client(FakeAtlas(sample_picks(23))).get("/?page=2").text
+    assert visitor.count('class="card pick"') == FREE_PICKS and "org/app1<" in visitor and "Page 2" not in visitor  # no pages behind the paywall
+
+
 def test_unpaid_or_forged_returns_unlock_nothing():
     atlas = FakeAtlas(sample_picks(7))
     c = client(atlas)

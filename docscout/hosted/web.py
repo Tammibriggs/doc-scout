@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import os
 import time
 from collections.abc import Callable
@@ -32,6 +33,7 @@ from docscout.hosted.picks import FREE_PICKS
 from docscout.run.sanitize import is_github_url
 
 COOKIE = "docscout_pass"
+PER_PAGE = 10  # picks per page for subscribers
 PASS_SECONDS = 31 * 24 * 3600  # a month's subscription, plus a day
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -74,11 +76,20 @@ def create_app(
     async def index(request: Request) -> Response:
         picks, updated = atlas.current_picks()
         subscribed = valid_pass(request.cookies.get(COOKIE), secret, clock())
-        shown = picks if subscribed else picks[:FREE_PICKS]
+        pages, number = 1, 1
+        if subscribed:  # pages of PER_PAGE; visitors see only the free picks, so they need no pages
+            pages = max(1, math.ceil(len(picks) / PER_PAGE))
+            requested = request.query_params.get("page", "1")
+            number = min(pages, max(1, int(requested))) if requested.isdigit() else 1
+            shown = picks[(number - 1) * PER_PAGE : number * PER_PAGE]
+        else:
+            shown = picks[:FREE_PICKS]
         return page(
             request,
             picks=shown,
-            hidden=len(picks) - len(shown),
+            hidden=0 if subscribed else len(picks) - len(shown),
+            page_number=number,
+            pages=pages,
             total=len(picks),
             subscribed=subscribed,
             updated=updated,

@@ -104,7 +104,14 @@
   .test { font-size: .82rem; color: var(--muted); margin: 10px 0 0; }
   @media (max-width: 680px) { .offer { grid-template-columns: 1fr; } }
 
-  .notice { background: var(--amber-soft); color: var(--amber); border-radius: 12px; padding: 12px 16px; margin: 18px 0 0; font-weight: 600; }
+  .status { margin: 0 0 18px; }
+  .notice { background: var(--amber-soft); color: var(--amber); border-radius: 12px; padding: 12px 16px; margin: 0 0 12px; font-weight: 600; }
+  .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 22px 0 0; flex-wrap: wrap; }
+  .pager .step { font-weight: 600; text-decoration: none; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .pager .step.off { color: var(--muted); opacity: .5; }
+  .pager .numbers { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pager .num { min-width: 36px; text-align: center; padding: 6px 10px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+  .pager .num.here { background: var(--brand); color: var(--brand-text); }
   .notice.ok { background: var(--green-soft); color: var(--green); }
   .empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 16px; padding: 28px; text-align: center; color: var(--muted); }
   footer { margin: 48px 0 0; padding: 26px 0 46px; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
@@ -123,8 +130,8 @@
 
   <header class="hero">
     <h1>Find open-source API docs that need a writer</h1>
-    <p>Every day DocScout checks open-source projects and Gemma reviews the most promising ones. You get a short list of projects whose REST API docs have real gaps, maintainers who merge outside help, and a first step to take.</p>
-    {% if total %}<span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} this week{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span>{% endif %}
+    <p>Every day DocScout measures the API docs of open-source projects, and Gemma reviews every candidate before it's listed: it turns away tools, libraries and look-alikes, then explains why the docs matter and where to start. You get a short list of projects with real gaps and maintainers who merge outside help.</p>
+    {% if total %}<p class="status"><span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} this week{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span></p>{% endif %}
     {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
     {% if subscribed %}<p class="notice ok" role="status">Subscribed: every pick is shown. Thanks for supporting DocScout!</p>{% endif %}
 
@@ -139,15 +146,16 @@
       </li>
       <li>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
-        <strong>Gemma explains</strong><span>Why the docs matter to users, and the first steps for a small pull request.</span>
+        <strong>Gemma decides</strong><span>Gemma 4 reviews every candidate, turns away the ones that aren't real apps with an API, and explains where to start.</span>
       </li>
     </ol>
   </header>
 
   <main>
-    <div class="section-head">
+    <div class="section-head" id="picks">
       <h2>This week's picks</h2>
-      {% if hidden > 0 %}<span>The top {{ picks | length }} are free. Subscribers see all {{ total }}.</span>{% endif %}
+      {% if hidden > 0 %}<span>The top {{ picks | length }} are free. Subscribers see all {{ total }}.</span>
+      {% elif pages > 1 %}<span>Page {{ page_number }} of {{ pages }}</span>{% endif %}
     </div>
 
     {% if not picks %}
@@ -209,6 +217,16 @@
     {% endfor %}
     </ol>
 
+    {% if pages > 1 %}
+    <nav class="pager" aria-label="Pages">
+      {% if page_number > 1 %}<a class="step" href="/?page={{ page_number - 1 }}#picks" rel="prev">← Previous</a>{% else %}<span class="step off">← Previous</span>{% endif %}
+      <span class="numbers">
+        {% for n in range(1, pages + 1) %}{% if n == page_number %}<span class="num here" aria-current="page">{{ n }}</span>{% else %}<a class="num" href="/?page={{ n }}#picks">{{ n }}</a>{% endif %}{% endfor %}
+      </span>
+      {% if page_number < pages %}<a class="step" href="/?page={{ page_number + 1 }}#picks" rel="next">Next →</a>{% else %}<span class="step off">Next →</span>{% endif %}
+    </nav>
+    {% endif %}
+
     {% if hidden > 0 %}
     <section class="offer" aria-labelledby="offer-title">
       <div>
@@ -231,7 +249,7 @@
   </main>
 
   <footer>
-    <p>Made for technical writers who want to contribute to open source. The counts come from reading each project's specs and docs, and Gemma 4 explains why they matter.</p>
+    <p>Made for technical writers who want to contribute to open source. DocScout's code counts the gaps in each project's specs and docs. Gemma 4, an open-weight model, reviews every candidate: it decides which projects are real apps with an API worth documenting, and writes why the docs matter and the first steps. On 58 hand-labeled projects, Gemma's review cut wrong picks while keeping recall: 85% precision against 76% for the code alone.</p>
     <p>Prefer to run it yourself? The {% if source_url %}<a href="{{ source_url }}">command-line version</a>{% else %}command-line version{% endif %} is open source and free.</p>
   </footer>
 </div>

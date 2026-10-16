@@ -13,6 +13,7 @@ project_sizes = ["small", "medium", "large"]
 provider = "openai_compatible"
 model = "gemma-4-31b-it"
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+timeout_seconds = 90            # a review takes 20-40 s; a request that hangs is retried after a pause
 
 [report]
 dir = "/tmp/docscout-reports"   # the website reads the picks from Atlas, not these files

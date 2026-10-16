@@ -128,6 +128,29 @@ def test_openai_compat_waits_and_retries_a_busy_provider():
         always_busy.review(RepoContext(full_name="a/b"))
 
 
+def test_openai_compat_retries_a_request_that_times_out():
+    from docscout.llm.base import LLMError
+
+    hangs = [True]
+
+    def handler(req):
+        if hangs:
+            hangs.pop()
+            raise httpx.ReadTimeout("timed out", request=req)
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(GOOD)}}]})
+
+    waits = []
+    client = OpenAICompatClient(base_url="https://llm.example/v1", model="m", api_key="k", transport=httpx.MockTransport(handler), sleep=waits.append)
+    assert client.review(RepoContext(full_name="a/b")).confidence == 0.9 and waits == [5.0]
+
+    def never(req):
+        raise httpx.ReadTimeout("timed out", request=req)
+
+    stuck = OpenAICompatClient(base_url="https://llm.example/v1", model="m", api_key="k", transport=httpx.MockTransport(never), sleep=waits.append)
+    with pytest.raises(LLMError, match="didn't answer in time"):
+        stuck.review(RepoContext(full_name="a/b"))
+
+
 def test_ollama_not_running_or_model_missing_explains_the_fix():
     from docscout.llm.base import LLMUnavailable, review_with_retry
 

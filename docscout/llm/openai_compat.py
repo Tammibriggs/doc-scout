@@ -63,6 +63,11 @@ class OpenAICompatClient:
                 resp = self._client.post("/chat/completions", json=payload)
             except httpx.ConnectError as exc:
                 raise LLMUnavailable(f"Can't connect to the LLM provider at {self._client.base_url}. Check the address (--base-url) and your connection.") from exc
+            except httpx.TimeoutException as exc:  # seen 16 Oct: a busy endpoint that never answered
+                if wait is None:
+                    raise LLMError(f"the LLM provider didn't answer in time: {exc}") from exc
+                self._sleep(wait)
+                continue
             except httpx.HTTPError as exc:
                 raise LLMError(f"cannot reach LLM provider: {exc}") from exc
             if resp.status_code not in RETRY_STATUSES or wait is None:

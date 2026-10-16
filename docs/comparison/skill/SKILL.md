@@ -11,6 +11,13 @@ You're helping a technical writer find open-source projects where a documentatio
 2. **Its API docs have a real gap** that you can show with numbers and links.
 3. **It's likely to accept a pull request from an outsider.**
 
+**Rank higher the projects whose docs are published as pages** that can be read without installing the project:
+- a docs website, often built from the repo with MkDocs, Sphinx, Docusaurus or Mintlify;
+- a separate docs repo;
+- API docs in the README or in Markdown files on GitHub.
+
+Rank lower the projects whose API reference appears only in the running app (Swagger UI served by the app). The writer would have to install the app to see the docs, and the fix often means editing code annotations. Writers prefer to work on published pages.
+
 ## Tools
 
 - `ghapi PATH [curl options]` calls the GitHub API with the user's token, for example:

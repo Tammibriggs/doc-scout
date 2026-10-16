@@ -50,3 +50,13 @@ Each pick is graded three ways:
 - **Day 2:** DocScout remembers what it showed, ignored or finished. A skill needs its own notes file for that.
 - **Running unattended:** schedule, offline, cut-off runs and alerts.
 - **Prompt injection:** the agent reads untrusted READMEs while holding a shell and a token. DocScout's model has no tools, and code caps how far its opinion can move a score.
+
+## Round 2 (16 Oct): after fixing DocScout
+
+Round 1 showed DocScout's blind spots, and they were fixed in 43965ee. Round 2 repeats Test 2, with these changes, which are fixed before anything runs:
+
+- **The same new knowledge for both sides.** The author prefers projects whose docs are published as pages. DocScout got this as a ranking bonus, and the skill got the same preference as a paragraph near its top ([skill/SKILL.md](skill/SKILL.md)).
+- **New projects only.** The agent is told to skip the 13 projects graded in round 1. DocScout's search (`43965ee`, a fresh data folder, clock set to the round 1 start) happens to include none of them.
+- **Gemma reviews DocScout's candidates** on the laptop's available memory, as in round 1.
+- **Grading, fact-check and costs** follow the round 1 rules: blind grading by the author, every gap claim checked against the cited commit by a separate agent, and the same cost measures.
+- **Test 1 isn't repeated.** Neither the classifier nor the agent's definition of "serves an API" changed.

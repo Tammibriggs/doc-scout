@@ -18,7 +18,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | **M2. Gemma required** (branch `m2-llm`, built in a separate worktree) | ✅ First, fewer noisy items (section 9). Then ✅: **Gemma reviews every repo that passes the health checks** (up to `reviews_per_run` a day, most promising first): it decides whether the project really has an API worth documenting, with the 0.8 cap, and writes why it matters plus up to 3 first steps. **Only reviewed repos are reported.** Unreviewed ones are held, not dropped, and reviewed later. A memory check runs before loading the model. `docscout draft owner/repo` writes a first message to the maintainers for a project you've chosen. **Measured on the 58 labels**, with and without Gemma, and with thinking off and on. **Compared with an AI agent given a skill** (section 2), which led to the fixes of 16 Oct. ✅ Merged into `main` on 16 Oct. ⏳ Still to check: you rate at least 7 of 10 of Gemma's first steps as useful (section 18) | | Wed 14 – Fri 16 Oct |
 | Unattended test | ✅ Passed. **2 days** from `docscout schedule install`: no manual starts, survives a reboot and going offline. Result: 5 scheduled runs (13–16 Oct), 2 restarts and 1 lost connection, all recovered without manual starts. M2 was built in a separate worktree, so the daily runs kept using the M3 code | | Tue 13 – Thu 15 Oct |
 | Polish and wrap-up | ✅ `m1-report`, `m3-daily` and `m2-llm` merged into `main` on 16 Oct (a fast-forward: each branch builds on the one before). From then on, the daily runs use the Gemma version. README, demo report | | Thu 15 Oct (Fri 16 buffer) |
-| **Hosted version** (branch `hosted`) | ✅ Built (16 Oct), section 20: a website that shows this week's top 5 picks free and the rest for $3 a month (Stripe Checkout, test mode); a daily Render cron job running DocScout with Gemma 4 31B on Google's API; MongoDB Atlas for DocScout's memory, the picks and the subscriptions. ⏳ Deploy once the accounts exist; Gemma 4 31B measured on the 58 labels | | Fri 16 – Sat 17 Oct |
+| **Hosted version** (branch `hosted`) | ✅ Built (16 Oct), section 20: a website that shows this week's top 5 picks free and the rest for $3 a month (Stripe Checkout, test mode); a daily Render cron job running DocScout with Gemma 4 31B on Google's API; MongoDB Atlas for DocScout's memory, the picks and the subscriptions. ✅ Gemma 4 31B measured on the 58 labels: 85% / 90%, against 81% / 81% for `e2b` (section 2). ⏳ Deploy once the accounts exist | | Fri 16 – Sat 17 Oct |
 | Challenge submission | Demo video; a real docs contribution made with a DocScout pick (the "first user"); the DEV post, written in your own voice | | Fri 16 – Sun 18 Oct |
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
@@ -78,6 +78,14 @@ All three sources are above 50%, so all stay on.
 | Gemma, first rule, thinking for borderline repos | 76% | 52% | 21 | 133.3 s |
 | **Gemma, new rule (same cached reviews)** | **81%** | **81%** | 31 | 51.1 s |
 | Gemma, prompt v3 + new rule (re-measured) | 74% | 81% | 34 | 61.5 s |
+| **Gemma 4 31B on Google's API, prompt v2 + new rule (16 Oct)** | **85%** | **90%** | 33 | 85.6 s, including waits for a busy free tier |
+
+**Gemma 4 31B (16 Oct), the hosted version's model:**
+- **Fewer mistakes:** about 8, against 12 for code alone and for `e2b`. It keeps code's recall (90%) and raises precision to 85%. For comparison, Claude Opus with the skill made 5.
+- **What it got right:** it rejected stackrender, django-wiki, Zero-K, anythingmcp, mycelium and the stoatchat deployment repo, and confirmed flagr.
+- **What it got wrong:** it accepted modxcms/revolution and the up-banking spec repo, and rejected the f3-nation monorepo.
+- **Errors:** 3 of the 50 reviews (flipt, cdnjs/api-server, trae-workbuddy-switch) failed even after retries, with 500 or 503. They kept the code's prediction.
+- **It runs on Google's servers,** so the laptop's memory didn't matter (1.3 GB free at the lowest, from other apps).
 
 - **The first rule threw out 12 real API apps.** Seven were answers like `serves_api` with style `none` (an app with an API, but "no API style"). flipt was rejected for being gRPC, though it serves REST too. The rule counted any answer other than "serves_api + rest" as disagreement and cut confidence from 1.00 to 0.20.
 - **The new rule:** an app that serves an API agrees whatever style the model names, and only a clear verdict (confidence ≥ `llm_veto_confidence`, 0.7) that it's a tool, library, spam or something else lowers confidence. On the cached reviews it makes 12 mistakes, the same number as code alone: precision up from 76% to 81%, recall down from 90% to 81%. Picked over alternatives on the same 58 labels, so the gain is small and uncertain.
@@ -545,5 +553,5 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 **Prize categories it genuinely uses:** Render, Gemma and MongoDB Atlas. The .tech domain category was dropped: the promo code was no longer available (16 Oct).
 
 **⏳ Still to do:**
-- Gemma 4 31B on the 58 labels;
+- ✅ Gemma 4 31B on the 58 labels: 85% precision, 90% recall (section 2);
 - deploy: the accounts, the public GitHub repo, and a real end-to-end test payment in test mode.

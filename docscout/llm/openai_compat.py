@@ -3,15 +3,24 @@
 Covers OpenRouter, Groq, Together, OpenAI and similar, using ``base_url`` such as
 ``https://openrouter.ai/api/v1``. It asks for a JSON schema response; providers that
 reject that get JSON mode with the schema written into the prompt instead.
+
+Busy providers are retried with a pause: free tiers answer 429, and on 16 Oct Google's
+Gemma endpoint answered 500 or 503 to about half the requests under load.
 """
 
 from __future__ import annotations
 
 import json
+import time
+from collections.abc import Callable
 
 import httpx
 
 from typing import Any
+
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+RETRY_WAITS = (5.0, 20.0, 60.0)  # seconds before each retry
+MAX_RETRY_AFTER = 120.0
 
 from docscout.llm.base import (
     DRAFT_SCHEMA,
@@ -37,20 +46,29 @@ class OpenAICompatClient:
         api_key: str | None,
         timeout: float = 300,
         transport: httpx.BaseTransport | None = None,
+        retry_waits: tuple[float, ...] = RETRY_WAITS,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.name = f"openai_compatible:{model}"
         self.model = model
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.Client(base_url=base_url.rstrip("/"), headers=headers, timeout=timeout, transport=transport)
         self._schema_mode = True
+        self._retry_waits = retry_waits
+        self._sleep = sleep
 
     def _post(self, payload: dict) -> httpx.Response:
-        try:
-            return self._client.post("/chat/completions", json=payload)
-        except httpx.ConnectError as exc:
-            raise LLMUnavailable(f"Can't connect to the LLM provider at {self._client.base_url}. Check the address (--base-url) and your connection.") from exc
-        except httpx.HTTPError as exc:
-            raise LLMError(f"cannot reach LLM provider: {exc}") from exc
+        for wait in (*self._retry_waits, None):
+            try:
+                resp = self._client.post("/chat/completions", json=payload)
+            except httpx.ConnectError as exc:
+                raise LLMUnavailable(f"Can't connect to the LLM provider at {self._client.base_url}. Check the address (--base-url) and your connection.") from exc
+            except httpx.HTTPError as exc:
+                raise LLMError(f"cannot reach LLM provider: {exc}") from exc
+            if resp.status_code not in RETRY_STATUSES or wait is None:
+                return resp
+            self._sleep(_retry_after(resp) or wait)
+        raise AssertionError("unreachable")
 
     def review(self, ctx: RepoContext, readme_chars: int = 1500, think: bool = False) -> Review:
         # Hosted reasoning models decide on thinking themselves; there's no common switch for it.
@@ -93,3 +111,11 @@ class OpenAICompatClient:
 
     def close(self) -> None:
         self._client.close()
+
+
+def _retry_after(resp: httpx.Response) -> float | None:
+    """The provider's Retry-After in seconds, capped; None when it's missing or a date."""
+    try:
+        return min(MAX_RETRY_AFTER, max(0.0, float(resp.headers.get("retry-after", ""))))
+    except ValueError:
+        return None

@@ -107,6 +107,27 @@ def test_openai_compat_falls_back_to_json_mode():
     assert seen == ["json_schema", "json_object"]
 
 
+def test_openai_compat_waits_and_retries_a_busy_provider():
+    # Seen 16 Oct: Google's Gemma endpoint answered 503 ("high demand") and 500 under load.
+    from docscout.llm.base import LLMError
+
+    answers = [httpx.Response(503), httpx.Response(429, headers={"Retry-After": "7"}), httpx.Response(500)]
+
+    def handler(req):
+        assert json.loads(req.content)["response_format"]["type"] == "json_schema"  # a 5xx never drops schema mode
+        return answers.pop(0) if answers else httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(GOOD)}}]})
+
+    waits = []
+    client = OpenAICompatClient(base_url="https://llm.example/v1", model="m", api_key="k", transport=httpx.MockTransport(handler), sleep=waits.append)
+    assert client.review(RepoContext(full_name="a/b")).confidence == 0.9
+    assert waits == [5.0, 7.0, 60.0]  # the provider's Retry-After wins over the default pause
+
+    always_busy = OpenAICompatClient(base_url="https://llm.example/v1", model="m", api_key="k", sleep=waits.append,
+                                     transport=httpx.MockTransport(lambda req: httpx.Response(503)))
+    with pytest.raises(LLMError, match="503"):
+        always_busy.review(RepoContext(full_name="a/b"))
+
+
 def test_ollama_not_running_or_model_missing_explains_the_fix():
     from docscout.llm.base import LLMUnavailable, review_with_retry
 

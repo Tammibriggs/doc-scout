@@ -96,7 +96,7 @@ All three sources are above 50%, so all stay on.
   - bug and feature issues counted as docs requests;
   - a docs site treated as a reason not to report.
 
-  ⏳ Decide which to fix before the submission.
+  ✅ All four fixed on 16 Oct (sections 8 and 9). On the 13 graded projects, DocScout now finds the spec of all 10 it reports, and none falls back to "check manually". ⏳ A rerun of the same search (with the original date, so it samples the same repos) is to be graded.
 
 ## 3. Success criteria
 
@@ -220,6 +220,7 @@ All three sources are above 50%, so all stay on.
 3. **Help requested:** open, unassigned issues with no linked PR.
    - One query per label family (`documentation,docs` or `"help wanted","good first issue"`) × keyword (`api` plus each API type's own keywords).
    - An issue counts only if it has an outreach label or was opened by someone outside the project. Bots, dependency dashboards and bounty labels are ignored.
+   - ✅ (16 Oct) It must also be about docs: a docs label, or a docs word in the title ("document", "docs", "examples", "reference"…). The comparison showed "help wanted" plus "api" finding a feature request (traceroot #2579) and a bug (mycelium #279). Docs labels are matched as words, so "docker" isn't one.
    - When a maintainer has labeled an issue "help wanted" or "good first issue", the activity check is looser (1 committer, no merged outside PRs needed).
 4. **Code search for definition files** (optional, needs a token): each API type's `definition_filenames`, sliced by file size.
 
@@ -259,6 +260,7 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   | No servers | 5 |
 
   - `$ref` is resolved only within the file.
+  - **Finding the spec** ✅ (16 Oct): files named `openapi*`/`swagger*` first, then any YAML or JSON in an `openapi`/`swagger` folder, then files named like `api.yaml` or `public-api.yaml`, at most 4 fetched. The parser drops files that aren't specs. Matching by name alone missed 4 specs in the comparison (dagu, jupyter_server, traceroot, ChurchCRM). The classifier's "owns a spec" evidence still uses names only, so the measured label numbers stay valid.
   - **Generated specs** (a `DO NOT EDIT` header, or CI that regenerates the file) keep their score, but the suggestion becomes "edit the code annotations".
 - **C. Docs only in prose.** Each endpoint in the README or docs is checked for: a description (25), a request example (20), a response example (25), status or error codes (15) and auth (15). If the docs are at least 80% complete, the gap is set to 35 and the suggestion becomes "turn them into an OpenAPI spec".
 - **D. No docs found.** Gap = **60**, only when type confidence is at least 0.8 and no docs were found elsewhere. Always marked *unverified*. It was 75, but that tied it with measured spec gaps in the first test report, and it rests on the weakest evidence.
@@ -274,7 +276,16 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
 - **Signals must belong to this project** ✅ (13 Oct, after wrong signals in the first daily report):
   - a docs link counts only if its address contains the full repo or owner name (django-crm had counted Django's own docs);
   - a named docs repo must name the project (`mylar3-website`), and a generic one (`docs`, `website`) counts only when the owner is one product (`kuzzleio/documentation`) or has at most 10 repos (OFBiz had got `apache/tvm-site` and `apache/airflow-site`);
-  - Markdown files under decision-record, audit, proposal, design or internal folders aren't read as API docs (kuzzle's `docs/adr-001/step-15-audit/A3-api.md`).
+  - Markdown files under decision-record, audit, proposal, design or internal folders aren't read as API docs (kuzzle's `docs/adr-001/step-15-audit/A3-api.md`);
+  - ✅ (16 Oct) neither are files in hidden folders (`.agents/`, `.claude/`, `.cursor/`), which hold instructions for AI coding agents (ChurchCRM's `.agents/skills/churchcrm/api-development.md`).
+- **Docs published as pages** ✅ (16 Oct): any of:
+  - a docs-site config in the repo (MkDocs, Read the Docs, Sphinx, Docusaurus, mdBook, Mintlify, Antora, VitePress);
+  - a docs host as the homepage (`docs.*`, `*.readthedocs.io`);
+  - a README docs link whose host carries the project's or owner's name (badges and package registries don't count);
+  - a separate docs repo;
+  - Markdown API docs on GitHub.
+
+  These add `[scoring] published_docs_bonus` (10) and a "Docs published" line, because the writer prefers projects whose docs can be read without installing them (comparison grading, 16 Oct). It's a bonus, not a filter: 5 of the 7 graded "no"s have published docs too.
 - **Generated-spec limitation:** detection reads the file's header and folder names only. Specs generated without a marker (e.g. JSON from some code generators) show as hand-written.
 
 **Live findings from 12 Oct, already fixed:**
@@ -287,6 +298,7 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
 ```
 score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted +10, good first issue +5, docs label +5; max +15)
         + language bonus when the repo is in one of your preferred languages (M1)
+        + published-docs bonus (10) when the docs are published as pages (16 Oct)
 ```
 
 **Effort** is counted in operations or endpoints needing work: up to 10 is S, up to 40 is M, more is L.
@@ -434,7 +446,7 @@ hacktoberfest/
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
     db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅  llm_eval.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 177 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 183 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

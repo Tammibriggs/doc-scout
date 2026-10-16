@@ -23,11 +23,19 @@ from datetime import date
 from typing import Any
 
 from docscout.github import GitHub
+from docscout.scoring import is_docs_label
 from docscout.sources import Candidate
 
 SOURCE = "help_requested"
 INSIDERS = {"OWNER", "MEMBER", "COLLABORATOR"}
 OUTREACH_LABELS = ("help wanted", "good first issue")
+# An outreach label plus "api" in the title also finds bugs and feature requests (seen 15 Oct:
+# "OpenAPI DecimalValue rejects canonical negative fractions", "Accept Claude Platform
+# OpenTelemetry export"), so without a docs label the title must be about docs.
+_DOCS_TITLE = re.compile(
+    r"\b(docs?|documentation|document(ed|ing|s)?|undocumented|readme|guides?|tutorials?|examples?|reference|describe|descriptions?|wiki)\b",
+    re.IGNORECASE,
+)
 
 
 def queries(label_families: list[str], keywords: list[str], since: date, qualifiers: str = "") -> list[str]:
@@ -55,9 +63,16 @@ def is_bot(user: dict[str, Any] | None) -> bool:
     return user.get("type") == "Bot" or str(user.get("login", "")).endswith("[bot]")
 
 
+def is_docs_request(issue: dict[str, Any]) -> bool:
+    """A docs label, or a title about docs."""
+    if any(is_docs_label(str(label.get("name", ""))) for label in issue.get("labels") or []):
+        return True
+    return bool(_DOCS_TITLE.search(str(issue.get("title", ""))))
+
+
 def issue_counts(issue: dict[str, Any], *, label_denylist: list[str], title_denylist: list[str]) -> bool:
     """True if the issue is a real, open invitation to help with docs."""
-    if is_bot(issue.get("user")):
+    if is_bot(issue.get("user")) or not is_docs_request(issue):
         return False
     title = str(issue.get("title", "")).lower()
     if any(term in title for term in title_denylist):

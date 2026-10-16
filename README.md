@@ -80,7 +80,8 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 **Each item shows:**
 - **Gemma's review:** what the project is (for example "an app or service with its own REST API"), the quote it based that on, and how it changed the code's confidence (for example 0.50 → 0.80). It can raise confidence to at most 0.8, so a README written to fool it can't push a project to the top;
 - **why its docs matter** and **up to 3 first steps**, from Gemma;
-- **the gap:** for an OpenAPI spec, which operations lack descriptions, examples, success schemas or error responses, with a permanent link to the file; for prose docs, which endpoints lack a description, request and response examples, status codes or auth;
+- **the gap:** for an OpenAPI spec, which operations lack descriptions, examples, success schemas or error responses, with a permanent link to the file; for prose docs, which endpoints lack a description, request and response examples, status codes or auth. Specs are found by name (`openapi.yaml`, `swagger.json`), by folder (`docs/openapi/…`), and as files named like `api.yaml`;
+- **"Docs published":** where the docs can be read as pages without installing the project: a docs site built from the repo (MkDocs, Sphinx, Docusaurus, Mintlify…), a docs website, a separate docs repo, or Markdown API docs on GitHub. These projects rank higher (`[scoring] published_docs_bonus`), because you can see the gap in a browser and the fix is Markdown;
 - **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
 - **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
 - **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally;
@@ -217,7 +218,7 @@ Give each row about a minute. Open the `url`, read the description and the top o
 |---|---|
 | `awesome_selfhosted` | The curated [awesome-selfhosted](https://github.com/awesome-selfhosted/awesome-selfhosted-data) list of real self-hosted apps |
 | `repo_search` | GitHub repo search, using each enabled API type's `repo_queries` |
-| `help_requested` | Open, unassigned issues where maintainers ask for API docs help. An issue only counts if it carries a "help wanted" or "good first issue" label, or was opened by someone outside the project. Bots, dependency dashboards and bounty labels are ignored |
+| `help_requested` | Open, unassigned issues where maintainers ask for API docs help. An issue only counts if it's about docs (a docs label, or a title such as "Document the webhooks") and carries a "help wanted" or "good first issue" label or was opened by someone outside the project. Bots, dependency dashboards and bounty labels are ignored |
 | `code_search` (optional, needs a token) | Repos containing an API definition file, using each API type's `definition_filenames` |
 
 Every repo, whatever its source, goes through the same code-only health gate: not archived or a fork, has a license, at least 20 stars, recent pushes, and real activity. When a maintainer has labeled a docs issue "help wanted" or "good first issue", the activity part is looser (`[health.help_requested]`): the explicit ask stands in for a history of merged outside PRs.

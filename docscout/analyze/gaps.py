@@ -37,6 +37,7 @@ class Gap:
     generated: bool = False  # the file is generated: edit its source, not the file
     check_manually: list[str] = field(default_factory=list)  # signs docs may exist elsewhere
     unverified: bool = False
+    published: list[str] = field(default_factory=list)  # where the docs are published as pages
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -50,6 +51,7 @@ class Gap:
             "generated": self.generated,
             "check_manually": self.check_manually,
             "unverified": self.unverified,
+            "published": self.published,
         }
 
     @classmethod

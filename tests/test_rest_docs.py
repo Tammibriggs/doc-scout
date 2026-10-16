@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from docscout.analyze.elsewhere import docs_elsewhere, doc_links, sibling_repos
+from docscout.analyze.elsewhere import docs_elsewhere, doc_links, published_docs, sibling_repos
 from docscout.apitypes.base import DocsContext
 from docscout.apitypes.rest import RestApi
 from docscout.apitypes.rest_prose import analyze_docs, analyze_text
@@ -104,7 +104,54 @@ def test_internal_design_notes_are_not_api_docs():
     assert gh.fetched == [] and gap.kind == "none"
 
 
+def test_ai_agent_instructions_are_not_api_docs():
+    # Seen 15 Oct: ChurchCRM's instructions for coding agents were read as its API docs.
+    path = ".agents/skills/app/api-development.md"
+    gh = FakeGitHub({path: readme("thin.md").encode()})
+    gap = RestApi().analyze(ctx(gh, [blob(path)], "# App", confidence=0.9))
+    assert gh.fetched == [] and gap.kind == "none"
+
+
+def test_docs_published_as_pages():
+    tree = [blob("mkdocs.yml"), blob("conf.py")]
+    assert published_docs({}, "", tree, [], "org/app") == ["Docs site built from this repo (mkdocs.yml)"]
+    assert published_docs({}, "", [blob("docs/source/conf.py")], [], "org/app") == ["Docs site built from this repo (docs/source/conf.py)"]
+    assert published_docs({}, "", [blob("conf.py"), blob("_config.yml")], [], "org/app") == []  # could be anything
+    assert published_docs({"homepage": "https://docs.app.dev"}, "", [], [], "org/app") == ["Docs website: docs.app.dev"]
+    assert published_docs({"homepage": "https://app.dev"}, "", [], [], "org/app") == []  # a plain homepage isn't docs
+    assert published_docs({}, "", [], [{"full_name": "org/app-docs"}], "org/app") == ["Separate docs repo: org/app-docs"]
+    # Seen 16 Oct: badges and someone else's article about the project aren't its docs.
+    text = (
+        "[![Go Reference](https://pkg.go.dev/badge/org/app.svg)](https://pkg.go.dev/org/app)\n"
+        "[A guide to it](https://smarthomescene.com/guides/app-setup/)\n"
+        "[Documentation](https://app.dev/docs)\n"
+    )
+    assert published_docs({}, text, [], [], "org/app") == ["Docs website: app.dev"]
+
+
 # ---------------------------------------------------------------------- RestApi.analyze
+
+
+def test_specs_named_otherwise_are_found():
+    # Seen 15 Oct: dagu's api/v1/api.yaml and ChurchCRM's docs/openapi/generated/public-api.yaml were missed.
+    spec = (FIXTURES / "specs" / "bare.yaml").read_bytes()
+    tree = [blob("web/src/api.json"), blob("api/v1/api.yaml"), blob("docs/openapi/package.json")]
+    gh = FakeGitHub({"web/src/api.json": b'{"baseUrl": "/api"}', "api/v1/api.yaml": spec})
+    gap = RestApi().analyze(ctx(gh, tree))
+    assert gap.kind == "spec" and gap.location == "api/v1/api.yaml"
+    assert gh.fetched == ["api/v1/api.yaml", "web/src/api.json"]  # not a spec: skipped; package.json: never fetched
+
+    gh = FakeGitHub({"docs/openapi/generated/public-api.yaml": spec})
+    gap = RestApi().analyze(ctx(gh, [blob("docs/openapi/generated/public-api.yaml")]))
+    assert gap.location == "docs/openapi/generated/public-api.yaml" and gap.generated
+
+
+def test_published_docs_come_with_any_gap():
+    spec = (FIXTURES / "specs" / "bare.yaml").read_bytes()
+    gap = RestApi().analyze(ctx(FakeGitHub({"openapi.yaml": spec}), [blob("openapi.yaml"), blob("mkdocs.yml")]))
+    assert gap.kind == "spec" and gap.published == ["Docs site built from this repo (mkdocs.yml)"]
+    gap = RestApi().analyze(ctx(FakeGitHub(), [], readme("thin.md")))
+    assert gap.kind == "prose" and gap.published == ["API docs in Markdown on GitHub (the README)"]
 
 
 def test_owned_spec_wins_and_is_fetched_at_the_commit():

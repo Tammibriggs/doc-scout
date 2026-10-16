@@ -1,25 +1,33 @@
 """The opportunity score that ranks report items.
 
-    score = gap × (0.5 + 0.5·health) × type_confidence + issue bonus + language bonus   (max 100)
+    score = gap × (0.5 + 0.5·health) × type_confidence
+            + issue bonus + language bonus + published-docs bonus   (max 100)
 
 Issue bonus: "help wanted" +10, "good first issue" +5, a docs label +5 (at most +15).
 Language bonus: [scoring] language_bonus when the repo is in one of your languages.
+Published-docs bonus: [scoring] published_docs_bonus when the docs are published as pages.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass
 from typing import Any
 
 OUTREACH_BONUS = {"help wanted": 10, "good first issue": 5}
 DOCS_LABEL_BONUS = 5
 MAX_ISSUE_BONUS = 15
+_DOCS_LABEL = re.compile(r"\bdoc(s|umentation)?\b", re.IGNORECASE)  # "type: docs", not "docker"
+
+
+def is_docs_label(name: str) -> bool:
+    return bool(_DOCS_LABEL.search(name))
 
 
 def issue_bonus(issues: list[dict[str, Any]]) -> int:
     outreach = {o for issue in issues for o in issue.get("outreach") or []}
     bonus = sum(OUTREACH_BONUS.get(o, 0) for o in outreach)
-    if any("doc" in str(label).lower() for issue in issues for label in issue.get("labels") or []):
+    if any(is_docs_label(str(label)) for issue in issues for label in issue.get("labels") or []):
         bonus += DOCS_LABEL_BONUS
     return min(MAX_ISSUE_BONUS, bonus)
 
@@ -32,6 +40,7 @@ class Score:
     type_confidence: float
     issue_bonus: int = 0
     language_bonus: int = 0
+    published_bonus: int = 0
 
     def breakdown(self) -> str:
         text = f"gap {self.gap:.0f} × health {self.health:.2f} × type {self.type_confidence:.2f}"
@@ -39,6 +48,8 @@ class Score:
             text += f" + help requested {self.issue_bonus}"
         if self.language_bonus:
             text += f" + your language {self.language_bonus}"
+        if self.published_bonus:
+            text += f" + docs published {self.published_bonus}"
         return text
 
     def as_dict(self) -> dict[str, Any]:
@@ -52,9 +63,11 @@ def opportunity_score(
     issues: list[dict[str, Any]],
     language_match: bool | None,
     language_bonus: int = 5,
+    published_bonus: int = 0,
 ) -> Score:
+    """``published_bonus`` is added as given: pass 0 when the docs aren't published as pages."""
     bonus_issues = issue_bonus(issues)
     bonus_language = language_bonus if language_match else 0
     base = gap * (0.5 + 0.5 * health) * type_confidence
-    total = round(min(100.0, base + bonus_issues + bonus_language), 1)
-    return Score(total, gap, health, type_confidence, bonus_issues, bonus_language)
+    total = round(min(100.0, base + bonus_issues + bonus_language + published_bonus), 1)
+    return Score(total, gap, health, type_confidence, bonus_issues, bonus_language, published_bonus)

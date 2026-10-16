@@ -149,6 +149,7 @@ def assess(
         d.get("issues") or [],
         (d.get("repo") or {}).get("language_match"),
         int(cfg["scoring"]["language_bonus"]),
+        int(score_parts.get("published_bonus", 0)),  # as found when the docs were analyzed
     )
     d["score"], d["breakdown"] = score.as_dict(), score.breakdown()
     d["review"] = {

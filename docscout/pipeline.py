@@ -97,6 +97,7 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
         ev.candidate.issues,
         ev.language_match,
         int(cfg["scoring"]["language_bonus"]),
+        int(cfg["scoring"]["published_docs_bonus"]) if gap.published else 0,
     )
     repo = ev.repo
     details = {

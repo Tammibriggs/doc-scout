@@ -47,6 +47,13 @@ def test_score_formula_and_bonuses():
     assert opportunity_score(100, 1, 1, issues, True).total == 100  # capped
 
 
+def test_docs_published_as_pages_raise_the_score_and_docker_is_not_a_docs_label():
+    s = opportunity_score(40, 1, 1, [], language_match=False, published_bonus=10)
+    assert s.total == 50 and s.breakdown() == "gap 40 × health 1.00 × type 1.00 + docs published 10"
+    assert issue_bonus([{"outreach": [], "labels": ["docker"]}]) == 0
+    assert issue_bonus([{"outreach": [], "labels": ["type: docs"]}]) == 5
+
+
 def test_untrusted_text_cannot_inject_markdown_links_or_controls():
     evil = "Click [here](https://evil.example)\n# Heading <img src=x onerror=alert(1)> ‮\x1b[31m"
     out = text(evil)

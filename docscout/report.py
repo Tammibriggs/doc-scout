@@ -104,6 +104,8 @@ def render_item(index: int, finding: StoredFinding, now: datetime) -> list[str]:
         lines.append(f"**Suggestion:** {text(gap.suggestion, 400)}")
     if gap.check_manually:
         lines.append("**Check manually:** " + " · ".join(text(r, 140) for r in gap.check_manually))
+    elif gap.published:  # with "check manually" the same places are already listed
+        lines.append("**Docs published:** " + " · ".join(text(p, 140) for p in gap.published))
     if gap.unverified:
         lines.append("*Unverified: based on finding no docs, not on reading them.*")
     if review.get("why"):

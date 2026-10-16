@@ -90,6 +90,18 @@ def test_issue_filter():
     assert not help_requested.issue_counts(issue("NONE", ["help wanted", "tier:trivial"]), **DENY)
 
 
+def test_outreach_issues_count_only_when_they_are_about_docs():
+    # Seen 15 Oct: a bug and a feature request found by "help wanted" or "good first issue" plus "api".
+    bug = "OpenAPI DecimalValue rejects canonical negative fractions accepted by the runtime"
+    feature = "Accept Claude Platform OpenTelemetry export (Claude Managed Agents + Messages API)"
+    assert not help_requested.issue_counts(issue("MEMBER", ["good first issue"], title=bug), **DENY)
+    assert not help_requested.issue_counts(issue("OWNER", ["help wanted", "docker"], title=feature), **DENY)
+    assert help_requested.issue_counts(issue("OWNER", ["help wanted"], title="Document webhook payloads"), **DENY)
+    assert help_requested.issue_counts(issue("OWNER", ["help wanted"], title="API docs: OpenAPI omits response schemas"), **DENY)
+    # A docs label says it's about docs, whatever the title.
+    assert help_requested.issue_counts(issue("OWNER", ["help wanted", "type: docs"], title=bug), **DENY)
+
+
 # ---------------------------------------------------------------------- when the curated list goes away or stale
 
 

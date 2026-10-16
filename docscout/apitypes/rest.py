@@ -9,17 +9,19 @@ Docs analysis, in order of evidence:
 - **elsewhere**: no endpoints in the repo, but signs of docs on a website or in another repo;
 - **none**: nothing at all, reported only when the repo is very likely an API (unverified).
 Signs of docs elsewhere, or of a spec generated when the app runs, cap the gap and mark
-the item "check manually".
+the item "check manually". Docs published as pages (a docs site, a docs repo, Markdown on
+GitHub) are listed with any gap, because they raise the project's score.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 
-from docscout.analyze.elsewhere import docs_elsewhere
+from docscout.analyze.elsewhere import docs_elsewhere, published_docs
 from docscout.analyze.gaps import Gap
-from docscout.analyze.tree import is_owned_path
+from docscout.analyze.tree import OwnedFile, find_owned_files, is_owned_path
 from docscout.apitypes.base import ApiType, DocsContext
 from docscout.apitypes.openapi import score_spec
 from docscout.apitypes.rest_prose import COMPLETE, analyze_docs, find_endpoints, mentions_rest_api
@@ -41,6 +43,17 @@ _RUNTIME_SPEC = re.compile(
 _DOCS_FILE = re.compile(r"(api|endpoint|rest)[^/]*\.(md|mdx|markdown)$|(^|/)api/[^/]+\.(md|mdx|markdown)$", re.IGNORECASE)
 # Notes for the project's own developers (decision records, audits, proposals), not API docs for users.
 _INTERNAL_DOCS = re.compile(r"(^|[/_-])(adrs?|rfcs?|decisions?|proposals?|design|audits?|internal|meetings?|changelogs?|archive)([/_-]|$)", re.IGNORECASE)
+# Hidden folders hold tool settings and instructions for AI coding agents (.agents/, .claude/,
+# .cursor/), not docs for users. Seen 15 Oct: ChurchCRM's .agents/skills/churchcrm/api-development.md.
+_HIDDEN_DIR = re.compile(r"(^|/)\.[^/]+/")
+# Specs whose file name doesn't say so. Seen 15 Oct: dagu's api/v1/api.yaml, jupyter_server's
+# services/api/api.yaml, traceroot's backend/rest/openapi/public.json and ChurchCRM's
+# docs/openapi/generated/public-api.yaml. score_spec skips the files that turn out not to be specs.
+_SPEC_FOLDER = re.compile(r"(^|/)(openapi|swagger)[\w.-]*(/|$)", re.IGNORECASE)
+_YAML_OR_JSON = re.compile(r"\.(ya?ml|json)$", re.IGNORECASE)
+_API_NAMED = re.compile(r"^([\w.-]*[-_.])?api([-_.][\w.-]*)?\.(ya?ml|json)$", re.IGNORECASE)
+_NOT_A_SPEC = re.compile(r"^(package(-lock)?|composer|tsconfig[\w.-]*|\.?redocly[\w.-]*|\.?spectral[\w.-]*)\.(json|ya?ml)$", re.IGNORECASE)
+MAX_SPEC_FILES = 4
 MAX_DOCS_FILES = 3
 MAX_DOCS_BYTES = 512 * 1024
 
@@ -77,18 +90,47 @@ class RestApi(ApiType):
 
     # ------------------------------------------------------------------ docs analysis
 
-    def analyze(self, ctx: DocsContext) -> Gap | None:
-        spec = self._spec_gap(ctx)
-        if spec is not None:
-            return spec
+    def spec_files(self, tree: list[dict]) -> list[OwnedFile]:
+        """Files that may be this repo's spec, most likely first: named openapi or swagger, then
+        any YAML or JSON in an openapi or swagger folder, then files named like api.yaml."""
+        named = self.find_definitions(tree)
+        seen = {f.path for f in named}
+        in_folder, api_named = [], []
+        for f in find_owned_files(tree, _YAML_OR_JSON):
+            folder, _, name = f.path.rpartition("/")
+            if f.path in seen or _NOT_A_SPEC.search(name):
+                continue
+            if _SPEC_FOLDER.search(folder):
+                in_folder.append(f)
+            elif _API_NAMED.search(name):
+                api_named.append(f)
+        return named + in_folder + api_named
 
+    def analyze(self, ctx: DocsContext) -> Gap | None:
+        owner_repos: list[dict] | None = None
+
+        def owners() -> list[dict]:  # at most one API call per repo, and only when needed
+            nonlocal owner_repos
+            if owner_repos is None:
+                owner_repos = self._owner_repos(ctx)
+            return owner_repos
+
+        gap = self._spec_gap(ctx) or self._docs_gap(ctx, owners)
+        if gap is not None:
+            gap.published = published_docs(ctx.repo, ctx.readme, ctx.tree, owners(), ctx.full_name)
+            if gap.kind == "prose":
+                where = "the README" if gap.location is None else gap.location
+                gap.published.insert(0, f"API docs in Markdown on GitHub ({where})")
+        return gap
+
+    def _docs_gap(self, ctx: DocsContext, owners: Callable[[], list[dict]]) -> Gap | None:
         files = [("README", ctx.readme or ""), *self._docs_files(ctx)]
         prose = analyze_docs(files)
         check_manually = []
         if _RUNTIME_SPEC.search(ctx.readme or ""):
             check_manually.append("The README mentions Swagger UI, ReDoc or an OpenAPI URL, so a spec may be generated when the app runs")
         if not prose.endpoints or prose.completeness < COMPLETE:
-            check_manually += docs_elsewhere(ctx.repo, ctx.readme, self._owner_repos(ctx), ctx.full_name)
+            check_manually += docs_elsewhere(ctx.repo, ctx.readme, owners(), ctx.full_name)
 
         if prose.endpoints:
             completeness = prose.completeness
@@ -129,7 +171,7 @@ class RestApi(ApiType):
 
     def _spec_gap(self, ctx: DocsContext) -> Gap | None:
         best = None
-        for spec_file in self.find_definitions(ctx.tree)[:3]:
+        for spec_file in self.spec_files(ctx.tree)[:MAX_SPEC_FILES]:
             try:
                 content = ctx.gh.get_file(ctx.full_name, spec_file.path, ref=ctx.head_sha)
             except GitHubError as exc:
@@ -160,7 +202,7 @@ class RestApi(ApiType):
         paths = sorted(
             (e["path"] for e in ctx.tree
              if e.get("type") == "blob" and _DOCS_FILE.search(e.get("path", "")) and is_owned_path(e["path"])
-             and not _INTERNAL_DOCS.search(e["path"].rpartition("/")[0])
+             and not _INTERNAL_DOCS.search(e["path"].rpartition("/")[0]) and not _HIDDEN_DIR.search(e["path"])
              and 0 < int(e.get("size") or 0) <= MAX_DOCS_BYTES),
             key=lambda p: (p.count("/"), p),
         )  # fmt: skip

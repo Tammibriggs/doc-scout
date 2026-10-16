@@ -82,6 +82,7 @@ claim_and_policy = true         # for reported items: open docs PRs, claims, CLA
 
 [scoring]
 language_bonus = 5              # added to the score of repos in one of your languages
+published_docs_bonus = 10       # added when the docs are published as pages: a docs site, a docs repo, or Markdown on GitHub
 
 [report]
 min_score = 25                  # items scoring lower aren't reported

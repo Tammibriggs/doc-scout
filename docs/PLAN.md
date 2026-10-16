@@ -102,10 +102,10 @@ All three sources are above 50%, so all stay on.
   - The agent: 10 picks, 6 of which you'd act on, with 96% of claims right; 46 minutes and 324k tokens.
   - Gemma agreed with your "serves an API" grade on all 4 (2 of 4 in round 1).
   - Remaining misses:
-    - a swag-generated spec shown as hand-written;
+    - a swag-generated spec shown as hand-written (✅ fixed: a `docs.go` beside the spec marks it generated);
     - API docs in a GitHub wiki not read;
     - another product's docs repo counted;
-    - the only rejected pick was the unverified "no docs found" kind.
+    - the only rejected pick was the unverified "no docs found" kind (✅ decided 16 Oct: no longer reported).
 
 ## 3. Success criteria
 
@@ -272,7 +272,7 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   - **Finding the spec** ✅ (16 Oct): files named `openapi*`/`swagger*` first, then any YAML or JSON in an `openapi`/`swagger` folder, then files named like `api.yaml` or `public-api.yaml`, at most 4 fetched. The parser drops files that aren't specs. Matching by name alone missed 4 specs in the comparison (dagu, jupyter_server, traceroot, ChurchCRM). The classifier's "owns a spec" evidence still uses names only, so the measured label numbers stay valid.
   - **Generated specs** (a `DO NOT EDIT` header, or CI that regenerates the file) keep their score, but the suggestion becomes "edit the code annotations".
 - **C. Docs only in prose.** Each endpoint in the README or docs is checked for: a description (25), a request example (20), a response example (25), status or error codes (15) and auth (15). If the docs are at least 80% complete, the gap is set to 35 and the suggestion becomes "turn them into an OpenAPI spec".
-- **D. No docs found.** Gap = **60**, only when type confidence is at least 0.8 and no docs were found elsewhere. Always marked *unverified*. It was 75, but that tied it with measured spec gaps in the first test report, and it rests on the weakest evidence.
+- **D. No docs found.** ✅ **No longer reported** (decided 16 Oct). It rested only on not finding docs, never on reading them. In the comparison, the one such pick (VoucherVault) had its API docs in a GitHub wiki, and the author wouldn't act on it. Before that it scored 60, and only with type confidence of at least 0.8.
 - **Docs elsewhere or generated at runtime.** Detected from:
   - the homepage;
   - a docs link in the README, which only counts if its address mentions the project or its owner (so `laravel.com/docs` doesn't), one entry per site;
@@ -295,7 +295,7 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   - Markdown API docs on GitHub.
 
   These add `[scoring] published_docs_bonus` (10) and a "Docs published" line, because the writer prefers projects whose docs can be read without installing them (comparison grading, 16 Oct). It's a bonus, not a filter: 5 of the 7 graded "no"s have published docs too.
-- **Generated-spec limitation:** detection reads the file's header and folder names only. Specs generated without a marker (e.g. JSON from some code generators) show as hand-written.
+- **Generated-spec limitation:** detection reads the file's header and folder names, and, since 16 Oct, the files beside it: swag's `docs.go` next to `swagger.json` marks the spec generated (autentico). Specs exported by a framework without any marker (drf-spectacular, as at modoboa) still show as hand-written.
 
 **Live findings from 12 Oct, already fixed:**
 - **"specification" is no longer a tool word,** since it misclassified zot, an OCI registry with a Swagger spec.
@@ -455,7 +455,7 @@ hacktoberfest/
     llm/ base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ (M2)
     db.py ✅  scoring.py ✅  report.py ✅  sanitize.py ✅  pipeline.py ✅  daily.py ✅  lock.py ✅  notify.py ✅  __main__.py ✅  review.py ✅  draft.py ✅  llm_eval.py ✅ (M2)
     scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)    safe_fetch.py (M4)
-  tests/ ✅ 183 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 184 tests · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

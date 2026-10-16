@@ -148,7 +148,7 @@ def test_database_upgrades_keep_earlier_history(tmp_path, now):
 
 
 class RunGitHub(FakeGitHub):
-    """Fake GitHub for full runs: one repo with a bare spec, one without any API docs."""
+    """Fake GitHub for full runs: repos named org/spec-app* have a bare spec; others have no API docs."""
 
     def __init__(self):
         super().__init__()
@@ -156,7 +156,7 @@ class RunGitHub(FakeGitHub):
 
     def get_tree(self, name, ref):
         self.used.append("tree")
-        if name == "org/spec-app":
+        if name.startswith("org/spec-app"):
             return [{"path": "api/openapi.yaml", "type": "blob", "size": len(SPEC)}, {"path": "CONTRIBUTING.md", "type": "blob", "size": 5}], False
         return [{"path": "Dockerfile", "type": "blob", "size": 5}], False
 
@@ -193,13 +193,12 @@ def test_full_run_writes_a_safe_report_and_remembers_it(cfg, store, now, monkeyp
     result = pipeline.run(RunGitHub(), cfg, store, now, limit=10, sources=["repo_search"], rng=random.Random(1))
     assert result.status == "ok"
     by_name = {f.full_name: f for f in result.findings}
-    assert set(by_name) == {"org/spec-app", "org/plain-app"}
-    # No spec or endpoints at all, but very likely an API: reported, marked unverified.
-    assert by_name["org/plain-app"].details["gap"]["kind"] == "none" and by_name["org/plain-app"].details["gap"]["unverified"]
+    # No spec or endpoints at all: not reported, since that rests only on not finding docs.
+    assert set(by_name) == {"org/spec-app"}
     report = result.report_path.read_text()
     assert "### 1. [org/spec-app](https://github.com/org/spec-app) · score" in report
     assert "**REST API spec with gaps:** [`api/openapi.yaml`]" in report
-    assert "**No REST API docs found:** No spec" in report
+    assert "org/plain-app" not in report
     assert "\n\n> Self-hosted uptime app with a REST API\n\n" in report  # its own paragraph
     assert "[`api/openapi.yaml`](https://github.com/org/spec-app/blob/0123456789abcdef0123456789abcdef01234567/api/openapi.yaml)" in report
     assert "4/4 operations have no summary or description (e.g. `GET /checks`, `POST /checks`, +2 more)" in report

@@ -6,9 +6,9 @@ Detection and analysis are language- and framework-agnostic: they read OpenAPI f
 Docs analysis, in order of evidence:
 - **spec**: the worst-documented OpenAPI/Swagger file the repo owns (see :mod:`openapi`);
 - **prose**: endpoints documented in the README or API Markdown files (see :mod:`rest_prose`);
-- **elsewhere**: no endpoints in the repo, but signs of docs on a website or in another repo;
-- **none**: nothing at all, reported only when the repo is very likely an API (unverified).
-Signs of docs elsewhere, or of a spec generated when the app runs, cap the gap and mark
+- **elsewhere**: no endpoints in the repo, but signs of docs on a website or in another repo.
+Finding nothing at all isn't reported: it rests only on not finding docs, and the one such
+pick in the comparison (16 Oct) had its API docs in a GitHub wiki. Signs of docs elsewhere, or of a spec generated when the app runs, cap the gap and mark
 the item "check manually". Docs published as pages (a docs site, a docs repo, Markdown on
 GitHub) are listed with any gap, because they raise the project's score.
 """
@@ -57,11 +57,13 @@ MAX_SPEC_FILES = 4
 MAX_DOCS_FILES = 3
 MAX_DOCS_BYTES = 512 * 1024
 
+# Generators that put their "do not edit" marker in a file beside the spec, not in it: swag
+# writes docs.go next to swagger.json and swagger.yaml (seen 16 Oct: autentico's docs/).
+_GENERATOR_FILES_BESIDE = ("docs.go",)
+
 GAP_ELSEWHERE = 40  # no endpoints in the repo, but docs probably exist elsewhere
-GAP_NONE = 60  # nothing found anywhere; below a measured gap, since it rests on the weakest evidence
 CAP_CHECK_MANUALLY = 50
 CAP_COMPLETE_PROSE = 35
-NONE_MIN_CONFIDENCE = 0.8
 
 
 class RestApi(ApiType):
@@ -159,14 +161,6 @@ class RestApi(ApiType):
                 suggestion="Check the docs below. If they're thin or missing, document the API in the repo, ideally as an OpenAPI spec.",
                 check_manually=check_manually,
             )
-        if ctx.type_confidence >= NONE_MIN_CONFIDENCE:
-            return Gap(
-                kind="none",
-                score=GAP_NONE,
-                summary="No spec, no endpoints in the README or docs, and no docs found elsewhere",
-                suggestion="Confirm the project has an HTTP API (look for routes in the code), then document its main endpoints.",
-                unverified=True,
-            )
         return None
 
     def _spec_gap(self, ctx: DocsContext) -> Gap | None:
@@ -183,7 +177,10 @@ class RestApi(ApiType):
         if best is None:
             return None
         path, report = best
-        if report.generated:
+        folder = path.rpartition("/")[0]
+        beside = {f"{folder}/{name}" if folder else name for name in _GENERATOR_FILES_BESIDE}
+        generated = report.generated or any(e.get("path") in beside for e in ctx.tree)
+        if generated:
             suggestion = "This spec is generated: improve the descriptions and examples in the code annotations it's generated from, not the file itself."
         else:
             suggestion = "Fill in the missing descriptions, examples and responses in the spec."
@@ -193,9 +190,9 @@ class RestApi(ApiType):
             findings=report.findings,
             effort_units=report.failing_operations,
             location=path,
-            summary=f"{report.version}, {report.operations} operations, {'generated' if report.generated else 'hand-written'}",
+            summary=f"{report.version}, {report.operations} operations, {'generated' if generated else 'hand-written'}",
             suggestion=suggestion,
-            generated=report.generated,
+            generated=generated,
         )
 
     def _docs_files(self, ctx: DocsContext) -> list[tuple[str, str]]:

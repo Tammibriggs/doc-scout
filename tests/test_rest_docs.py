@@ -101,7 +101,7 @@ def test_docs_signals_must_belong_to_this_project():
 def test_internal_design_notes_are_not_api_docs():
     gh = FakeGitHub({"docs/adr-001/step-15-audit/A3-api.md": readme("thin.md").encode()})
     gap = RestApi().analyze(ctx(gh, [blob("docs/adr-001/step-15-audit/A3-api.md")], "# App", confidence=0.9))
-    assert gh.fetched == [] and gap.kind == "none"
+    assert gh.fetched == [] and gap is None
 
 
 def test_ai_agent_instructions_are_not_api_docs():
@@ -109,7 +109,7 @@ def test_ai_agent_instructions_are_not_api_docs():
     path = ".agents/skills/app/api-development.md"
     gh = FakeGitHub({path: readme("thin.md").encode()})
     gap = RestApi().analyze(ctx(gh, [blob(path)], "# App", confidence=0.9))
-    assert gh.fetched == [] and gap.kind == "none"
+    assert gh.fetched == [] and gap is None
 
 
 def test_docs_published_as_pages():
@@ -169,6 +169,16 @@ def test_generated_spec_suggests_editing_annotations():
     assert gap.generated and "code annotations" in gap.suggestion
 
 
+def test_spec_with_a_generator_file_beside_it_is_generated():
+    # Seen 16 Oct: autentico's docs/swagger.json has no marker; swag puts it in docs/docs.go.
+    spec = (FIXTURES / "specs" / "bare.yaml").read_bytes()
+    tree = [blob("docs/swagger.yaml"), blob("docs/docs.go")]
+    gap = RestApi().analyze(ctx(FakeGitHub({"docs/swagger.yaml": spec}), tree))
+    assert gap.generated and gap.summary.endswith("generated") and "code annotations" in gap.suggestion
+    gap = RestApi().analyze(ctx(FakeGitHub({"docs/swagger.yaml": spec}), [blob("docs/swagger.yaml"), blob("cmd/docs.go")]))
+    assert not gap.generated  # a docs.go elsewhere says nothing about this spec
+
+
 def test_thin_prose_without_spec():
     gap = RestApi().analyze(ctx(FakeGitHub(), [], readme("thin.md")))
     assert gap.kind == "prose" and gap.score >= 75 and gap.effort_units == 3
@@ -200,10 +210,10 @@ def test_no_endpoints_but_docs_elsewhere():
     assert gap.kind == "elsewhere" and gap.score == 40 and gap.check_manually == ["Separate docs repo: org/docs"]
 
 
-def test_nothing_found_is_reported_only_when_very_likely_an_api():
+def test_finding_nothing_is_not_reported():
+    # Dropped 16 Oct: it rests only on not finding docs (VoucherVault's were in its GitHub wiki).
     assert RestApi().analyze(ctx(FakeGitHub(), [], "# App", confidence=0.6)) is None
-    gap = RestApi().analyze(ctx(FakeGitHub(), [], "# App", confidence=0.85))
-    assert gap.kind == "none" and gap.score == 60 and gap.unverified
+    assert RestApi().analyze(ctx(FakeGitHub(), [], "# App", confidence=0.95)) is None
 
 
 def test_framework_docs_links_and_docs_hosts_are_not_mistaken_for_project_docs():
@@ -212,8 +222,8 @@ def test_framework_docs_links_and_docs_hosts_are_not_mistaken_for_project_docs()
         "Full guide at [our docs](https://docs.2fauth.app/getting-started) and https://docs.2fauth.app."
     )
     assert doc_links(text, "Bubka/2FAuth") == ["docs.2fauth.app"]
-    gap = RestApi().analyze(ctx(FakeGitHub(), [], text, confidence=0.9))
-    assert not any("Swagger UI" in r for r in gap.check_manually)
+    # Neither link is this project's docs ("org/app") nor a sign of Swagger UI: nothing to report.
+    assert RestApi().analyze(ctx(FakeGitHub(), [], text, confidence=0.9)) is None
     fastapi = RestApi().analyze(ctx(FakeGitHub(), [], "Open http://localhost:8000/docs for the API.", confidence=0.9))
     assert any("Swagger UI" in r for r in fastapi.check_manually)
 

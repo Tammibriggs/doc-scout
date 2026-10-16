@@ -148,7 +148,7 @@ def test_due_run_notifies_when_it_starts_and_finishes_then_rests_until_tomorrow(
     notes, clock = Notifications(), Clock(now)
     assert run_if_due(cfg, store, tmp_path, clock, notes) == 0
     assert notes[0] == ("DocScout is checking projects", "Your computer may be slower for about 20 minutes.", False)  # 60 repos + 13 reviews
-    assert notes[1][0] == "DocScout found 2 new projects" and notes[1][1].endswith("reports/2026-10-12.md")
+    assert notes[1][0] == "DocScout found 1 new project" and notes[1][1].endswith("reports/2026-10-12.md")
     assert store.recent_runs(1)[0]["started_by"] == "schedule"
 
     clock.advance(minutes=15)  # the sources had nothing more today

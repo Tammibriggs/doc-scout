@@ -18,7 +18,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | **M2. Gemma required** (branch `m2-llm`, built in a separate worktree) | ✅ First, fewer noisy items (section 9). Then ✅: **Gemma reviews every repo that passes the health checks** (up to `reviews_per_run` a day, most promising first): it decides whether the project really has an API worth documenting, with the 0.8 cap, and writes why it matters plus up to 3 first steps. **Only reviewed repos are reported.** Unreviewed ones are held, not dropped, and reviewed later. A memory check runs before loading the model. `docscout draft owner/repo` writes a first message to the maintainers for a project you've chosen. **Measured on the 58 labels**, with and without Gemma, and with thinking off and on. **Compared with an AI agent given a skill** (section 2), which led to the fixes of 16 Oct. ✅ Merged into `main` on 16 Oct. ⏳ Still to check: you rate at least 7 of 10 of Gemma's first steps as useful (section 18) | | Wed 14 – Fri 16 Oct |
 | Unattended test | ✅ Passed. **2 days** from `docscout schedule install`: no manual starts, survives a reboot and going offline. Result: 5 scheduled runs (13–16 Oct), 2 restarts and 1 lost connection, all recovered without manual starts. M2 was built in a separate worktree, so the daily runs kept using the M3 code | | Tue 13 – Thu 15 Oct |
 | Polish and wrap-up | ✅ `m1-report`, `m3-daily` and `m2-llm` merged into `main` on 16 Oct (a fast-forward: each branch builds on the one before). From then on, the daily runs use the Gemma version. README, demo report | | Thu 15 Oct (Fri 16 buffer) |
-| **Hosted version** (branch `hosted`) | ✅ Built (16 Oct), section 20: a website that shows the picks from the last 7 days, the top 3 free and the rest for $3 a month (Stripe Checkout, test mode); a daily Render cron job running DocScout with Gemma 4 31B on Google's API; MongoDB Atlas for DocScout's memory, the picks and the subscriptions. ✅ Gemma 4 31B measured on the 58 labels: 85% / 90%, against 81% / 81% for `e2b` (section 2). ✅ Deployed (16–17 Oct): the code is public on GitHub, and the daily job runs on Render (on schedule since 17 Oct, 04:15 UTC). ⏳ A test payment on the live site | | Fri 16 – Sat 17 Oct |
+| **Hosted version** (branch `hosted`) | ✅ Built (16 Oct), section 20: a website that shows the picks from the last 7 days, the top 3 free and the rest for $2 a month (Stripe Checkout, test mode); a daily Render cron job running DocScout with Gemma 4 31B on Google's API; MongoDB Atlas for DocScout's memory, the picks and the subscriptions. ✅ Gemma 4 31B measured on the 58 labels: 85% / 90%, against 81% / 81% for `e2b` (section 2). ✅ Deployed (16–17 Oct): the code is public on GitHub, and the daily job runs on Render (on schedule since 17 Oct, 04:15 UTC). ⏳ A test payment on the live site | | Fri 16 – Sat 17 Oct |
 | Challenge submission | Demo video; a real docs contribution made with a DocScout pick (the "first user"); the DEV post, written in your own voice | | Fri 16 – Sun 18 Oct |
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
@@ -321,6 +321,8 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 
 **Effort** is counted in operations or endpoints needing work: up to 10 is S, up to 40 is M, more is L.
 
+**Gaps too small to report** ✅ (17 Oct): fewer than `[report] min_effort_units` (5) operations or endpoints needing work. The repo isn't reported, Gemma doesn't review it, and it's checked again after `recheck_after_days`. Gaps of unknown size ("check manually") are kept. Why: Render's first picks included "1/1 endpoints have no description" (mycart), an 85%-complete page with 1 endpoint (ergo) and 3 of 17 endpoints (shkeeper.io). The smallest projects you'd act on in the comparison grading had 11 and 12 (local-settle-backend, ChurchCRM). The website applies the same rule when it publishes, so picks reported before the rule drop out too.
+
 ## 10. Before you contribute (M1; top 10 only, about 3 API calls each)
 
 - **Already claimed?** Checks open PRs that touch docs or the spec, and phrases like "I'll take this" in the issue's comments. PRs by bots and dependency updates don't count (13 Oct).
@@ -468,7 +470,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
     hosted/   picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 200 tests (186 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 203 tests (187 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -536,6 +538,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - subscribers can switch to newest first (17 Oct): the day it was found, then best score. Every card says when it was found, and a "New" label marks the last 24 hours;
   - the paywall is enforced on the server, so the page holds only what the visitor may see;
   - subscribers page through the list, 10 picks a page (server-side pages: infinite scrolling would need JavaScript);
+  - each card's "What needs doing" names the biggest gap (17 Oct; it was the first one, so statewave showed "2/19 endpoints have no description" instead of "19/19 endpoints have no response example");
   - the page states Gemma's role plainly: it reviews every candidate and turns away the ones that aren't real apps with an API, which raised precision from 76% to 85%.
   - no JavaScript, and a Content-Security-Policy that allows no scripts;
   - text escaped, and links only to GitHub URLs DocScout trusts.
@@ -546,7 +549,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - the cron job is the agent's runtime ("your project's AI runtime");
   - the website is "an agent's front end".
 - **Google AI Studio for Gemma.** It's free with no card, and it's Google serving Gemma. DigitalOcean's Inference also serves Gemma 4 ($0.18 / $0.50 per million input / output tokens), but the account wanted a charge. OpenRouter (`google/gemma-4-31b-it:free`) is the fallback: one setting.
-- **Price: $3 a month, not weekly.** Card fees (about $0.30 plus about 3% per charge) leave about $2.60 of $3, and weekly billing would pay the fixed fee four times.
+- **Price: $2 a month, not weekly** (17 Oct; it was $3). Card fees (about $0.30 plus 2.9% per charge) leave about $1.64 of $2, and weekly billing would pay the fixed fee four times.
 - **3 free picks** (17 Oct; it was 5). Render's first runs found 3 picks per 60 repos, so with a list of 10–20, 5 free would have given away a quarter to half of it. A writer needs only one project at a time. The free 3 are the top scores at that moment, so they change when better picks arrive.
 - **Bigger runs on Render** (17 Oct): up to 200 repos, 30 reviews and 30 new picks a run ([deploy/render.toml](../deploy/render.toml)). The defaults (60, 11, 10) were set for a laptop's memory and time. They're caps: Gemma only reviews the projects that pass the code checks, and the new-picks cap equals the review cap, so every accepted project is published the same day.
 

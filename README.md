@@ -87,6 +87,8 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 - **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally;
 - **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet, so it reports these only when maintainers asked for help.
 
+**Small gaps are skipped:** a project is reported only when at least 5 operations or endpoints need work (`[report] min_effort_units`). One undocumented endpoint is a quick fix, not a project to contribute to. A skipped project is checked again after 90 days, in case its API grows.
+
 **Once you've picked a project,** let Gemma draft your first message to the maintainers:
 
 ```bash

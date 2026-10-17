@@ -25,6 +25,7 @@ def cfg(tmp_path, monkeypatch):
     monkeypatch.setenv("DOCSCOUT_GITHUB_TOKEN", "test-token")
     values = load_defaults()
     values["report"]["dir"] = str(tmp_path / "reports")
+    values["report"]["min_effort_units"] = 1  # the sample spec has 4 operations; the size cutoff has its own test
     return Config(values=values, path=None, secrets_path=tmp_path / "secrets.env")
 
 

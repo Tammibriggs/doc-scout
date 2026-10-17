@@ -90,6 +90,12 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
     # wherever they are. In the first daily report, 4 of 10 items were such guesses.
     if gap.check_manually and not ev.candidate.issues:
         return None
+    # A gap only a few operations or endpoints wide is a quick fix, not a project to contribute
+    # to ("1/1 endpoints have no description", on the website on 17 Oct). The repo is checked
+    # again after recheck_after_days, in case its API grows. Unknown sizes are kept.
+    if gap.effort_units is not None and gap.effort_units < int(cfg["report"]["min_effort_units"]):
+        log.info("%s: only %d operations or endpoints need work", ev.candidate.full_name, gap.effort_units)
+        return None
     score = opportunity_score(
         gap.score,
         ev.health or 0.0,

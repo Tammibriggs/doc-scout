@@ -86,6 +86,7 @@ published_docs_bonus = 10       # added when the docs are published as pages: a 
 
 [report]
 min_score = 25                  # items scoring lower aren't reported
+min_effort_units = 5            # gaps covering fewer operations or endpoints are too small to be worth a contribution
 max_items = 10                  # new items per report
 dir = "~/Documents/DocScout/reports"
 still_open_count = 5

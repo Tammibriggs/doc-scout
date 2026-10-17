@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 API = "https://api.stripe.com/v1"
-PRICE_CENTS = 300
+PRICE_CENTS = 200
 PRODUCT_NAME = "DocScout: every pick, every week"
 _SESSION_ID = re.compile(r"^cs_(test|live)_[A-Za-z0-9]{10,200}$")
 

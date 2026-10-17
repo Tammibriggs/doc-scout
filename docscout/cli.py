@@ -373,7 +373,7 @@ def _score_repo(cfg: Config, target: str) -> int:
             checks = paid_checks(gh, name, Checks(**d["checks"]), d["check_paths"], d["issues"], d["head_sha"])
             d["checks"] = checks.as_dict()
     if result is None:
-        print("Not reported: not enough evidence of an API with docs gaps.")
+        print(f"Not reported: not enough evidence of an API with docs gaps, or fewer than {cfg['report']['min_effort_units']} operations or endpoints need work.")
         return 0
     finding = StoredFinding(name, result.score.total, result.details, 0)
     verdict = _review_one_repo(cfg, finding, {t.key: t for t in types})

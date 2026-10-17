@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None, atlas: object | None = None) -> int:
     os.environ.setdefault("XDG_DATA_HOME", "/tmp/docscout-data")
 
     from docscout import cli
-    from docscout.settings.config import data_dir
+    from docscout.settings.config import data_dir, load_config
     from docscout.run.db import Store
     from docscout.find.health import utcnow
     from docscout.hosted.picks import weekly_picks
@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None, atlas: object | None = None) -> int:
 
         atlas = Atlas(required_secret("MONGODB_URI"))
     config = os.environ.get("DOCSCOUT_CONFIG", str(DEFAULT_CONFIG))
+    min_units = int(load_config(Path(config))["report"]["min_effort_units"])
     db_path = data_dir() / "docscout.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     log.info("memory from Atlas: %s", "loaded" if atlas.load_state(db_path) else "none yet (first run)")
@@ -49,7 +50,7 @@ def main(argv: list[str] | None = None, atlas: object | None = None) -> int:
         if db_path.exists():
             store = Store(db_path)
             try:
-                picks = weekly_picks(store, utcnow())
+                picks = weekly_picks(store, utcnow(), min_units)
             finally:
                 store.close()
             atlas.publish(picks, utcnow())

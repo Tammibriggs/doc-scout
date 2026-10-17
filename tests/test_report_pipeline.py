@@ -24,6 +24,7 @@ SPEC = (Path(__file__).parent / "fixtures" / "specs" / "bare.yaml").read_bytes()
 def cfg(tmp_path):
     values = load_defaults()
     values["report"]["dir"] = str(tmp_path / "reports")
+    values["report"]["min_effort_units"] = 1  # the sample spec has 4 operations; the size cutoff has its own test
     return Config(values=values, path=None, secrets_path=tmp_path / "secrets.env")
 
 
@@ -208,6 +209,14 @@ def test_full_run_writes_a_safe_report_and_remembers_it(cfg, store, now, monkeyp
     # A second run the same day skips everything already checked and writes no file.
     again = pipeline.run(RunGitHub(), cfg, store, now, limit=10, sources=["repo_search"], rng=random.Random(1))
     assert again.status == "empty" and again.report_path is None and again.summary.evaluated == 0
+
+
+def test_gaps_too_small_to_be_worth_a_contribution_are_skipped(cfg, store, now, monkeypatch):
+    cfg.values["report"]["min_effort_units"] = 5  # the default; the sample spec's 4 operations all need work
+    monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app"))
+    result = pipeline.run(RunGitHub(), cfg, store, now, limit=10, sources=["repo_search"], rng=random.Random(1))
+    assert result.status == "empty" and result.findings == []
+    assert store.repo("org/spec-app")["status"] == "new"  # checked again later, in case the API grows
 
 
 def test_done_projects_drop_out_and_reported_ones_stay_listed(cfg, store, now, monkeypatch):

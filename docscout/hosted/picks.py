@@ -28,6 +28,11 @@ def _trusted(url: str) -> str | None:
     return url if is_github_url(url) else None
 
 
+def _biggest(findings: list) -> Any:
+    """The gap that covers the most operations or endpoints; the first one on a tie."""
+    return max(findings, key=lambda f: len(f.examples) + f.more)
+
+
 def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict[str, Any]:
     d = finding.details
     reported = datetime.fromisoformat(finding.reported).astimezone(timezone.utc) if finding.reported else None
@@ -58,7 +63,7 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
         "gap_file": clean(gap.location, 200) if gap.location else None,
         "gap_file_url": _trusted(blob_url(name, d.get("head_sha"), gap.location)) if gap.location else None,
         "findings": findings,
-        "headline": clean(gap.findings[0].text, 160) if gap.findings else clean(gap.summary, 160),
+        "headline": clean(_biggest(gap.findings).text, 160) if gap.findings else clean(gap.summary, 160),
         "effort": EFFORT.get(str(d.get("effort") or "")),
         "outside_prs": int(stats.get("outsider_merged_180d") or 0),
         "suggestion": clean(gap.suggestion, 400) or None,
@@ -77,6 +82,14 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
     }
 
 
-def weekly_picks(store: Store, now: datetime) -> list[dict[str, Any]]:
-    """Every project reported in the last 7 days and still open, best first."""
-    return [pick(f, rank, now) for rank, f in enumerate(store.reported_since(now - WEEK), 1)]
+def _too_small(finding: StoredFinding, min_units: int) -> bool:
+    units = (finding.details.get("gap") or {}).get("effort_units")
+    return units is not None and units < min_units
+
+
+def weekly_picks(store: Store, now: datetime, min_units: int = 0) -> list[dict[str, Any]]:
+    """Every project reported in the last 7 days and still open, best first, leaving out gaps
+    covering fewer than ``min_units`` operations or endpoints (``[report] min_effort_units``;
+    the same rule a run applies, so projects reported before it came in drop out too)."""
+    found = [f for f in store.reported_since(now - WEEK) if not _too_small(f, min_units)]
+    return [pick(f, rank, now) for rank, f in enumerate(found, 1)]

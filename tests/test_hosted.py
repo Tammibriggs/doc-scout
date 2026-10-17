@@ -28,15 +28,15 @@ SECRET = "test-secret"
 PUBLIC = "https://docscout.test"
 
 
-def details(name, *, description="Self-hosted uptime app", html_url=None):
+def details(name, *, description="Self-hosted uptime app", html_url=None, effort_units=None, findings=None):
     return {
         "api_type": "rest",
         "api_label": "REST",
         "head_sha": "0123456789abcdef0123456789abcdef01234567",
         "gap": {
             "kind": "spec", "score": 60, "location": "api/openapi.yaml", "summary": "OpenAPI 3.1, 38 operations, hand-written",
-            "findings": [{"text": "21/38 operations have no description", "examples": ["POST /checks"], "more": 20}],
-            "suggestion": "Fill in the missing descriptions.", "published": ["Docs website: docs.example.dev"],
+            "findings": findings or [{"text": "21/38 operations have no description", "examples": ["POST /checks"], "more": 20}],
+            "suggestion": "Fill in the missing descriptions.", "published": ["Docs website: docs.example.dev"], "effort_units": effort_units,
         },
         "repo": {"stars": 412, "language": "Go", "description": description},
         "review": {"model": "openai_compatible:gemma-4-31b-it", "why": "Users need the webhook payloads.", "first_steps": ["Read CONTRIBUTING.md", "Describe POST /checks"]},
@@ -132,6 +132,23 @@ def test_picks_say_when_they_were_found_and_label_the_newest(tmp_path, now):
     assert (older["full_name"], older["new"], today["new"]) == ("org/older", False, True)
     assert today["reported"] == this_morning.isoformat(timespec="seconds")
     assert older["found"] == f"{two_days_ago.day} {two_days_ago:%b}"
+
+
+def test_gaps_too_small_to_be_worth_a_contribution_are_left_out(tmp_path, now):
+    store = Store(tmp_path / "docscout.db")
+    report(store, now, "org/big", effort_units=21)
+    report(store, now, "org/tiny", score=90, effort_units=1)  # reported before the cutoff existed
+    report(store, now, "org/unknown", score=30)  # size unknown: kept
+    assert [p["full_name"] for p in weekly_picks(store, now, min_units=5)] == ["org/big", "org/unknown"]
+
+
+def test_the_headline_is_the_biggest_gap(tmp_path, now):
+    store = Store(tmp_path / "docscout.db")
+    report(store, now, "org/app", findings=[
+        {"text": "2/19 endpoints have no description", "examples": ["GET /a", "GET /b"], "more": 0},
+        {"text": "19/19 endpoints have no response example", "examples": ["GET /a", "GET /b"], "more": 17},
+    ])
+    assert weekly_picks(store, now)[0]["headline"] == "19/19 endpoints have no response example"
 
 
 # ---------------------------------------------------------------------- website
@@ -231,7 +248,7 @@ def test_payments_being_down_says_so_instead_of_failing():
 # ---------------------------------------------------------------------- Stripe
 
 
-def test_checkout_asks_stripe_for_a_3_dollar_monthly_subscription():
+def test_checkout_asks_stripe_for_a_2_dollar_monthly_subscription():
     sent = []
 
     def handler(req):
@@ -242,7 +259,7 @@ def test_checkout_asks_stripe_for_a_3_dollar_monthly_subscription():
     assert url == "https://checkout.stripe.com/c/pay/cs_test_abc"
     method, path, form = sent[0]
     assert (method, path) == ("POST", "/v1/checkout/sessions")
-    assert form["mode"] == "subscription" and form["line_items[0][price_data][unit_amount]"] == "300"
+    assert form["mode"] == "subscription" and form["line_items[0][price_data][unit_amount]"] == "200"
     assert form["line_items[0][price_data][recurring][interval]"] == "month"
     assert form["success_url"] == "https://docscout.test/subscribed?session_id={CHECKOUT_SESSION_ID}"
 

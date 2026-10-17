@@ -72,7 +72,8 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
         "model": model_label(str(review.get("model") or "")) if review else None,
         "why": clean(review.get("why") or "", 600) or None,
         "first_steps": [clean(s, 300) for s in (review.get("first_steps") or [])[:3]],
-        "claimed": [clean(c, 140) for c in checks.get("claimed") or []],
+        "claimed": [clean(c, 300) for c in checks.get("claimed") or []],
+        "claim_checked": bool(checks.get("claim_checked")),  # by Gemma; unchecked picks show no claim label
         "requirements": [clean(r, 220) for r in checks.get("requirements") or []],
         "local_setup": clean(checks.get("local_setup") or "", 60) or None,
         "issues": [

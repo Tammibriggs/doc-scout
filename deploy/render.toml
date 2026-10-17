@@ -17,6 +17,7 @@ daily_repo_budget = 200         # about 660 GitHub requests, well under the 5,00
 # Gemma 4 31B through Google's OpenAI-compatible Gemini API endpoint.
 provider = "openai_compatible"
 model = "gemma-4-31b-it"
+fallback_model = "gemma-4-26b-a4b-it"  # when the 31B is busy or down after its retries (5, 20 and 60 s)
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 timeout_seconds = 90            # a review takes 20-40 s; a request that hangs is retried after a pause
 reviews_per_run = 30            # the rest wait for the next run

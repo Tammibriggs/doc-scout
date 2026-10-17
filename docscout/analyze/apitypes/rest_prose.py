@@ -20,6 +20,14 @@ _CURL_LINE = re.compile(r"\bcurl\b[^\n]*")
 _CURL_METHOD = re.compile(rf"(?:-X|--request)\s*['\"]?({_METHODS})\b")
 _CURL_URL_PATH = re.compile(r"https?://[^\s/'\"]+(/[\w{}:./\-*]*)")
 _TABLE_ROW = re.compile(rf"^\|\s*`?({_METHODS})`?\s*\|\s*`?(/[^|`\s]*)`?[^\n]*", re.MULTILINE | re.IGNORECASE)
+# curl commands that download an installer and run it, or fetch a file from GitHub, aren't API
+# requests: mycart's only "endpoint" was "curl -L https://raw.githubusercontent.com/.../install | sh"
+# (17 Oct), which made up a 1-endpoint gap and the day's top pick.
+_PIPED_TO_SHELL = re.compile(r"\|\s*(?:sudo\s+(?:-E\s+)?)?(?:ba|z|da)?sh\b")
+_DOWNLOAD_HOST = re.compile(
+    r"https?://(?:raw\.githubusercontent\.com|gist\.githubusercontent\.com|objects\.githubusercontent\.com|codeload\.github\.com|github\.com|get\.docker\.com)[/:]",
+    re.IGNORECASE,
+)
 _REST_MENTION = re.compile(r"\b(rest(ful)?\s+api|api\s+(reference|endpoints?|docs|documentation)|http\s+api)\b", re.IGNORECASE)
 
 _CODE_BLOCK = re.compile(r"^(```|~~~)[^\n]*\n(.*?)^\1", re.DOTALL | re.MULTILINE)
@@ -92,6 +100,8 @@ def _anchors(text: str, spans: list[tuple[int, int]]) -> list[_Anchor]:
     for m in _METHOD_PATH.finditer(text):
         add(m.group(1), m.group(2), m.start())
     for m in _CURL_LINE.finditer(text):
+        if _PIPED_TO_SHELL.search(m.group(0)) or _DOWNLOAD_HOST.search(m.group(0)):
+            continue
         url = _CURL_URL_PATH.search(m.group(0))
         if url:
             method = _CURL_METHOD.search(m.group(0))

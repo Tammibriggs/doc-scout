@@ -306,6 +306,8 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   These add `[scoring] published_docs_bonus` (10) and a "Docs published" line, because the writer prefers projects whose docs can be read without installing them (comparison grading, 16 Oct). It's a bonus, not a filter: 5 of the 7 graded "no"s have published docs too.
 - **Generated-spec limitation:** detection reads the file's header and folder names, and, since 16 Oct, the files beside it: swag's `docs.go` next to `swagger.json` marks the spec generated (autentico). Specs exported by a framework without any marker (drf-spectacular, as at modoboa) still show as hand-written.
 
+**Install commands aren't endpoints** ✅ (17 Oct): `curl` lines that pipe into a shell (`| sh`, `| bash`) or fetch from a download host (raw.githubusercontent.com, github.com, get.docker.com) are skipped. mycart's only "endpoint" was its install line, which invented a "1/1 endpoints have no description" gap and made it the day's top pick (76). Prose docs remain the weakest measurement: only endpoints written in the docs are counted, so a README that documents 3 of 40 endpoints looks small; and a section is checked for the presence of a description or example, not its quality.
+
 **Live findings from 12 Oct, already fixed:**
 - **"specification" is no longer a tool word,** since it misclassified zot, an OCI registry with a Swagger spec.
 - **Many topics count as spam only on new repos.**
@@ -325,11 +327,17 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 
 ## 10. Before you contribute (M1; top 10 only, about 3 API calls each)
 
-- **Already claimed?** Checks open PRs that touch docs or the spec, and phrases like "I'll take this" in the issue's comments. PRs by bots and dependency updates don't count (13 Oct), nor do typo, spelling and broken-link fixes (17 Oct: ergo's "docs: fix receive spelling…").
+- **Already claimed? Gemma decides** ✅ (17 Oct; word matching until then).
+  - **What code does:** it gathers the 30 most recently updated open PRs and the comments on the first 2 help-request issues. It sends Gemma up to 15 PRs (title, branch, author, dates, draft, description, changed files) and the last 8 comments, with the gap DocScout found.
+  - **What Gemma does:** it lists the items that overlap the gap, each with a reason shown on the card. Code keeps only answers that name an item it was given.
+  - **Why:** word matching on titles flagged 4 things on Render's picks, and none was work on the gap: an offer to fix a licence badge (statewave), a docs-site deploy rework and a formula fix (bike4mind), an install-guide PR open since Nov 2025 (shkeeper.io), plus a spelling fix (ergo).
+  - **Checked live** on those 6 picks: Gemma 4 31B called all 6 not claimed, matching a reading by hand. On a made-up PR "Add request and response examples to the API reference" for statewave it said claimed, and it ignored a typo fix beside it. 25–190 s per project, including retries; a project with no open PRs or comments isn't asked about.
+  - **When Gemma can't answer:** retries (5, 20, 60 s), then the other Gemma model (`fallback_model`); twice in that check the 31B failed and the 26B answered. If both fail, the pick shows "not checked yet", never a guess, and the next run asks again.
+  - **Not asked again** while a project's open PRs and comments are unchanged since Gemma's last answer.
 - **Checked again every day** ✅ (17 Oct): once a day for `[checks] recheck_claims_days` (7) after a project is reported, so a pick can be claimed after it's shown, including by another DocScout user. A claim that has gone (the PR was closed) is cleared.
   - The laptop report's "Still open from earlier" lines show ⚠️ with what was found.
   - The website moves claimed picks below the rest, so the free 3 are ones a writer can start.
-  - On Render's 6 picks it took 5.5 s and 9 GitHub requests.
+  - About 3–5 GitHub requests per project; Gemma is asked only when its PRs or comments changed.
   - It sees only public signs: an open PR, or an offer in the issue's comments. It doesn't measure the gap again (section 19).
 - **Requirements, shown only when found.** They never change a repo's score, and each quotes the sentence it matched:
   - a **CLA** to sign;
@@ -348,6 +356,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 1. **Judge** whether the project really has an API worth documenting (the code classifier is 76% precise: apps that only mention "API" get through, and borderline repos are dropped unseen). Gemma's verdict, API style and a quoted piece of evidence adjust confidence within the limits below.
 2. **Guide:** why its docs matter, and up to 3 first steps based on the gaps code found.
 3. ✅ **`docscout draft owner/repo`** (on demand, after you pick a project): a short first message asking the maintainers whether a docs PR is welcome, using the current issue and PR state. DocScout never posts anything itself. It replies on an open "help wanted" or docs issue when there is one, otherwise it drafts a new issue. The claim check runs again first and warns if someone has started, and CLA or AI-policy notes are shown. The draft is printed with control characters removed.
+4. ✅ **Claims** (17 Oct): whether someone is already working on the gap, from the open PRs and issue comments (section 10). On the laptop this uses the local model: one question per new pick and per earlier pick whose PRs or comments changed, with an 8,192-token context (bike4mind's question was about 3,100 tokens, too close to the 4,096 used for reviews).
 
 **Thinking:** Gemma 4 supports it (on by default in the model; DocScout turns it off). ✅ Measured (section 2): no more accurate, 2.6 times slower, so `think = "off"`. The setting stays for faster machines and hosted models.
 
@@ -362,6 +371,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 **Backends:** both done ✅.
 - Ollama: JSON schema output, `think: false`, the model kept loaded during the batch, then unloaded.
 - Any OpenAI-compatible API, falling back to JSON mode if a provider doesn't support schemas.
+- ✅ **A second model** (17 Oct): `[llm] fallback_model` is asked when the first can't answer after its retries (busy, down, unknown, or a malformed answer), for reviews, drafts and claims; the report records the model that answered. Off by default; on Render it's `gemma-4-26b-a4b-it` (schema mode works; a review took 4.7 s).
 
 - ✅ **Memory check:** a local model loads only when `[llm] min_free_memory_gb` (6, measured: Gemma used 5.5–5.9 GB) is free. A run started on a busy laptop holds its findings, and the next 15-minute check reviews them without a new run until memory is free. The value is set from the label check's memory measurement.
 - ✅ **What the report shows:** Gemma's verdict with its evidence quote and the confidence change (e.g. 0.50 → 0.80), why the docs matter, and numbered first steps. Everything the model writes is escaped like other untrusted text. A project the model can't give a valid answer for in 2 runs is dropped.
@@ -469,13 +479,13 @@ hacktoberfest/
               sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
     analyze/  tree.py ✅ gaps.py ✅ elsewhere.py ✅ checks.py ✅ scoring.py ✅ safe_yaml.py ✅
               apitypes/ base.py ✅ rest.py ✅ openapi.py ✅ rest_prose.py ✅     # graphql.py, grpc.py, … (later)
-    llm/      base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ review.py ✅ draft.py ✅
+    llm/      base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ review.py ✅ draft.py ✅ claims.py ✅
     run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅
               scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
     hosted/   picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 205 tests (188 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 210 tests (193 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -532,7 +542,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 
 **Built on branch `hosted`:**
 - **Daily job** (`docscout.hosted.job`, a Render cron job): load DocScout's database from Atlas, `docscout run` with [deploy/render.toml](../deploy/render.toml), publish the picks from the last 7 days, save the database back. The save also happens after a failed run.
-- **Model:** Gemma 4 31B (`gemma-4-31b-it`) through Google's OpenAI-compatible Gemini API endpoint, on the free tier. Google lists `gemma-4-31b-it` and `gemma-4-26b-a4b-it` for the key. Under load it answered 500 or 503 to about half the requests (16 Oct), so busy answers (429, 5xx) are retried after 5, 20 and 60 s, or after the provider's `Retry-After`. Only schema mode returned clean JSON; JSON mode on the 26B returned its "thoughts".
+- **Model:** Gemma 4 31B (`gemma-4-31b-it`) through Google's OpenAI-compatible Gemini API endpoint, on the free tier. Google lists `gemma-4-31b-it` and `gemma-4-26b-a4b-it` for the key. Under load it answered 500 or 503 to about half the requests (16 Oct), so busy answers (429, 5xx) are retried after 5, 20 and 60 s, or after the provider's `Retry-After`, and then Gemma 4 26B is asked instead (17 Oct, `fallback_model`). Only schema mode returned clean JSON; JSON mode on the 26B returned its "thoughts".
 - **MongoDB Atlas** (free tier):
   - DocScout's SQLite file, in GridFS, newest 3 versions kept. Render cron jobs can't keep files or attach disks;
   - the picks: one document, rewritten after each run;

@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 
 from docscout.analyze import apitypes
-from docscout.analyze.checks import Checks, find_claims, free_checks, paid_checks
+from docscout.analyze.checks import Checks, free_checks, requirement_checks
 from docscout.analyze.gaps import Gap, effort_label
 from docscout.analyze.apitypes import ApiType
 from docscout.analyze.apitypes.base import DocsContext
@@ -31,6 +31,8 @@ from docscout.settings.config import data_dir
 from docscout.find.github import AuthError, GitHub, GitHubError, RateLimited
 from docscout.settings.profile import language_policy, one_line
 from docscout.run.report import RunSummary, render, write
+from docscout.llm import LLMClient, LLMError, LLMUnavailable, memory
+from docscout.llm import claims as claims_mod
 from docscout.llm import review as reviews_mod
 from docscout.llm.review import ReviewOutcome, Reviewer, model_label, potential_confidence, review_waiting
 from docscout.analyze.scoring import Score, opportunity_score
@@ -137,37 +139,33 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
 CLAIMS_RECHECK_HOURS = 20  # one claim check a day per project, however many runs there are
 
 
-def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime | None = None) -> None:
-    """Claim and requirement checks for reported items (about 2-3 API calls each)."""
+def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime | None = None, client: LLMClient | None = None) -> None:
+    """Requirement checks for reported items, plus the model's claim check when ``client`` is
+    given (about 3-5 API calls each)."""
     for finding in findings:
         d = finding.details
         checks = Checks(**d.get("checks", {}))
-        paid_checks(gh, finding.full_name, checks, d.get("check_paths", {}), d.get("issues", []), d.get("head_sha"))
+        requirement_checks(gh, finding.full_name, checks, d.get("check_paths", {}), d.get("head_sha"))
         d["checks"] = checks.as_dict()
-        if checks.claim_checked and now is not None:
-            d["claims_checked"] = now.isoformat(timespec="seconds")
+        if client is not None and now is not None:
+            claims_mod.check(gh, client, finding, now)
         store.update_details(finding.run_id, finding.full_name, d)
 
 
-def recheck_claims(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime) -> int:
-    """Check projects reported earlier again for signs someone has started: a docs PR, or an
-    offer to help on the issue. A claim that has gone (the PR was closed) is cleared. At most
-    once a day per project. Returns how many were checked."""
+def _claims_due(finding: StoredFinding, now: datetime) -> bool:
+    last = finding.details.get("claims_checked")
+    return not last or now - datetime.fromisoformat(last) >= timedelta(hours=CLAIMS_RECHECK_HOURS)
+
+
+def recheck_claims(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime, client: LLMClient) -> int:
+    """Check projects reported earlier again for someone who has started since: a docs PR, or an
+    offer to help. A claim that has gone (the PR was closed) is cleared. At most once a day per
+    project. Returns how many were checked."""
     checked = 0
     for finding in findings:
-        d = finding.details
-        last = d.get("claims_checked")
-        if last and now - datetime.fromisoformat(last) < timedelta(hours=CLAIMS_RECHECK_HOURS):
-            continue
-        try:
-            claimed = find_claims(gh, finding.full_name, d.get("issues", []))
-        except GitHubError as exc:
-            log.info("couldn't check %s for claims again: %s", finding.full_name, exc)
-            continue
-        d["checks"] = {**d.get("checks", {}), "claimed": claimed, "claim_checked": True}
-        d["claims_checked"] = now.isoformat(timespec="seconds")
-        store.update_details(finding.run_id, finding.full_name, d)
-        checked += 1
+        if _claims_due(finding, now) and claims_mod.check(gh, client, finding, now):
+            store.update_details(finding.run_id, finding.full_name, finding.details)
+            checked += 1
     return checked
 
 
@@ -315,20 +313,35 @@ def run(
     report_cfg = cfg["report"]
     min_score, max_items = float(report_cfg["min_score"]), int(report_cfg["max_items"])
     findings = store.pending_findings(now, min_score, max_items)
-    if findings and cfg["checks"]["claim_and_policy"] and auth_error is None and not offline:
-        try:
-            before_you_start(gh, store, findings, now)
-        except Exception as exc:  # optional extras: never lose the report over them
-            log.warning("skipped some before-you-start checks: %s", exc)
-        findings = store.pending_findings(now, min_score, max_items)
     if cfg["checks"]["claim_and_policy"] and auth_error is None and not offline:
         # Earlier picks can be claimed after they're reported, by anyone, including other
-        # DocScout users: the website lists them for 7 days.
+        # DocScout users: the website lists them for 7 days. Whether someone is on a gap is
+        # the model's call; without it, a claim stays unchecked until a later run.
+        earlier = [f for f in store.reported_since(now - timedelta(days=int(cfg["checks"]["recheck_claims_days"]))) if _claims_due(f, now)]
+        client, why_not = None, None
+        if findings or earlier:
+            why_not = memory.shortage(cfg["llm"])
+            if why_not is None:
+                try:
+                    client = (reviewer or (lambda: reviews_mod.open_reviewer(cfg)))()
+                except LLMError as exc:
+                    why_not = str(exc)
         try:
-            earlier = store.reported_since(now - timedelta(days=int(cfg["checks"]["recheck_claims_days"])))
-            summary.claims_rechecked = recheck_claims(gh, store, earlier, now)
-        except Exception as exc:  # optional: never lose the report over it
-            log.warning("skipped some claim re-checks: %s", exc)
+            if findings:
+                before_you_start(gh, store, findings, now, client)
+            if client is not None:
+                summary.claims_rechecked = recheck_claims(gh, store, earlier, now, client)
+        except LLMUnavailable as exc:
+            why_not = str(exc)
+        except Exception as exc:  # optional extras: never lose the report over them
+            log.warning("skipped some before-you-start checks: %s", exc)
+        finally:
+            if client is not None:
+                client.unload()
+                client.close()
+        if why_not:
+            summary.notes.append(f"{model_label(str(cfg['llm']['model']))} couldn't check whether anyone is already on these projects ({why_not}); a later run will")
+        findings = store.pending_findings(now, min_score, max_items)
     still_open = store.still_open(run_id, int(report_cfg["still_open_count"]))
     report_path = None
     if findings:

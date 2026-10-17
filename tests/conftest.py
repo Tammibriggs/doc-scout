@@ -26,6 +26,16 @@ def iso(days_ago: float) -> str:
     return (NOW - timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def judge_claims_like_gemma(ctx):
+    """Stands in for the model's claim check in tests: a PR whose title starts with "docs" works
+    on the gap, and so does a comment saying "I'll take this"."""
+    from docscout.llm.base import Claim, ClaimCheck
+
+    claims = [Claim(item=label, reason="it documents the API endpoints") for label, text in ctx.items
+              if text.startswith("Title: docs") or "I'll take this" in text]  # fmt: skip
+    return ClaimCheck(claims=claims)
+
+
 class AgreeingModel:
     """Stands in for the local model in tests: confirms every project as a REST API."""
 
@@ -33,6 +43,11 @@ class AgreeingModel:
 
     def __init__(self):
         self.reviewed: list[str] = []
+        self.claim_checks: list[str] = []
+
+    def claims(self, ctx):
+        self.claim_checks.append(ctx.full_name)
+        return judge_claims_like_gemma(ctx)
 
     def review(self, ctx, readme_chars=1500, think=False):
         from docscout.llm.base import Review

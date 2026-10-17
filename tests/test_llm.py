@@ -128,6 +128,53 @@ def test_openai_compat_waits_and_retries_a_busy_provider():
         always_busy.review(RepoContext(full_name="a/b"))
 
 
+def test_a_model_that_stays_busy_hands_over_to_the_other_gemma():
+    # 17 Oct: Gemma 4 31B on Google's API is often busy; Gemma 4 26B answers the same questions.
+    from docscout.llm import FallbackClient, make_client
+    from docscout.llm.base import ClaimContext
+
+    asked = []
+
+    def handler(req):
+        body = json.loads(req.content)
+        asked.append(body["model"])
+        if body["model"] == "gemma-4-31b-it":
+            return httpx.Response(503)
+        answer = {"claims": [{"item": "PR #3", "reason": "r"}]} if body["response_format"]["json_schema"]["name"] == "claims" else GOOD
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(answer)}}]})
+
+    def gemma(model, transport=httpx.MockTransport(handler)):
+        return OpenAICompatClient(base_url="https://llm.example/v1", model=model, api_key="k", transport=transport, sleep=lambda s: None)
+
+    both = FallbackClient(gemma("gemma-4-31b-it"), gemma("gemma-4-26b-a4b-it"))
+    assert both.review(RepoContext(full_name="a/b")).confidence == 0.9
+    assert asked == ["gemma-4-31b-it"] * 4 + ["gemma-4-26b-a4b-it"]  # 3 retries first, then the other model
+    assert both.name == "openai_compatible:gemma-4-26b-a4b-it"  # recorded as the model that answered
+    assert both.claims(ClaimContext(full_name="a/b", today="2026-10-17", items=[("PR #3", "Title: docs")])).claims[0].item == "PR #3"
+
+    down = httpx.MockTransport(lambda req: httpx.Response(503))
+    with pytest.raises(LLMError, match="503"):
+        FallbackClient(gemma("gemma-4-31b-it", down), gemma("gemma-4-26b-a4b-it", down)).review(RepoContext(full_name="a/b"))
+
+    hosted = {"provider": "openai_compatible", "model": "gemma-4-31b-it", "base_url": "https://llm.example/v1"}
+    assert isinstance(make_client({**hosted, "fallback_model": "gemma-4-26b-a4b-it"}, "k"), FallbackClient)
+    assert isinstance(make_client({**hosted, "fallback_model": ""}, "k"), OpenAICompatClient)
+
+
+def test_ollama_gives_claims_questions_a_longer_context():
+    from docscout.llm.base import ClaimContext
+
+    sent = []
+
+    def handler(req):
+        sent.append(json.loads(req.content))
+        return httpx.Response(200, json={"message": {"content": json.dumps({"claims": []})}})
+
+    client = OllamaClient(base_url="http://localhost:11434", model="gemma4:e2b", transport=httpx.MockTransport(handler))
+    assert client.claims(ClaimContext(full_name="a/b", today="2026-10-17", items=[("PR #1", "Title: x")])).claims == []
+    assert sent[0]["options"]["num_ctx"] == 8192 and sent[0]["format"]["title"] == "ClaimCheck"
+
+
 def test_openai_compat_retries_a_request_that_times_out():
     from docscout.llm.base import LLMError
 

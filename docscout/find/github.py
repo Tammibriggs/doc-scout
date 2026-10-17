@@ -41,6 +41,17 @@ query($owner: String!, $name: String!, $states: [PullRequestState!], $after: Str
   }
 }"""
 
+# Open PRs with what the model needs to judge whether one already covers a docs gap: the
+# description and changed files as well as the title (17 Oct: titles alone flagged a licence fix).
+_OPEN_PULLS_QUERY = """
+query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: [OPEN], first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes { number title headRefName createdAt updatedAt isDraft bodyText author { login __typename } files(first: 10) { nodes { path } } }
+    }
+  }
+}"""
+
 # Issue search with only the fields the help_requested source reads: REST search results
 # carry each issue's full text (230-630 KB per search, up to 2.5 minutes on a slow link).
 _ISSUES_QUERY = """
@@ -371,9 +382,13 @@ class GitHub:
         return self.get_json(f"/repos/{full_name}/issues/{number}")
 
     def list_open_pulls(self, full_name: str) -> list[dict]:
+        """The 30 most recently updated open PRs, with description and (with a token) changed files."""
         if self.has_token:
-            return self._pulls(full_name, ["OPEN"], max_pages=1)
-        return self.get_json(f"/repos/{full_name}/pulls", params={"state": "open", "per_page": 100}, retry_not_found=True)
+            owner, name = full_name.split("/", 1)
+            data = self.graphql(_OPEN_PULLS_QUERY, {"owner": owner, "name": name}, retry_not_found=True)
+            nodes = (((data.get("repository") or {}).get("pullRequests")) or {}).get("nodes") or []
+            return [_open_pull_as_rest(node) for node in nodes if node]
+        return self.get_json(f"/repos/{full_name}/pulls", params={"state": "open", "sort": "updated", "direction": "desc", "per_page": 30}, retry_not_found=True)
 
     def list_issue_comments(self, full_name: str, number: int) -> list[dict]:
         return self.get_json(f"/repos/{full_name}/issues/{number}/comments", params={"per_page": 100})
@@ -442,6 +457,18 @@ def _pull_as_rest(node: dict[str, Any]) -> dict[str, Any]:
         "created_at": node.get("createdAt"),
         "closed_at": node.get("closedAt"),
         "merged_at": node.get("mergedAt"),
+    }
+
+
+def _open_pull_as_rest(node: dict[str, Any]) -> dict[str, Any]:
+    """An open GraphQL pull request in the REST shape, plus ``files`` (changed paths)."""
+    files = ((node.get("files") or {}).get("nodes")) or []
+    return {
+        **_pull_as_rest(node),
+        "updated_at": node.get("updatedAt"),
+        "draft": bool(node.get("isDraft")),
+        "body": node.get("bodyText") or "",
+        "files": [f.get("path") for f in files if f and f.get("path")],
     }
 
 

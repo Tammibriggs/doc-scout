@@ -193,7 +193,7 @@
           {% if p.effort %}<li class="chip">{{ p.effort }}</li>{% endif %}
           {% if p.published %}<li class="chip green">Docs published</li>{% endif %}
           {% if p.issues %}<li class="chip blue">Maintainers asked for help</li>{% endif %}
-          {% if p.claimed %}<li class="chip amber" title="Found when DocScout checked again: see Before you start">Someone may be on it</li>{% else %}<li class="chip green" title="Checked every day: no open docs PR, and no one offering to do it">Not claimed</li>{% endif %}
+          {% if p.claimed %}<li class="chip amber" title="Gemma found an open PR or an offer that overlaps this gap: see Before you start">Someone may be on it</li>{% elif p.claim_checked %}<li class="chip green" title="Gemma checks the open PRs and comments every day">Not claimed</li>{% endif %}
           {% if p.outside_prs %}<li class="chip">{{ p.outside_prs }} outside PR{{ "" if p.outside_prs == 1 else "s" }} merged lately</li>{% endif %}
           {% if p.found %}<li class="chip">Found {{ p.found }}</li>{% endif %}
         </ul>

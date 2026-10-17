@@ -119,9 +119,11 @@ def render_item(index: int, finding: StoredFinding, now: datetime) -> list[str]:
     if checks:
         parts = []
         if checks.get("claimed"):
-            parts += [f"⚠️ {text(c, 140)}" for c in checks["claimed"]]
+            parts += [f"⚠️ {text(c, 300)}" for c in checks["claimed"]]
         elif checks.get("claim_checked"):
             parts.append("✅ not claimed")
+        else:
+            parts.append("❔ not checked yet for anyone already on it")
         parts += [f"⚠️ {text(r, 220)}" for r in checks.get("requirements") or []]
         parts.append(f"local setup: {text(checks.get('local_setup', 'unclear'))}")
         lines.append("**Before you start:** " + " · ".join(parts))

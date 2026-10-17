@@ -23,15 +23,20 @@ RETRY_WAITS = (5.0, 20.0, 60.0)  # seconds before each retry
 MAX_RETRY_AFTER = 120.0
 
 from docscout.llm.base import (
+    CLAIM_SCHEMA,
     DRAFT_SCHEMA,
     REVIEW_SCHEMA,
+    ClaimCheck,
+    ClaimContext,
     Draft,
     LLMError,
     LLMUnavailable,
     RepoContext,
     Review,
+    build_claim_messages,
     build_draft_messages,
     build_messages,
+    parse_claims,
     parse_draft,
     parse_review,
 )
@@ -81,6 +86,9 @@ class OpenAICompatClient:
 
     def draft(self, ctx: RepoContext, issue: str | None = None) -> Draft:
         return parse_draft(self._structured(build_draft_messages(ctx, issue), DRAFT_SCHEMA, "draft"))
+
+    def claims(self, ctx: ClaimContext) -> ClaimCheck:
+        return parse_claims(self._structured(build_claim_messages(ctx), CLAIM_SCHEMA, "claims"))
 
     def _structured(self, messages: list[dict[str, str]], schema: dict[str, Any], name: str) -> str:
         payload: dict = {"model": self.model, "messages": messages, "temperature": 0}

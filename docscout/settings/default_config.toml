@@ -68,6 +68,7 @@ drop_below = 0.4                # below this, never reported; between this and m
 # The model reviews every project that passes the health checks; only reviewed projects are reported.
 provider = "ollama"             # ollama (local) | openai_compatible (hosted, e.g. an open-weight model on OpenRouter or Groq)
 model = "gemma4:e2b"
+fallback_model = ""             # another model of the same provider, asked when the first can't answer after its retries
 base_url = "http://localhost:11434"
 api_key_env = "DOCSCOUT_LLM_API_KEY"
 reviews_per_run = 11            # about 10 minutes at 51 s per review (measured); `docscout bench-llm` measures yours

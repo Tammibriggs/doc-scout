@@ -1,8 +1,8 @@
 """``docscout draft owner/repo``: a first message to the maintainers of a project you've picked.
 
 Written by the model from what DocScout found (the docs gaps, any open docs issue),
-for you to edit and post yourself; DocScout never posts anything. The claim check runs
-again first, so you know if someone started on it since the report.
+for you to edit and post yourself; DocScout never posts anything. The model checks for
+claims again first, so you know if someone started on it since the report.
 """
 
 from __future__ import annotations
@@ -10,10 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from docscout.analyze.checks import Checks, paid_checks
+from docscout.analyze.checks import Checks, requirement_checks
 from docscout.run.db import StoredFinding
-from docscout.find.github import GitHub, GitHubError
-from docscout.llm import LLMClient
+from docscout.find.github import GitHub
+from docscout.find.health import utcnow
+from docscout.llm import LLMClient, LLMError
+from docscout.llm import claims
 from docscout.llm.review import context_for
 from docscout.run.sanitize import block, clean, repo_url
 
@@ -40,12 +42,14 @@ def write_draft(client: LLMClient, gh: GitHub | None, finding: StoredFinding, ap
     warnings: list[str] = []
     if gh is not None:
         checks = Checks(**(d.get("checks") or {}))
-        checks.claimed, checks.requirements = [], []
+        checks.requirements = []
+        d["checks"] = requirement_checks(gh, finding.full_name, checks, d.get("check_paths") or {}, d.get("head_sha")).as_dict()
         try:
-            paid_checks(gh, finding.full_name, checks, d.get("check_paths") or {}, d.get("issues") or [], d.get("head_sha"))
-        except GitHubError:
-            pass
-        warnings = [clean(w, 220) for w in checks.claimed + checks.requirements]
+            claims.check(gh, client, finding, utcnow())
+        except LLMError:
+            pass  # the draft still helps; the claims are as last checked
+        checks = Checks(**d["checks"])
+        warnings = [clean(w, 300) for w in checks.claimed + checks.requirements]
     issue_label = f"#{issue.get('number')} {clean(issue.get('title', ''), 120)}" if issue else None
     draft = client.draft(context_for(finding, [api_label]), issue_label)
     if issue:

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from conftest import AgreeingModel
 from conftest import iso
 from test_discover_eval import GOOD_REPO, FakeGitHub
 
@@ -245,13 +246,36 @@ def test_earlier_picks_are_checked_again_for_claims_once_a_day(cfg, store, now, 
     monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app-2"))
     later = now + timedelta(days=1)
     second = pipeline.run(Claimed(), cfg, store, later, limit=10, sources=["repo_search"])
-    assert second.summary.claims_rechecked == 1 and claims("org/spec-app") == ["Open PR #9: docs: describe every endpoint"]
+    assert second.summary.claims_rechecked == 1
+    assert claims("org/spec-app") == ['Open PR #9 "docs: describe every endpoint": it documents the API endpoints']
     report = second.report_path.read_text()
     assert "## Still open from earlier" in report and "⚠️ Open PR" in report and "earlier picks checked again for claims" in report
+    model = AgreeingModel()
     earlier = store.reported_since(now - timedelta(days=7))
-    assert pipeline.recheck_claims(Claimed(), store, earlier, later + timedelta(hours=2)) == 0  # once a day
-    assert pipeline.recheck_claims(RunGitHub(), store, earlier, later + timedelta(days=1)) == 2  # the PR was closed
-    assert claims("org/spec-app") == []
+    assert pipeline.recheck_claims(Claimed(), store, earlier, later + timedelta(hours=2), model) == 0  # once a day
+    assert pipeline.recheck_claims(Claimed(), store, earlier, later + timedelta(days=1), model) == 2
+    assert model.claim_checks == []  # nothing changed on GitHub, so the model wasn't asked again
+    assert pipeline.recheck_claims(RunGitHub(), store, store.reported_since(now - timedelta(days=7)), later + timedelta(days=2), model) == 2
+    assert claims("org/spec-app") == []  # the PR was closed: nothing left to read, so no question needed
+
+
+def test_claims_stay_unchecked_when_the_model_cannot_answer(cfg, store, now, monkeypatch):
+    from docscout.llm import LLMError
+
+    class Busy(AgreeingModel):
+        def claims(self, ctx):
+            raise LLMError("503 after retries, and the fallback model too")
+
+    class WithPR(RunGitHub):
+        def list_open_pulls(self, name):
+            return [{"number": 9, "title": "docs: describe every endpoint", "head": {"ref": "docs"}}]
+
+    monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app"))
+    result = pipeline.run(WithPR(), cfg, store, now, limit=10, sources=["repo_search"], reviewer=Busy)
+    checks = result.findings[0].details["checks"]
+    assert checks["claim_checked"] is False and "claims_checked" not in result.findings[0].details  # asked again next run
+    report = result.report_path.read_text()
+    assert "✅ not claimed" not in report and "❔ not checked yet for anyone already on it" in report
 
 
 def test_rate_limit_keeps_results_and_auth_failure_is_raised(cfg, store, now, monkeypatch):
@@ -327,7 +351,7 @@ def test_before_you_start_checks_appear_in_the_report(cfg, store, now, monkeypat
     monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/claimed", "org/spec-app"))
     result = pipeline.run(WithContributing(), cfg, store, now, limit=10, sources=["repo_search"])
     report = result.report_path.read_text()
-    assert "**Before you start:** ⚠️ Open PR \\#7: docs: describe the checks endpoints" in report
+    assert '**Before you start:** ⚠️ Open PR \\#7 "docs: describe the checks endpoints": it documents the API endpoints' in report
     assert "✅ not claimed · ⚠️ CLA required" in report
     assert "in CONTRIBUTING.md\\) · local setup: easy \\(docker-compose\\)" in report
 

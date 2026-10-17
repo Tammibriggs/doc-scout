@@ -367,10 +367,10 @@ def _score_repo(cfg: Config, target: str) -> int:
     with _github(cfg) as gh:
         result = _check_repo(cfg, gh, name, types, now, show=True)
         if result is not None and cfg["checks"]["claim_and_policy"]:
-            from docscout.analyze.checks import Checks, paid_checks
+            from docscout.analyze.checks import Checks, requirement_checks
 
             d = result.details
-            checks = paid_checks(gh, name, Checks(**d["checks"]), d["check_paths"], d["issues"], d["head_sha"])
+            checks = requirement_checks(gh, name, Checks(**d["checks"]), d["check_paths"], d["head_sha"])
             d["checks"] = checks.as_dict()
     if result is None:
         print(f"Not reported: not enough evidence of an API with docs gaps, or fewer than {cfg['report']['min_effort_units']} operations or endpoints need work.")
@@ -380,6 +380,18 @@ def _score_repo(cfg: Config, target: str) -> int:
     if verdict is None:
         return 1
     finding, accepted = verdict
+    if accepted and cfg["checks"]["claim_and_policy"]:
+        from docscout.llm import LLMError, claims, review
+
+        client = review.open_reviewer(cfg)
+        try:
+            with _github(cfg) as gh:
+                claims.check(gh, client, finding, now)
+        except LLMError as exc:
+            print(f"Couldn't check whether anyone is already on it: {exc}", file=sys.stderr)
+        finally:
+            client.unload()
+            client.close()
     print()
     print("\n\n".join(render_item(1, finding, now)))
     if not accepted:

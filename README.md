@@ -84,7 +84,7 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 - **"Docs published":** where the docs can be read as pages without installing the project: a docs site built from the repo (MkDocs, Sphinx, Docusaurus, Mintlify…), a docs website, a separate docs repo, or Markdown API docs on GitHub. These projects rank higher (`[scoring] published_docs_bonus`), because you can see the gap in a browser and the fix is Markdown;
 - **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
 - **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
-- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. For 7 days after a project is reported, each run checks it again once a day for anyone who has started (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;
+- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. Whether someone is already on it is Gemma's call: it reads the open pull requests and the comments on the project's docs issues next to the gap DocScout found, and says which overlap it and why. For 7 days after a project is reported, each run checks it again once a day (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;
 - **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet, so it reports these only when maintainers asked for help.
 
 **Small gaps are skipped:** a project is reported only when at least 5 operations or endpoints need work (`[report] min_effort_units`). One undocumented endpoint is a quick fix, not a project to contribute to. A skipped project is checked again after 90 days, in case its API grows.
@@ -252,7 +252,7 @@ Discovery, the health gate, ranking and the LLM backends are shared. To add a ty
 
 Most people only need `docscout init` and `docscout set`, which write the `[profile]` and `[llm]` sections. Every other setting has a default in [docscout/settings/default_config.toml](docscout/settings/default_config.toml), such as search queries, health thresholds and the daily budget. To change one, add the key to your own `config.toml`, or pass `--config path/to/config.toml`.
 
-To switch to a hosted model, set `provider = "openai_compatible"` together with `base_url`, `model` and the `DOCSCOUT_LLM_API_KEY` secret. Any OpenAI-compatible API works, for example OpenRouter, Groq, Together or OpenAI.
+To switch to a hosted model, set `provider = "openai_compatible"` together with `base_url`, `model` and the `DOCSCOUT_LLM_API_KEY` secret. Any OpenAI-compatible API works, for example OpenRouter, Groq, Together or OpenAI. Set `fallback_model` to a second model from the same provider, and DocScout asks it whenever the first can't answer after its retries; the hosted version uses Gemma 4 31B with Gemma 4 26B behind it.
 
 ## How the code is organized
 

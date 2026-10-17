@@ -54,6 +54,18 @@ Use GET requests sparingly.
     assert not mentions_rest_api("A library with a clean API.")
 
 
+def test_install_commands_are_not_api_endpoints():
+    # mycart (17 Oct): its install line was counted as "GET /shurco/mycart/main/scripts/install".
+    text = """
+curl -L https://raw.githubusercontent.com/shurco/mycart/main/scripts/install | sh
+curl -fsSL https://get.docker.com | sudo sh
+curl https://example.com/setup.sh | bash
+curl -LO https://github.com/org/app/releases/download/v1.2/app.tar.gz
+curl -X GET https://demo.example.com/api/v1/crypto | jq .
+"""
+    assert find_endpoints(text) == {("GET", "/api/v1/crypto")}
+
+
 def test_yaml_aliases_rejected():
     with pytest.raises(UnsafeYAML):
         load_untrusted("a: &x [1, 2]\nb: *x\n")

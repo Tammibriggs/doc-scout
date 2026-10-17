@@ -14,18 +14,28 @@ import httpx
 from typing import Any
 
 from docscout.llm.base import (
+    CLAIM_SCHEMA,
     DRAFT_SCHEMA,
     REVIEW_SCHEMA,
+    ClaimCheck,
+    ClaimContext,
     Draft,
     LLMError,
     LLMUnavailable,
     RepoContext,
     Review,
+    build_claim_messages,
     build_draft_messages,
     build_messages,
+    parse_claims,
     parse_draft,
     parse_review,
 )
+
+
+# A claims question lists up to 15 PRs and 8 comments: about 3,100 tokens for bike4mind (17 Oct),
+# too close to the 4,096 used for reviews, where Ollama would cut the start (the instructions).
+CLAIMS_NUM_CTX = 8192
 
 
 class OllamaClient:
@@ -62,7 +72,10 @@ class OllamaClient:
     def draft(self, ctx: RepoContext, issue: str | None = None) -> Draft:
         return parse_draft(self._structured(build_draft_messages(ctx, issue), DRAFT_SCHEMA, False))
 
-    def _structured(self, messages: list[dict[str, str]], schema: dict[str, Any], think: bool) -> str:
+    def claims(self, ctx: ClaimContext) -> ClaimCheck:
+        return parse_claims(self._structured(build_claim_messages(ctx), CLAIM_SCHEMA, False, num_ctx=max(self.num_ctx, CLAIMS_NUM_CTX)))
+
+    def _structured(self, messages: list[dict[str, str]], schema: dict[str, Any], think: bool, num_ctx: int | None = None) -> str:
         """The model's JSON answer, shaped by ``schema``."""
         payload: dict[str, Any] = {
             "model": self.model,
@@ -70,7 +83,7 @@ class OllamaClient:
             "format": schema,
             "stream": False,
             "keep_alive": "2m",
-            "options": {"num_ctx": self.num_ctx, "temperature": 0},
+            "options": {"num_ctx": num_ctx or self.num_ctx, "temperature": 0},
         }
         if self._send_think:
             payload["think"] = think

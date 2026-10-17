@@ -2,8 +2,9 @@
 
 These never hide a repo or change its score; they warn about things that otherwise
 surprise contributors after the work is done. Each requirement quotes the sentence it
-matched, so you can judge it yourself. Everything is plain-text matching, so it works
-for any language.
+matched, so you can judge it yourself; requirements are plain-text matching, so they work
+for any language. Whether someone is already on the gap is Gemma's call
+(:mod:`docscout.llm.claims`): this module only gathers the open PRs and comments it reads.
 
 Free checks (from data already fetched) run during analysis; the ones that cost API
 calls (open PRs, issue comments, CONTRIBUTING and the PR template) run only for items
@@ -29,16 +30,6 @@ _AI_TERMS = re.compile(
     re.IGNORECASE,
 )
 _AI_POLICY_WORDS = re.compile(r"\b(contribut\w*|pull requests?|PRs?|accept\w*|prohibit\w*|disclos\w*|ban\w*|not allowed|reject\w*)\b", re.IGNORECASE)
-_DOCS_WORK = re.compile(r"\b(docs?|documentation|openapi|swagger|api[- ]docs|readme)\b", re.IGNORECASE)
-# Dependency updates that touch docs tooling ("bump mkdocs-material in /docs") aren't someone writing docs.
-_DEPENDENCY_UPDATE = re.compile(r"\b(bump|bumps|deps?|dependenc(y|ies)|dependabot|renovate)\b|\(deps\)", re.IGNORECASE)
-# Nor are small fixes ("docs: fix receive spelling", ergo, 17 Oct): they leave the API docs gap open.
-_SMALL_FIX = re.compile(r"\b(typos?|spelling|misspell\w*|grammar|broken links?|dead links?)\b", re.IGNORECASE)
-_CLAIM = re.compile(
-    r"\b(i'?ll take|i will take|i'?d like to (?:work|take)|i am working on|i'?m working on|working on (?:this|it)|"
-    r"assign (?:this|it)? ?to me|assign me|can i (?:take|work on))\b",
-    re.IGNORECASE,
-)
 _SETUP_HEADINGS = re.compile(r"^#{1,6}[ \t]+.*\b(development|developing|running locally|run locally|getting started|install\w*|build\w* from source|setup)\b", re.IGNORECASE | re.MULTILINE)
 CONTRIBUTING = re.compile(r"^(\.github/|docs/)?contributing(\.\w+)?$", re.IGNORECASE)
 PR_TEMPLATE = re.compile(r"^(\.github/|docs/)?(pull_request_template\.md|PULL_REQUEST_TEMPLATE\.md)$", re.IGNORECASE)
@@ -104,32 +95,19 @@ def free_checks(tree: list[dict[str, Any]], readme: str | None) -> tuple[Checks,
     return checks, paths
 
 
-def find_claims(gh: GitHub, full_name: str, issues: list[dict[str, Any]]) -> list[str]:
-    """Signs someone is already on it: open docs PRs, and offers to help in the comments of the
-    first 2 help-request issues. About 1-3 API calls; raises GitHubError."""
-    claimed = []
-    for pr in gh.list_open_pulls(full_name):
-        user = pr.get("user") or {}
-        if user.get("type") == "Bot" or str(user.get("login", "")).endswith("[bot]"):
-            continue
-        title_and_branch = f"{pr.get('title', '')} {(pr.get('head') or {}).get('ref', '')}"
-        if _DOCS_WORK.search(title_and_branch) and not _DEPENDENCY_UPDATE.search(title_and_branch) and not _SMALL_FIX.search(title_and_branch):
-            claimed.append(f"Open PR #{pr.get('number')}: {pr.get('title', '')}")
+def claim_signals(gh: GitHub, full_name: str, issues: list[dict[str, Any]]) -> tuple[list[dict], list[dict]]:
+    """What Gemma reads to decide whether someone is already on the gap: the open pull requests,
+    and the comments on the first 2 help-request issues (each with its ``issue``). About 1-3 API
+    calls; raises GitHubError."""
+    pulls = gh.list_open_pulls(full_name)
+    comments = []
     for issue in issues[:2]:
-        for comment in gh.list_issue_comments(full_name, int(issue["number"])):
-            if _CLAIM.search(str(comment.get("body") or "")):
-                claimed.append(f"Someone offered to work on #{issue['number']}")
-                break
-    return claimed
+        comments += [{**c, "issue": issue} for c in gh.list_issue_comments(full_name, int(issue["number"]))]
+    return pulls, comments
 
 
-def paid_checks(gh: GitHub, full_name: str, checks: Checks, paths: dict[str, str], issues: list[dict[str, Any]], head_sha: str | None) -> Checks:
-    """Open docs PRs, claims in issue comments, and requirements in CONTRIBUTING and the PR template."""
-    try:
-        checks.claimed += find_claims(gh, full_name, issues)
-        checks.claim_checked = True
-    except GitHubError:
-        pass
+def requirement_checks(gh: GitHub, full_name: str, checks: Checks, paths: dict[str, str], head_sha: str | None) -> Checks:
+    """Requirements in CONTRIBUTING and the PR template (a CLA, sign-off, an AI policy)."""
     seen = {r.split(" (")[0] for r in checks.requirements}
     for key in ("contributing", "pr_template"):
         path = paths.get(key)

@@ -1,4 +1,4 @@
-"""This week's picks as plain data for the website.
+"""The picks from the last 7 days as plain data for the website.
 
 Built from DocScout's own database after each run. Every string is cleaned as in the
 reports (no control or bidirectional characters, one line, limited length), and the
@@ -9,7 +9,7 @@ DocScout builds and trusts; anything else becomes plain text.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from docscout.analyze.gaps import Gap, kind_label
@@ -18,7 +18,8 @@ from docscout.llm.review import model_label
 from docscout.run.sanitize import blob_url, clean, is_github_url, repo_url
 
 WEEK = timedelta(days=7)
-FREE_PICKS = 5
+NEW_FOR = timedelta(days=1)  # picks reported this recently are labeled "New"
+FREE_PICKS = 3
 EFFORT = {"S": "Small job", "M": "Medium job", "L": "Big job"}
 _EMOJI_CODE = re.compile(r":[a-z0-9_+-]{1,30}:")  # GitHub shows ":baby:" as an emoji; elsewhere it's noise
 
@@ -27,8 +28,9 @@ def _trusted(url: str) -> str | None:
     return url if is_github_url(url) else None
 
 
-def pick(finding: StoredFinding, rank: int) -> dict[str, Any]:
+def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict[str, Any]:
     d = finding.details
+    reported = datetime.fromisoformat(finding.reported).astimezone(timezone.utc) if finding.reported else None
     name = finding.full_name
     gap = Gap.from_dict(d.get("gap") or {"kind": "spec", "score": 0})
     review = d.get("review") or {}
@@ -42,6 +44,9 @@ def pick(finding: StoredFinding, rank: int) -> dict[str, Any]:
         findings.append(clean(f.text, 300) + (f" (e.g. {examples}{more})" if examples else ""))
     return {
         "rank": rank,
+        "reported": reported.isoformat(timespec="seconds") if reported else None,  # sortable: always UTC
+        "found": f"{reported.day} {reported:%b}" if reported else None,
+        "new": bool(reported and now and now - reported < NEW_FOR),
         "full_name": clean(name, 140),
         "url": _trusted(repo_url(name)),
         "score": round(float(finding.score)),
@@ -74,4 +79,4 @@ def pick(finding: StoredFinding, rank: int) -> dict[str, Any]:
 
 def weekly_picks(store: Store, now: datetime) -> list[dict[str, Any]]:
     """Every project reported in the last 7 days and still open, best first."""
-    return [pick(f, rank) for rank, f in enumerate(store.reported_since(now - WEEK), 1)]
+    return [pick(f, rank, now) for rank, f in enumerate(store.reported_since(now - WEEK), 1)]

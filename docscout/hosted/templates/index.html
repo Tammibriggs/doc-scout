@@ -52,7 +52,11 @@
   /* Section heading */
   .section-head { margin: 40px 0 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .section-head h2 { margin: 0; font-size: 1.4rem; }
-  .section-head span { color: var(--muted); font-size: .93rem; }
+  .section-head .note { color: var(--muted); font-size: .93rem; }
+  .tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .sort { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); font-size: .9rem; font-weight: 600; }
+  .sort a, .sort strong { padding: 6px 12px; text-decoration: none; }
+  .sort strong { background: var(--brand); color: var(--brand-text); }
 
   /* Pick cards */
   .picks { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
@@ -69,6 +73,7 @@
   .chip.green { background: var(--green-soft); color: var(--green); }
   .chip.blue { background: var(--blue-soft); color: var(--blue); }
   .chip.amber { background: var(--amber-soft); color: var(--amber); }
+  .chip.new { background: var(--brand); color: var(--brand-text); }
   .todo { margin: 16px 0 0; padding: 14px 16px; background: var(--surface-2); border-radius: 12px; }
   .todo .label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 4px; }
   .todo p { margin: 0; }
@@ -131,7 +136,7 @@
   <header class="hero">
     <h1>Find open-source API docs that need a writer</h1>
     <p>Every day DocScout measures the API docs of open-source projects, and Gemma reviews every candidate before it's listed: it turns away tools, libraries and look-alikes, then explains why the docs matter and where to start. You get a short list of projects with real gaps and maintainers who merge outside help.</p>
-    {% if total %}<p class="status"><span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} this week{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span></p>{% endif %}
+    {% if total %}<p class="status"><span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} in the last 7 days{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span></p>{% endif %}
     {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
     {% if subscribed %}<p class="notice ok" role="status">Subscribed: every pick is shown. Thanks for supporting DocScout!</p>{% endif %}
 
@@ -153,20 +158,28 @@
 
   <main>
     <div class="section-head" id="picks">
-      <h2>This week's picks</h2>
-      {% if hidden > 0 %}<span>The top {{ picks | length }} are free. Subscribers see all {{ total }}.</span>
-      {% elif pages > 1 %}<span>Page {{ page_number }} of {{ pages }}</span>{% endif %}
+      <h2>Picks from the last 7 days</h2>
+      {% if hidden > 0 %}<span class="note">The top {{ picks | length }} are free. Subscribers see all {{ total }}.</span>
+      {% elif subscribed and total > 1 %}
+      <div class="tools">
+        <nav class="sort" aria-label="Order">
+          {% if sort == "latest" %}<a href="/#picks">Best first</a><strong aria-current="true">Newest first</strong>
+          {% else %}<strong aria-current="true">Best first</strong><a href="/?sort=latest#picks">Newest first</a>{% endif %}
+        </nav>
+        {% if pages > 1 %}<span class="note">Page {{ page_number }} of {{ pages }}</span>{% endif %}
+      </div>
+      {% endif %}
     </div>
 
     {% if not picks %}
-    <p class="empty">This week's picks are on their way. DocScout checks projects once a day, so come back tomorrow.</p>
+    <p class="empty">The first picks are on their way. DocScout checks projects every day, so come back tomorrow.</p>
     {% endif %}
 
     <ol class="picks">
     {% for p in picks %}
       <li class="card pick">
         <div class="card-head">
-          <span class="rank" aria-label="Rank {{ p.rank }}">{{ p.rank }}</span>
+          <span class="rank" aria-label="Rank {{ p.rank }} by score" title="Rank by score">{{ p.rank }}</span>
           <div>
             <h3>{% if p.url %}<a href="{{ p.url }}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}</h3>
             {% if p.description %}<p class="desc">{{ p.description }}</p>{% endif %}
@@ -174,6 +187,7 @@
         </div>
 
         <ul class="chips" aria-label="At a glance">
+          {% if p.new %}<li class="chip new">New</li>{% endif %}
           {% if p.language %}<li class="chip">{{ p.language }}</li>{% endif %}
           {% if p.stars is not none %}<li class="chip">★ {{ "{:,}".format(p.stars) }}</li>{% endif %}
           {% if p.effort %}<li class="chip">{{ p.effort }}</li>{% endif %}
@@ -181,6 +195,7 @@
           {% if p.issues %}<li class="chip blue">Maintainers asked for help</li>{% endif %}
           {% if p.claimed %}<li class="chip amber">Someone may be on it</li>{% else %}<li class="chip green">Not claimed</li>{% endif %}
           {% if p.outside_prs %}<li class="chip">{{ p.outside_prs }} outside PR{{ "" if p.outside_prs == 1 else "s" }} merged lately</li>{% endif %}
+          {% if p.found %}<li class="chip">Found {{ p.found }}</li>{% endif %}
         </ul>
 
         <div class="todo">
@@ -218,22 +233,24 @@
     </ol>
 
     {% if pages > 1 %}
+    {% set sort_q = "&sort=latest" if sort == "latest" else "" %}
     <nav class="pager" aria-label="Pages">
-      {% if page_number > 1 %}<a class="step" href="/?page={{ page_number - 1 }}#picks" rel="prev">← Previous</a>{% else %}<span class="step off">← Previous</span>{% endif %}
+      {% if page_number > 1 %}<a class="step" href="/?page={{ page_number - 1 }}{{ sort_q }}#picks" rel="prev">← Previous</a>{% else %}<span class="step off">← Previous</span>{% endif %}
       <span class="numbers">
-        {% for n in range(1, pages + 1) %}{% if n == page_number %}<span class="num here" aria-current="page">{{ n }}</span>{% else %}<a class="num" href="/?page={{ n }}#picks">{{ n }}</a>{% endif %}{% endfor %}
+        {% for n in range(1, pages + 1) %}{% if n == page_number %}<span class="num here" aria-current="page">{{ n }}</span>{% else %}<a class="num" href="/?page={{ n }}{{ sort_q }}#picks">{{ n }}</a>{% endif %}{% endfor %}
       </span>
-      {% if page_number < pages %}<a class="step" href="/?page={{ page_number + 1 }}#picks" rel="next">Next →</a>{% else %}<span class="step off">Next →</span>{% endif %}
+      {% if page_number < pages %}<a class="step" href="/?page={{ page_number + 1 }}{{ sort_q }}#picks" rel="next">Next →</a>{% else %}<span class="step off">Next →</span>{% endif %}
     </nav>
     {% endif %}
 
     {% if hidden > 0 %}
     <section class="offer" aria-labelledby="offer-title">
       <div>
-        <h2 id="offer-title">{{ hidden }} more project{{ "" if hidden == 1 else "s" }} this week</h2>
+        <h2 id="offer-title">{{ hidden }} more project{{ "" if hidden == 1 else "s" }} to choose from</h2>
         <p class="desc">Subscribe to see every pick DocScout and Gemma find.</p>
         <ul>
-          <li>Every pick, refreshed every day</li>
+          <li>Every pick from the last 7 days, refreshed every day</li>
+          <li>Newest first, to see what was just found</li>
           <li>Gemma's first steps for each project</li>
           <li>Nothing to install, and cancel anytime</li>
         </ul>

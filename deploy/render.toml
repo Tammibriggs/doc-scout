@@ -8,15 +8,22 @@ languages = []
 language_filter = "auto"
 project_sizes = ["small", "medium", "large"]
 
+# A server has no laptop to keep free, so each run checks more than the defaults (60 repos,
+# 11 reviews, 10 new items). These are caps: on 16 Oct, 60 repos gave 3 projects for Gemma.
+[discovery]
+daily_repo_budget = 200         # about 660 GitHub requests, well under the 5,000 an hour
+
 [llm]
 # Gemma 4 31B through Google's OpenAI-compatible Gemini API endpoint.
 provider = "openai_compatible"
 model = "gemma-4-31b-it"
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 timeout_seconds = 90            # a review takes 20-40 s; a request that hangs is retried after a pause
+reviews_per_run = 30            # the rest wait for the next run
 
 [report]
 dir = "/tmp/docscout-reports"   # the website reads the picks from Atlas, not these files
+max_items = 30                  # as many as Gemma can review, so every accepted project is published that day
 
 [notifications]
 run_started = false             # no desktop on a server

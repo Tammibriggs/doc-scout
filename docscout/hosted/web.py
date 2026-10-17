@@ -1,4 +1,4 @@
-"""The website: this week's picks, the top few free and the rest for subscribers.
+"""The website: the picks from the last 7 days, the top few free and the rest for subscribers.
 
 Run it with ``uvicorn --factory docscout.hosted.web:from_env``. It reads, from the environment:
 ``MONGODB_URI``, ``STRIPE_SECRET_KEY``, ``SESSION_SECRET`` (signs the subscriber cookie) and
@@ -76,8 +76,11 @@ def create_app(
     async def index(request: Request) -> Response:
         picks, updated = atlas.current_picks()
         subscribed = valid_pass(request.cookies.get(COOKIE), secret, clock())
-        pages, number = 1, 1
-        if subscribed:  # pages of PER_PAGE; visitors see only the free picks, so they need no pages
+        pages, number, sort = 1, 1, "best"
+        if subscribed:  # pages of PER_PAGE; visitors see only the free picks, so they need no pages or sorting
+            if request.query_params.get("sort") == "latest":  # newest first, then best first within a day
+                sort = "latest"
+                picks = sorted(picks, key=lambda p: (str(p.get("reported") or ""), p.get("score") or 0), reverse=True)
             pages = max(1, math.ceil(len(picks) / PER_PAGE))
             requested = request.query_params.get("page", "1")
             number = min(pages, max(1, int(requested))) if requested.isdigit() else 1
@@ -90,6 +93,7 @@ def create_app(
             hidden=0 if subscribed else len(picks) - len(shown),
             page_number=number,
             pages=pages,
+            sort=sort,
             total=len(picks),
             subscribed=subscribed,
             updated=updated,

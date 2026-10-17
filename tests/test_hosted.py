@@ -1,4 +1,4 @@
-"""The hosted version: weekly picks, the website's paywall, Stripe Checkout and the daily job.
+"""The hosted version: the last 7 days' picks, the website's paywall, Stripe Checkout and the daily job.
 
 Atlas and Stripe are replaced by fakes (Stripe's HTTP API by httpx.MockTransport), so no
 test reaches a real service. Skipped unless the hosted extras are installed.
@@ -7,6 +7,7 @@ test reaches a real service. Skipped unless the hosted extras are installed.
 import json
 import re
 from datetime import timedelta
+from pathlib import Path
 
 import httpx
 import pytest
@@ -122,6 +123,17 @@ def test_weekly_picks_are_this_weeks_open_reports_with_only_trusted_links(tmp_pa
     assert best["published"] == ["Docs website: docs.example.dev"]
 
 
+def test_picks_say_when_they_were_found_and_label_the_newest(tmp_path, now):
+    store = Store(tmp_path / "docscout.db")
+    two_days_ago, this_morning = now - timedelta(days=2), now - timedelta(hours=3)
+    report(store, two_days_ago, "org/older", score=90)
+    report(store, this_morning, "org/today", score=40)
+    older, today = weekly_picks(store, now)  # still best first
+    assert (older["full_name"], older["new"], today["new"]) == ("org/older", False, True)
+    assert today["reported"] == this_morning.isoformat(timespec="seconds")
+    assert older["found"] == f"{two_days_ago.day} {two_days_ago:%b}"
+
+
 # ---------------------------------------------------------------------- website
 
 
@@ -129,8 +141,8 @@ def test_visitors_see_the_top_picks_and_an_offer_for_the_rest():
     resp = client(FakeAtlas(sample_picks(7))).get("/")
     assert resp.status_code == 200
     assert resp.text.count('class="card pick"') == FREE_PICKS
-    assert "2 more projects this week" in resp.text and 'action="/subscribe"' in resp.text
-    assert "org/app5" in resp.text and "org/app6" not in resp.text  # the rest never reach the page
+    assert f"{7 - FREE_PICKS} more projects to choose from" in resp.text and 'action="/subscribe"' in resp.text
+    assert f"org/app{FREE_PICKS}<" in resp.text and f"org/app{FREE_PICKS + 1}<" not in resp.text  # the rest never reach the page
     assert "4242 4242 4242 4242" in resp.text  # test mode is labeled
     csp = resp.headers["content-security-policy"]
     assert "default-src 'none'" in csp and "script-src" not in csp  # no scripts allowed at all
@@ -169,6 +181,24 @@ def test_subscribers_page_through_every_pick():
     assert "Page 1 of 3" in c.get("/?page=-2").text and "Page 1 of 3" in c.get("/?page=abc").text
     visitor = client(FakeAtlas(sample_picks(23))).get("/?page=2").text
     assert visitor.count('class="card pick"') == FREE_PICKS and "org/app1<" in visitor and "Page 2" not in visitor  # no pages behind the paywall
+
+
+def test_subscribers_can_see_the_newest_first_and_visitors_keep_the_best():
+    picks = sample_picks(12)
+    for p in picks:
+        p["reported"] = "2026-10-16T04:15:00+00:00"
+    picks[10]["reported"] = picks[11]["reported"] = "2026-10-17T04:15:00+00:00"  # ranks 11 and 12 are the newest
+    picks[11]["new"] = True
+    c = client(FakeAtlas(picks))
+    c.cookies.set(COOKIE, sign_pass("cs_test_paid0000000001", 2_000_000_000, SECRET))
+    best = c.get("/").text
+    assert re.findall(r">(org/app\d+)</a>", best)[:2] == ["org/app1", "org/app2"] and 'href="/?sort=latest#picks"' in best
+    latest = c.get("/?sort=latest").text
+    assert re.findall(r">(org/app\d+)</a>", latest)[:3] == ["org/app11", "org/app12", "org/app1"]  # newest day, then best first
+    assert 'href="/?page=2&amp;sort=latest#picks"' in latest and latest.count('class="chip new"') == 1  # pages keep the order
+    visitor = client(FakeAtlas(picks)).get("/?sort=latest").text
+    assert re.findall(r">(org/app\d+)</a>", visitor) == [f"org/app{i}" for i in range(1, FREE_PICKS + 1)]
+    assert "?sort=latest" not in visitor  # sorting is for subscribers
 
 
 def test_unpaid_or_forged_returns_unlock_nothing():
@@ -241,6 +271,14 @@ def test_only_a_complete_paid_session_counts_and_no_email_is_kept():
 
 
 # ---------------------------------------------------------------------- daily job
+
+
+def test_the_hosted_settings_check_more_than_a_laptop_run():
+    from docscout.settings.config import load_config
+
+    cfg = load_config(Path(__file__).parents[1] / "deploy" / "render.toml")
+    assert cfg["discovery"]["daily_repo_budget"] == 200 and cfg["llm"]["reviews_per_run"] == 30 and cfg["report"]["max_items"] == 30
+    assert cfg["llm"]["model"] == "gemma-4-31b-it" and cfg["notifications"]["run_finished"] is False
 
 
 def test_the_daily_job_keeps_docscouts_memory_in_atlas(tmp_path, now, monkeypatch):

@@ -18,7 +18,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | **M2. Gemma required** (branch `m2-llm`, built in a separate worktree) | ✅ First, fewer noisy items (section 9). Then ✅: **Gemma reviews every repo that passes the health checks** (up to `reviews_per_run` a day, most promising first): it decides whether the project really has an API worth documenting, with the 0.8 cap, and writes why it matters plus up to 3 first steps. **Only reviewed repos are reported.** Unreviewed ones are held, not dropped, and reviewed later. A memory check runs before loading the model. `docscout draft owner/repo` writes a first message to the maintainers for a project you've chosen. **Measured on the 58 labels**, with and without Gemma, and with thinking off and on. **Compared with an AI agent given a skill** (section 2), which led to the fixes of 16 Oct. ✅ Merged into `main` on 16 Oct. ⏳ Still to check: you rate at least 7 of 10 of Gemma's first steps as useful (section 18) | | Wed 14 – Fri 16 Oct |
 | Unattended test | ✅ Passed. **2 days** from `docscout schedule install`: no manual starts, survives a reboot and going offline. Result: 5 scheduled runs (13–16 Oct), 2 restarts and 1 lost connection, all recovered without manual starts. M2 was built in a separate worktree, so the daily runs kept using the M3 code | | Tue 13 – Thu 15 Oct |
 | Polish and wrap-up | ✅ `m1-report`, `m3-daily` and `m2-llm` merged into `main` on 16 Oct (a fast-forward: each branch builds on the one before). From then on, the daily runs use the Gemma version. README, demo report | | Thu 15 Oct (Fri 16 buffer) |
-| **Hosted version** (branch `hosted`) | ✅ Built (16 Oct), section 20: a website that shows this week's top 5 picks free and the rest for $3 a month (Stripe Checkout, test mode); a daily Render cron job running DocScout with Gemma 4 31B on Google's API; MongoDB Atlas for DocScout's memory, the picks and the subscriptions. ✅ Gemma 4 31B measured on the 58 labels: 85% / 90%, against 81% / 81% for `e2b` (section 2). ⏳ Deploy once the accounts exist | | Fri 16 – Sat 17 Oct |
+| **Hosted version** (branch `hosted`) | ✅ Built (16 Oct), section 20: a website that shows the picks from the last 7 days, the top 3 free and the rest for $3 a month (Stripe Checkout, test mode); a daily Render cron job running DocScout with Gemma 4 31B on Google's API; MongoDB Atlas for DocScout's memory, the picks and the subscriptions. ✅ Gemma 4 31B measured on the 58 labels: 85% / 90%, against 81% / 81% for `e2b` (section 2). ✅ Deployed (16–17 Oct): the code is public on GitHub, and the daily job runs on Render (on schedule since 17 Oct, 04:15 UTC). ⏳ A test payment on the live site | | Fri 16 – Sat 17 Oct |
 | Challenge submission | Demo video; a real docs contribution made with a DocScout pick (the "first user"); the DEV post, written in your own voice | | Fri 16 – Sun 18 Oct |
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
@@ -468,7 +468,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
     hosted/   picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 196 tests (186 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 200 tests (186 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -524,15 +524,16 @@ Re-checking still-open items for changes (docs fixed by someone else, a PR merge
 For writers who'd rather not run anything: no terminal, and no 6 GB of free memory, which Gemma pushed this laptop to its limit for in every comparison run. It also serves the challenge's "something someone would actually pay for".
 
 **Built on branch `hosted`:**
-- **Daily job** (`docscout.hosted.job`, a Render cron job): load DocScout's database from Atlas, `docscout run` with [deploy/render.toml](../deploy/render.toml), publish this week's picks, save the database back. The save also happens after a failed run.
+- **Daily job** (`docscout.hosted.job`, a Render cron job): load DocScout's database from Atlas, `docscout run` with [deploy/render.toml](../deploy/render.toml), publish the picks from the last 7 days, save the database back. The save also happens after a failed run.
 - **Model:** Gemma 4 31B (`gemma-4-31b-it`) through Google's OpenAI-compatible Gemini API endpoint, on the free tier. Google lists `gemma-4-31b-it` and `gemma-4-26b-a4b-it` for the key. Under load it answered 500 or 503 to about half the requests (16 Oct), so busy answers (429, 5xx) are retried after 5, 20 and 60 s, or after the provider's `Retry-After`. Only schema mode returned clean JSON; JSON mode on the 26B returned its "thoughts".
 - **MongoDB Atlas** (free tier):
   - DocScout's SQLite file, in GridFS, newest 3 versions kept. Render cron jobs can't keep files or attach disks;
-  - this week's picks: one document;
+  - the picks: one document, rewritten after each run;
   - subscriptions: no names or email addresses kept.
 - **Website** (`docscout.hosted.web`, Starlette and Jinja2, a Render web service). Redesigned on 16 Oct after "a wall of text": a short welcome, 3 how-it-works steps, cards with labels (language, stars, effort, docs published, help requested, not claimed, outside PRs merged), "What needs doing" and Gemma's note up front, the details folded away (`<details>`, no JavaScript):
-  - this week's picks, every project reported in the last 7 days and still open;
-  - the top 5 free, the rest after a Stripe Checkout subscription;
+  - the picks from the last 7 days: every project first reported in that window and still open, best score first. Each stays for 7 daily runs; a reported project isn't checked again, so it doesn't come back;
+  - the top 3 free (5 until 17 Oct), the rest after a Stripe Checkout subscription;
+  - subscribers can switch to newest first (17 Oct): the day it was found, then best score. Every card says when it was found, and a "New" label marks the last 24 hours;
   - the paywall is enforced on the server, so the page holds only what the visitor may see;
   - subscribers page through the list, 10 picks a page (server-side pages: infinite scrolling would need JavaScript);
   - the page states Gemma's role plainly: it reviews every candidate and turns away the ones that aren't real apps with an API, which raised precision from 76% to 85%.
@@ -546,7 +547,8 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - the website is "an agent's front end".
 - **Google AI Studio for Gemma.** It's free with no card, and it's Google serving Gemma. DigitalOcean's Inference also serves Gemma 4 ($0.18 / $0.50 per million input / output tokens), but the account wanted a charge. OpenRouter (`google/gemma-4-31b-it:free`) is the fallback: one setting.
 - **Price: $3 a month, not weekly.** Card fees (about $0.30 plus about 3% per charge) leave about $2.60 of $3, and weekly billing would pay the fixed fee four times.
-- **5 free picks a week.** The pool is about 4–10 good picks a day, so a weekly list makes "5 free" meaningful.
+- **3 free picks** (17 Oct; it was 5). Render's first runs found 3 picks per 60 repos, so with a list of 10–20, 5 free would have given away a quarter to half of it. A writer needs only one project at a time. The free 3 are the top scores at that moment, so they change when better picks arrive.
+- **Bigger runs on Render** (17 Oct): up to 200 repos, 30 reviews and 30 new picks a run ([deploy/render.toml](../deploy/render.toml)). The defaults (60, 11, 10) were set for a laptop's memory and time. They're caps: Gemma only reviews the projects that pass the code checks, and the new-picks cap equals the review cap, so every accepted project is published the same day.
 
 **Cost:**
 - Render: a cron job (billed per second, $1 minimum a month) plus the web service. Use the paid plan during judging so visitors don't wait about a minute for a sleeping free service; switch to free after.
@@ -556,6 +558,17 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 
 **Rehearsal (16 Oct), on this laptop against the real Atlas and Stripe test mode:** 42 picks published; 5 shown free; Checkout opened and the test card paid; the return link unlocked all 42. Atlas recorded the subscription with Stripe's IDs only (no email).
 
+**First runs on Render** (60 repos each, before the bigger runs):
+
+| Run | Checked | Reviewed by Gemma, all accepted | Time | GitHub requests |
+|---|---|---|---|---|
+| 16 Oct, 23:08 UTC (started by hand) | 60 | 3 | 6 min | 197 |
+| 17 Oct, 04:15 UTC (scheduled) | 60 | 3 | 7 min | 216 |
+
+In the first run, 16 of the 60 passed the health checks. Render started with an empty memory. The rehearsal had published picks from a database on this laptop without saving that database to Atlas, so Render's first run replaced the 42 rehearsal picks with its own 3.
+
 **⏳ Still to do:**
 - ✅ Gemma 4 31B on the 58 labels: 85% precision, 90% recall (section 2);
-- deploy: the accounts, the public GitHub repo, and a real end-to-end test payment in test mode.
+- ✅ deployed: the public GitHub repo, the Render Blueprint, Atlas access for Render;
+- a real end-to-end test payment on the live site, in test mode;
+- after the deadline: check published projects again after 90 days, like the others, so one that still has the gap and isn't claimed can come back.

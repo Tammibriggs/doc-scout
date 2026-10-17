@@ -4,7 +4,7 @@ Struggling to find open-source API docs to contribute to? Digging through dozens
 
 DocScout finds projects that serve a REST API, are actively maintained, have documentation gaps you can fix, and are likely to accept your pull request. It checks new projects every day and gives you a short, ranked list, with each gap counted and linked.
 
-Use it on the [website](https://docscout-web.onrender.com/), [run it yourself](#install), or give [the skill](#use-it-from-your-own-ai-agent) to your own AI agent.
+Use it on the [website](https://docscout-web.onrender.com/), run it yourself [once](#run-it-once) or [every day by itself on Linux](#run-it-every-day-by-itself-linux), or give [the skill](#use-it-from-your-own-ai-agent) to your own AI agent.
 
 **How it works:** code searches GitHub, checks each project's health and measures its docs gaps. Then **an open-weight model, Gemma 4, reviews every project that passes**. It decides whether the project really has an API worth documenting, checks whether someone is already working on the gap, explains why the docs matter, and suggests where to start. Only projects it has reviewed are reported. Gemma runs on your computer with Ollama, or through a hosted API, as on the website (Gemma 4 31B). DocScout starts with REST APIs and is built so other API types (GraphQL, gRPC, AsyncAPI, ...) can be added as modules; everything it checks is language- and framework-agnostic.
 
@@ -61,15 +61,24 @@ Install Ollama from [ollama.com](https://ollama.com), or use a hosted model with
 | Notifications for the daily run | on | `--start-notification off`, `--finish-notification off` |
 
 Three model settings live in the `[llm]` section of `config.toml`:
-- `reviews_per_run`: 13 a day, about 10 minutes at 45 s each. `docscout bench-llm` measures your speed.
+- `reviews_per_run`: 11 a day, about 10 minutes at 51 s each. `docscout bench-llm` measures your speed.
 - `think`: `off`, `borderline` (only where the code is unsure) or `on`. Slower.
-- `min_free_memory_gb`: 2.5. A local model waits until this much memory is free, so your computer doesn't start swapping.
+- `min_free_memory_gb`: 6, since `gemma4:e2b` used 5.5–5.9 GB. A local model waits until this much memory is free, so your computer doesn't start swapping.
 
 The same flags work on `discover` for a single run without saving, for example `docscout discover --languages rust --only-these-languages`. `init` also accepts them; any setting given as a flag skips its question.
 
 Settings are saved in `config.toml` and secrets in `secrets.env`, both in your config folder (`~/.config/docscout/` on Linux). `secrets.env` is readable only by you. You can also set the token or the LLM API key with the `GITHUB_TOKEN` or `DOCSCOUT_LLM_API_KEY` environment variables, which take precedence.
 
-## Find projects to contribute to
+## Run it yourself
+
+Two ways, both after [installing](#install) and [setting up](#set-up). Both write the same [report](#read-the-report).
+
+| | Command | What happens |
+|---|---|---|
+| **Run it once**, whenever you want | `docscout run` | Checks up to 60 projects, Gemma reviews the promising ones, and a report is written. About 15 minutes |
+| **Run it every day by itself** (Linux) | `docscout schedule install`, once | A run starts on its own each day in the background, and a notification tells you when the report is ready |
+
+### Run it once
 
 ```bash
 .venv/bin/docscout run              # checks up to 60 repos, Gemma reviews up to 11 (about 15 minutes), writes a report
@@ -77,48 +86,7 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 .venv/bin/docscout run --limit 0    # only Gemma's reviews of projects still waiting for one (e.g. after a run with too little free memory)
 ```
 
-**The report** goes to `~/Documents/DocScout/reports/` (set `[report] dir` to change it):
-- every run writes a new dated file, such as `2026-10-14.md`, then `2026-10-14_2.md` for a second run that day, and `latest.md` is always a copy of the newest;
-- a run that finds nothing new writes no file.
-
-**Each item shows:**
-- **Gemma's review:** what the project is (for example "an app or service with its own REST API"), the quote it based that on, and how it changed the code's confidence (for example 0.50 → 0.80). It can raise confidence to at most 0.8, so a README written to fool it can't push a project to the top;
-- **why its docs matter** and **up to 3 first steps**, from Gemma;
-- **the gap:** for an OpenAPI spec, which operations lack descriptions, examples, success schemas or error responses, with a permanent link to the file; for prose docs, which endpoints lack a description, request and response examples, status codes or auth. Specs are found by name (`openapi.yaml`, `swagger.json`), by folder (`docs/openapi/…`), and as files named like `api.yaml`;
-- **"Docs published":** where the docs can be read as pages without installing the project: a docs site built from the repo (MkDocs, Sphinx, Docusaurus, Mintlify…), a docs website, a separate docs repo, or Markdown API docs on GitHub. These projects rank higher (`[scoring] published_docs_bonus`), because you can see the gap in a browser and the fix is Markdown;
-- **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
-- **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
-- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. Whether someone is already on it is Gemma's call: it reads the open pull requests and the comments on the project's docs issues next to the gap DocScout found, and says which overlap it and why. For 7 days after a project is reported, each run checks it again once a day (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;
-- **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet, so it reports these only when maintainers asked for help.
-
-**Small gaps are skipped:** a project is reported only when at least 5 operations or endpoints need work (`[report] min_effort_units`). One undocumented endpoint is a quick fix, not a project to contribute to. A skipped project is checked again after 90 days, in case its API grows.
-
-**Once you've picked a project,** let Gemma draft your first message to the maintainers:
-
-```bash
-.venv/bin/docscout draft owner/repo
-```
-
-It writes a short message asking whether a docs PR would be welcome, naming the gaps DocScout found. It replies on the open "help wanted" or docs issue if there is one, otherwise it drafts a new issue. It checks again that nobody has started on it. Edit it so it sounds like you, then post it yourself: DocScout never posts anything.
-
-**Once you've dealt with a project,** hide it from future reports:
-
-```bash
-.venv/bin/docscout done owner/repo                     # you contributed
-.venv/bin/docscout ignore owner/repo --reason "..."    # not for you; the reason helps tune DocScout
-```
-
-Repos are only checked again after 90 days (`[discovery] recheck_after_days`), and reported ones stay listed under "Still open from earlier" until you mark them.
-
-**To look at one spec, docs file or repo:**
-
-```bash
-.venv/bin/docscout score path/to/openapi.yaml   # gap score with the reason for each point
-.venv/bin/docscout score docs/API.md            # endpoint completeness of a Markdown file
-.venv/bin/docscout score owner/repo             # the full check with Gemma's review, as it would appear in a report
-```
-
-## Run it every day by itself (Linux)
+### Run it every day by itself (Linux)
 
 ```bash
 .venv/bin/docscout schedule install   # once
@@ -151,6 +119,51 @@ Problem notifications can't be turned off.
 **The log:** `journalctl --user -u docscout.service -n 50`.
 
 On macOS and Windows, daily runs come in a later version (stage M5). Until then, run `docscout run` yourself.
+
+## Read the report
+
+Reports go to `~/Documents/DocScout/reports/` (set `[report] dir` to change it):
+- every run writes a new dated file, such as `2026-10-14.md`, then `2026-10-14_2.md` for a second run that day, and `latest.md` is always a copy of the newest;
+- a run that finds nothing new writes no file.
+
+**Each item shows:**
+- **Gemma's review:** what the project is (for example "an app or service with its own REST API"), the quote it based that on, and how it changed the code's confidence (for example 0.50 → 0.80). It can raise confidence to at most 0.8, so a README written to fool it can't push a project to the top;
+- **why its docs matter** and **up to 3 first steps**, from Gemma;
+- **the gap:** for an OpenAPI spec, which operations lack descriptions, examples, success schemas or error responses, with a permanent link to the file; for prose docs, which endpoints lack a description, request and response examples, status codes or auth. Specs are found by name (`openapi.yaml`, `swagger.json`), by folder (`docs/openapi/…`), and as files named like `api.yaml`;
+- **"Docs published":** where the docs can be read as pages without installing the project: a docs site built from the repo (MkDocs, Sphinx, Docusaurus, Mintlify…), a docs website, a separate docs repo, or Markdown API docs on GitHub. These projects rank higher (`[scoring] published_docs_bonus`), because you can see the gap in a browser and the fix is Markdown;
+- **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
+- **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
+- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. Whether someone is already on it is Gemma's call: it reads the open pull requests and the comments on the project's docs issues next to the gap DocScout found, and says which overlap it and why. For 7 days after a project is reported, each run checks it again once a day (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;
+- **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet, so it reports these only when maintainers asked for help.
+
+**Small gaps are skipped:** a project is reported only when at least 5 operations or endpoints need work (`[report] min_effort_units`). One undocumented endpoint is a quick fix, not a project to contribute to. A skipped project is checked again after 90 days, in case its API grows.
+
+## Once you've picked a project
+
+Let Gemma draft your first message to the maintainers:
+
+```bash
+.venv/bin/docscout draft owner/repo
+```
+
+It writes a short message asking whether a docs PR would be welcome, naming the gaps DocScout found. It replies on the open "help wanted" or docs issue if there is one, otherwise it drafts a new issue. It checks again that nobody has started on it. Edit it so it sounds like you, then post it yourself: DocScout never posts anything.
+
+**Once you've dealt with a project,** hide it from future reports:
+
+```bash
+.venv/bin/docscout done owner/repo                     # you contributed
+.venv/bin/docscout ignore owner/repo --reason "..."    # not for you; the reason helps tune DocScout
+```
+
+Repos are only checked again after 90 days (`[discovery] recheck_after_days`), and reported ones stay listed under "Still open from earlier" until you mark them.
+
+**To look at one spec, docs file or repo:**
+
+```bash
+.venv/bin/docscout score path/to/openapi.yaml   # gap score with the reason for each point
+.venv/bin/docscout score docs/API.md            # endpoint completeness of a Markdown file
+.venv/bin/docscout score owner/repo             # the full check with Gemma's review, as it would appear in a report
+```
 
 ## Use it from your own AI agent
 

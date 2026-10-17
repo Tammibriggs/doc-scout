@@ -118,7 +118,20 @@ All three sources are above 50%, so all stay on.
 - **The skill is public** (17 Oct): [skills/find-api-docs-to-contribute/SKILL.md](../skills/find-api-docs-to-contribute/SKILL.md), for writers who'd rather use their own agent (Claude Code or any tool that supports Agent Skills); the README says how to install it.
   - It adds what DocScout learned after the comparison: the size cutoff, the claim rules Gemma follows, help requests that must be about the API docs, install commands and hidden agent folders that aren't docs, GitHub wikis, another product's docs repo, swag's `docs.go`, comparing documented endpoints with the routes in the code, and never recommending a project only because no docs were found.
   - It uses `gh api` or a token instead of the comparison's `ghapi` wrapper, and its frontmatter keeps to the fields other tools accept (`name`, `description`, `license`, `compatibility`).
-  - The comparison's copy ([comparison/skill/SKILL.md](comparison/skill/SKILL.md)) stays as it was tested, so the results can be repeated. The public skill hasn't been run end to end yet.
+  - The comparison's copy ([comparison/skill/SKILL.md](comparison/skill/SKILL.md)) stays as it was tested, so the results can be repeated.
+- **Round 3 (17 Oct, both sides updated; [results](comparison/RESULTS.md#round-3-17-oct-both-sides-updated)):**
+  - **DocScout's fixed 60-repo run found nothing.** 10 of its 13 healthy projects have a project website that may hold their docs, which it can't read yet (M4).
+  - **An extra run to 200 repos found 3 picks:** you'd act on 1, maybe 2, with 83% of claims right.
+  - **The agent with the public skill found 10:** you'd act on 4, maybe 3, with 95% of claims right. It took 1 h 20 min and 361,000 tokens, against about 20 minutes and no tokens.
+  - **The public skill ran end to end** without problems, and listed what it found unclear.
+  - **Fixes it points to (⏳):**
+    - outsiders must exclude people who merge PRs (zowe's "63 outside PRs" were maintainers with private org membership; both sides);
+    - endpoints written without an HTTP method, and endpoint tables in sub-folder READMEs, aren't found;
+    - `$ref`s to URL-encoded path names aren't followed (sharry: 57 operations, not 62);
+    - a badge URL was quoted as an AI policy;
+    - "Docs published" should keep the path (eikek.github.io/sharry, not the bare host, which returns 404);
+    - local setup should read CONTRIBUTING's commands;
+    - check that the published API page is built from the spec that's measured (sharry's isn't).
 
 ## 3. Success criteria
 

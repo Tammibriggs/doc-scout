@@ -212,6 +212,22 @@ def test_full_run_writes_a_safe_report_and_remembers_it(cfg, store, now, monkeyp
     assert again.status == "empty" and again.report_path is None and again.summary.evaluated == 0
 
 
+def test_a_full_run_works_the_same_with_the_atlas_store(cfg, now, monkeypatch):
+    # The hosted version keeps DocScout's memory in MongoDB Atlas collections (mongomock here).
+    mongomock = pytest.importorskip("mongomock")
+    pytest.importorskip("pymongo")
+    from docscout.hosted.atlas_store import AtlasStore
+
+    store = AtlasStore(mongomock.MongoClient().db)
+    monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app", "org/plain-app"))
+    result = pipeline.run(RunGitHub(), cfg, store, now, limit=10, sources=["repo_search"], rng=random.Random(1))
+    assert result.status == "ok" and [f.full_name for f in result.findings] == ["org/spec-app"]
+    assert "### 1. [org/spec-app](https://github.com/org/spec-app) · score" in result.report_path.read_text()
+    assert store.repo("org/spec-app")["status"] == "reported" and store.skip_reason("org/plain-app", now, 90) == "checked recently"
+    assert store.db.findings.find_one({"repo_key": "org/spec-app"})["details"]["review"]["model"]  # Gemma's review, as a document
+    assert store.recent_runs(1)[0]["status"] == "ok"
+
+
 def test_gaps_too_small_to_be_worth_a_contribution_are_skipped(cfg, store, now, monkeypatch):
     cfg.values["report"]["min_effort_units"] = 5  # the default; the sample spec's 4 operations all need work
     monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app"))

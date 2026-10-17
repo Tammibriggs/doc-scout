@@ -78,6 +78,9 @@ num_ctx = 4096
 timeout_seconds = 300
 readme_chars = 1500
 
+[storage]
+backend = "sqlite"              # sqlite: a file in your data folder | atlas: MongoDB Atlas collections (the hosted version; needs MONGODB_URI)
+
 [checks]
 claim_and_policy = true         # for reported items: open docs PRs, claims, CLA/DCO/AI-policy notes (~2-3 API calls each)
 recheck_claims_days = 7         # after that, check them for claims again once a day for this many days (the website's list)

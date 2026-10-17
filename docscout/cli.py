@@ -150,6 +150,24 @@ def store_path() -> Path:
     return data_dir() / "docscout.db"
 
 
+def open_store(cfg: Config):
+    """DocScout's memory: a SQLite file in your data folder, or MongoDB Atlas collections
+    (``[storage] backend = "atlas"``, the hosted version, which needs the MONGODB_URI secret)."""
+    from docscout.run.db import Store
+
+    backend = cfg["storage"]["backend"]
+    if backend == "atlas":
+        uri = cfg.secret("MONGODB_URI")
+        if not uri:
+            raise ConfigError('[storage] backend = "atlas" needs the MONGODB_URI secret, as an environment variable or in secrets.env.')
+        from docscout.hosted.atlas_store import AtlasStore
+
+        return AtlasStore.connect(uri)
+    if backend != "sqlite":
+        raise ConfigError(f'unknown [storage] backend {backend!r} (use "sqlite" or "atlas")')
+    return Store(store_path())
+
+
 def lock_path() -> Path:
     return data_dir() / "run.lock"
 
@@ -173,7 +191,6 @@ def _github(cfg: Config):
 
 def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     from docscout.run import pipeline
-    from docscout.run.db import Store
     from docscout.find.github import AuthError
     from docscout.find.health import utcnow
 
@@ -186,7 +203,7 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     if args.if_due:
         return _run_if_due(cfg, sources)
     limit = int(cfg["discovery"]["daily_repo_budget"]) if args.limit is None else max(0, args.limit)
-    store = Store(store_path())
+    store = open_store(cfg)
     try:
         with lock.hold(lock_path()), _github(cfg) as gh:
             print(f"Checking up to {limit} repos...", file=sys.stderr)
@@ -216,11 +233,10 @@ def _cmd_run(cfg: Config, args: argparse.Namespace) -> int:
 
 def _run_if_due(cfg: Config, sources: list[str]) -> int:
     from docscout.run import daily, notify
-    from docscout.run.db import Store
     from docscout.find.github import GitHub
     from docscout.find.health import utcnow
 
-    store = Store(store_path())
+    store = open_store(cfg)
     try:
         return daily.run_if_due(
             cfg, store, lock_path=lock_path(), github=GitHub, notifier=notify.send, clock=utcnow, sources=sources
@@ -249,14 +265,13 @@ def _schedule_line(cfg: Config, args: argparse.Namespace) -> tuple[list[str], ob
 
 def _cmd_status(cfg: Config, args: argparse.Namespace) -> int:
     from docscout.run import daily, lock
-    from docscout.run.db import Store
     from docscout.find.health import utcnow
 
     lines, sched = _schedule_line(cfg, args)
     print("\n".join(lines))
     if not cfg.github_token:
         print("  ⚠️  No GitHub token, so runs can't start. Add one with: docscout init")
-    store = Store(store_path())
+    store = open_store(cfg)
     try:
         print()
         print(daily.status_report(store, cfg, utcnow(), running=lock.is_held(lock_path()), scheduled=sched is not None))
@@ -302,7 +317,6 @@ def _cmd_schedule(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _cmd_mark(cfg: Config, args: argparse.Namespace) -> int:
-    from docscout.run.db import Store
     from docscout.find.health import utcnow
     from docscout.find.sources import github_full_name
 
@@ -310,7 +324,7 @@ def _cmd_mark(cfg: Config, args: argparse.Namespace) -> int:
     if name.count("/") != 1:
         print(f"Expected OWNER/REPO or a GitHub URL, got {args.repo!r}", file=sys.stderr)
         return 2
-    store = Store(store_path())
+    store = open_store(cfg)
     try:
         store.set_status(name, args.status, utcnow(), getattr(args, "reason", None))
     finally:
@@ -419,7 +433,7 @@ def _check_repo(cfg: Config, gh, name: str, types, now, *, show: bool):
 def _cmd_draft(cfg: Config, args: argparse.Namespace) -> int:
     from docscout.analyze import apitypes
     from docscout.llm import review
-    from docscout.run.db import Store, StoredFinding
+    from docscout.run.db import StoredFinding
     from docscout.llm.draft import NEW_ISSUE, write_draft
     from docscout.find.health import utcnow
     from docscout.llm import LLMError, LLMUnavailable, memory
@@ -429,7 +443,7 @@ def _cmd_draft(cfg: Config, args: argparse.Namespace) -> int:
     if name.count("/") != 1:
         print(f"Expected OWNER/REPO or a GitHub URL, got {args.repo!r}", file=sys.stderr)
         return 2
-    store = Store(store_path())
+    store = open_store(cfg)
     try:
         finding = store.latest_finding(name)
     finally:

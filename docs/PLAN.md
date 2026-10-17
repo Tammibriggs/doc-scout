@@ -500,9 +500,9 @@ hacktoberfest/
     run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅
               scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
-    hosted/   picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
+    hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 211 tests (194 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 226 tests (200 and 9 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -564,10 +564,15 @@ Re-checking still-open items for changes (docs fixed by someone else, a PR merge
 For writers who'd rather not run anything: no terminal, and no 6 GB of free memory, which Gemma pushed this laptop to its limit for in every comparison run. It also serves the challenge's "something someone would actually pay for".
 
 **Built on branch `hosted`:**
-- **Daily job** (`docscout.hosted.job`, a Render cron job): load DocScout's database from Atlas, `docscout run` with [deploy/render.toml](../deploy/render.toml), publish the picks from the last 7 days, save the database back. The save also happens after a failed run.
+- **Daily job** (`docscout.hosted.job`, a Render cron job): `docscout run` with [deploy/render.toml](../deploy/render.toml), whose memory is in Atlas collections (`[storage] backend = "atlas"`), then publish the picks from the last 7 days. Publishing also happens after a failed run.
 - **Model:** Gemma 4 31B (`gemma-4-31b-it`) through Google's OpenAI-compatible Gemini API endpoint, on the free tier. Google lists `gemma-4-31b-it` and `gemma-4-26b-a4b-it` for the key. Under load it answered 500 or 503 to about half the requests (16 Oct), so busy answers (429, 5xx) are retried after 5, 20 and 60 s, or after the provider's `Retry-After`, and then Gemma 4 26B is asked instead (17 Oct, `fallback_model`). Only schema mode returned clean JSON; JSON mode on the 26B returned its "thoughts".
 - **MongoDB Atlas** (free tier):
-  - DocScout's SQLite file, in GridFS, newest 3 versions kept. Render cron jobs can't keep files or attach disks;
+  - **DocScout's memory, in collections** ✅ (17 Oct; until then a SQLite file in GridFS, copied in and out around each run). Render cron jobs start on an empty machine, so everything DocScout remembers lives in Atlas:
+    - `repos` (one document per repo checked), `findings` (each gap, with its details as an embedded document, so they can be queried), `runs`, `run_state`, `sweep` (the search cursor) and `counters` (run and finding numbers);
+    - "the latest finding of each repo" is an aggregation pipeline (`$sort`, `$group`, `$lookup`);
+    - `AtlasStore` ([hosted/atlas_store.py](../docscout/hosted/atlas_store.py)) has the same methods as the SQLite `Store`, and contract tests run every behavior against both (mongomock stands in for Atlas). The command-line tool keeps its local SQLite file;
+    - why: the switch makes Atlas the store DocScout works in, not a place to park a file (for the "Best Use of MongoDB Atlas" category);
+    - the first run with empty collections moves the GridFS file in (the file stays as a backup). Checked on the real Atlas in a temporary database: 695 repos, 43 findings and 4 runs in 5.5 s, and every query gave the same answers as SQLite, including the website's 25 picks;
   - the picks: one document, rewritten after each run;
   - subscriptions: no names or email addresses kept.
 - **Website** (`docscout.hosted.web`, Starlette and Jinja2, a Render web service). Redesigned on 16 Oct after "a wall of text": a short welcome, 3 how-it-works steps, cards with labels (language, stars, effort, docs published, help requested, not claimed, outside PRs merged), "What needs doing" and Gemma's note up front, the details folded away (`<details>`, no JavaScript):

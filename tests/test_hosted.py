@@ -62,6 +62,7 @@ def sample_picks(n):
 class FakeAtlas:
     def __init__(self, picks=(), state=None):
         self.picks, self.updated, self.state, self.subscriptions = list(picks), None, state, {}
+        self.db = None  # a mongomock database, for the daily job's tests
 
     def current_picks(self):
         return self.picks, self.updated
@@ -78,9 +79,6 @@ class FakeAtlas:
             return False
         path.write_bytes(self.state)
         return True
-
-    def save_state(self, path):
-        self.state = path.read_bytes()
 
 
 class FakeStripe:
@@ -305,33 +303,56 @@ def test_the_hosted_settings_check_more_than_a_laptop_run():
     assert cfg["llm"]["model"] == "gemma-4-31b-it" and cfg["notifications"]["run_finished"] is False
 
 
-def test_the_daily_job_keeps_docscouts_memory_in_atlas(tmp_path, now, monkeypatch):
-    from docscout import cli
-    from docscout.settings import config
+def atlas_with_db():
+    mongomock = pytest.importorskip("mongomock")
+    atlas = FakeAtlas()
+    atlas.db = mongomock.MongoClient().db
+    return atlas
 
-    monkeypatch.setattr(config, "data_dir", lambda: tmp_path)
+
+def test_the_daily_job_keeps_docscouts_memory_in_atlas_collections(now, monkeypatch):
+    from docscout import cli
+    from docscout.find import health
+    from docscout.hosted.atlas_store import AtlasStore
+
+    monkeypatch.setattr(health, "utcnow", lambda: now)
+    atlas = atlas_with_db()
     seen_args = []
 
     def first_run(argv):
         seen_args.append(argv)
-        assert not (tmp_path / "docscout.db").exists()  # nothing in Atlas yet
-        store = Store(tmp_path / "docscout.db")
-        report(store, now, "org/app")
-        store.close()
+        report(AtlasStore(atlas.db), now, "org/app")  # what `docscout run` does with [storage] backend = "atlas"
         return 0
 
-    atlas = FakeAtlas()
     monkeypatch.setattr(cli, "main", first_run)
     assert job.main(atlas=atlas) == 0
     assert seen_args == [["--config", "deploy/render.toml", "run"]]
-    assert atlas.state and [p["full_name"] for p in atlas.picks] == ["org/app"]
+    assert [p["full_name"] for p in atlas.picks] == ["org/app"]
+    assert atlas.db.repos.find_one({"_id": "org/app"})["status"] == "reported"  # a document, not a file
 
     def next_run(argv):
-        assert Store(tmp_path / "docscout.db").repo("org/app")["status"] == "reported"  # memory restored
+        assert AtlasStore(atlas.db).repo("org/app")["status"] == "reported"  # remembered
         raise RuntimeError("connection lost")
 
-    (tmp_path / "docscout.db").unlink()
     monkeypatch.setattr(cli, "main", next_run)
     with pytest.raises(RuntimeError):
         job.main(atlas=atlas)
-    assert atlas.state and len(atlas.picks) == 1  # saved and published even after a failed run
+    assert len(atlas.picks) == 1  # published even after a failed run
+
+
+def test_the_first_run_moves_the_sqlite_memory_kept_in_gridfs(tmp_path, now, monkeypatch):
+    from docscout import cli
+    from docscout.find import health
+    from docscout.hosted.atlas_store import AtlasStore
+
+    monkeypatch.setattr(health, "utcnow", lambda: now)
+    old = Store(tmp_path / "docscout.db")
+    report(old, now, "org/app")
+    old.close()
+    atlas = atlas_with_db()
+    atlas.state = (tmp_path / "docscout.db").read_bytes()  # the GridFS file, until 18 Oct
+    monkeypatch.setattr(cli, "main", lambda argv: 0)
+    assert job.main(atlas=atlas) == 0
+    assert AtlasStore(atlas.db).repo("org/app")["status"] == "reported" and [p["full_name"] for p in atlas.picks] == ["org/app"]
+    assert job.move_sqlite_memory(atlas, AtlasStore(atlas.db)) is None  # once only: the collections aren't empty now
+    assert atlas.db.findings.count_documents({}) == 1

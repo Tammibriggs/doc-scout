@@ -1,8 +1,8 @@
 """MongoDB Atlas, the hosted version's data layer.
 
-- **DocScout's memory.** Render cron jobs can't keep files between runs, so the SQLite file
-  that remembers what was checked, shown and skipped is stored here (GridFS) and copied in
-  and out around each run. The newest few versions are kept.
+- **DocScout's memory:** what it has checked, reported and skipped, in collections of their
+  own (:mod:`docscout.hosted.atlas_store`). Until 18 Oct it was a SQLite file in GridFS, copied
+  in and out around each run; :meth:`Atlas.load_state` reads that file for the one-time move.
 - **This week's picks:** one document, replaced after each run.
 - **Subscriptions:** one document per completed Stripe Checkout. No names or email
   addresses are stored.
@@ -17,8 +17,7 @@ from typing import Any
 import gridfs
 import pymongo
 
-STATE_FILE = "docscout.db"
-KEEP_STATE_VERSIONS = 3
+STATE_FILE = "docscout.db"  # the SQLite memory kept in GridFS until 18 Oct
 
 
 class Atlas:
@@ -30,7 +29,7 @@ class Atlas:
     # ------------------------------------------------------------------ DocScout's memory
 
     def load_state(self, path: Path) -> bool:
-        """Copy the newest database file to ``path``; False on the very first run."""
+        """Copy the newest SQLite memory kept in GridFS to ``path``; False if there is none."""
         try:
             with path.open("wb") as fh:
                 self.fs.download_to_stream_by_name(STATE_FILE, fh)
@@ -38,13 +37,6 @@ class Atlas:
         except gridfs.errors.NoFile:
             path.unlink(missing_ok=True)
             return False
-
-    def save_state(self, path: Path) -> None:
-        with path.open("rb") as fh:
-            self.fs.upload_from_stream(STATE_FILE, fh)
-        old = self.db["state.files"].find({"filename": STATE_FILE}, {"_id": 1}).sort("uploadDate", -1).skip(KEEP_STATE_VERSIONS)
-        for doc in list(old):
-            self.fs.delete(doc["_id"])
 
     # ------------------------------------------------------------------ picks
 

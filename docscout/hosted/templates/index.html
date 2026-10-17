@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DocScout: API docs that need a writer</title>
-<meta name="description" content="Open-source projects whose API docs need a writer. Checked every day, reviewed by Gemma, with what's missing and where to start.">
+<title>DocScout: find open-source API docs you can contribute to</title>
+<meta name="description" content="Open-source projects that serve a REST API, are actively maintained, have docs gaps you can fix and merge outside contributions. New projects every day.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d5afe'/%3E%3Ccircle cx='14' cy='14' r='6.5' fill='none' stroke='white' stroke-width='3'/%3E%3Cpath d='M19 19l6 6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -37,6 +37,15 @@
   .hero { padding: 36px 0 12px; }
   .hero h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 14px; letter-spacing: -.01em; }
   .hero p { font-size: 1.12rem; color: var(--muted); max-width: 640px; margin: 0 0 18px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; padding: 0; list-style: none; }
+  .checks li { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+               padding: 5px 12px; font-size: .92rem; font-weight: 600; line-height: 1.35; }
+  .checks li::before { content: "✓"; color: var(--green); font-weight: 800; }
+  @media (max-width: 480px) {
+    .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .checks li { font-size: .82rem; padding: 6px 10px; gap: 5px; border-radius: 10px; }
+    .checks li:last-child { grid-column: 1 / -1; }
+  }
   .stat { display: inline-flex; align-items: center; gap: 8px; background: var(--brand-soft); color: var(--brand); font-weight: 600;
           padding: 6px 14px; border-radius: 999px; font-size: .92rem; }
   .stat .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
@@ -134,8 +143,15 @@
   </nav>
 
   <header class="hero">
-    <h1>Find open-source API docs that need a writer</h1>
-    <p>Every day DocScout measures the API docs of open-source projects, and Gemma reviews every candidate before it's listed: it turns away tools, libraries and look-alikes, then explains why the docs matter and where to start. You get a short list of projects with real gaps and maintainers who merge outside help.</p>
+    <h1>Find open-source API docs you can contribute to</h1>
+    <p>Tired of checking repo after repo for one that fits? DocScout checks new projects every day and lists only the ones that pass:</p>
+    <ul class="checks" aria-label="Every project listed">
+      <li>Serves a REST API</li>
+      <li>Actively maintained</li>
+      <li>Docs gaps you can fix</li>
+      <li>Not already claimed</li>
+      <li>Merges outside contributions</li>
+    </ul>
     {% if total %}<p class="status"><span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} in the last 7 days{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span></p>{% endif %}
     {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
     {% if subscribed %}<p class="notice ok" role="status">Subscribed: every pick is shown. Thanks for supporting DocScout!</p>{% endif %}
@@ -151,7 +167,7 @@
       </li>
       <li>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
-        <strong>Gemma decides</strong><span>Gemma 4 reviews every candidate, turns away the ones that aren't real apps with an API, and explains where to start.</span>
+        <strong>Gemma decides</strong><span>Gemma 4 reviews every candidate: it turns away the ones that aren't real apps with an API, checks nobody is already on the gap, and explains where to start.</span>
       </li>
     </ol>
   </header>

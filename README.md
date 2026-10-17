@@ -1,8 +1,12 @@
 # DocScout
 
-Finds open-source projects that serve an API, have documentation gaps you can fix, and are likely to accept your pull request. It starts with REST APIs, and is built so other API types (GraphQL, gRPC, AsyncAPI, ...) can be added as modules. Everything it checks is language- and framework-agnostic.
+Struggling to find open-source API docs to contribute to? Digging through dozens of GitHub repos for the one project that fits?
 
-**How it works:** code searches GitHub, checks each project's health and measures its docs gaps. Then **an open-weight model (Gemma 4, running locally with Ollama) reviews every project that passes**. It decides whether the project really has an API worth documenting, explains why its docs matter, and suggests where to start. Only projects it has reviewed are reported.
+DocScout finds projects that serve a REST API, are actively maintained, have documentation gaps you can fix, and are likely to accept your pull request. It checks new projects every day and gives you a short, ranked list, with each gap counted and linked.
+
+Use it on the [website](https://docscout-web.onrender.com/), [run it yourself](#install), or give [the skill](#use-it-from-your-own-ai-agent) to your own AI agent.
+
+**How it works:** code searches GitHub, checks each project's health and measures its docs gaps. Then **an open-weight model, Gemma 4, reviews every project that passes**. It decides whether the project really has an API worth documenting, checks whether someone is already working on the gap, explains why the docs matter, and suggests where to start. Only projects it has reviewed are reported. Gemma runs on your computer with Ollama, or through a hosted API, as on the website (Gemma 4 31B). DocScout starts with REST APIs and is built so other API types (GraphQL, gRPC, AsyncAPI, ...) can be added as modules; everything it checks is language- and framework-agnostic.
 
 > **Status:** works on Linux, including daily runs without starting it yourself. macOS and Windows come later.
 

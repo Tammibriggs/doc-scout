@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DocScout: find open-source API docs you can contribute to</title>
-<meta name="description" content="Open-source projects that serve a REST API, are actively maintained, have docs gaps you can fix and merge outside contributions. New projects every day.">
+<meta name="description" content="Open-source projects that serve a REST API, are actively maintained, have docs gaps you can fix and welcome outside contributions. New projects every day.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d5afe'/%3E%3Ccircle cx='14' cy='14' r='6.5' fill='none' stroke='white' stroke-width='3'/%3E%3Cpath d='M19 19l6 6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -44,8 +44,9 @@
   @media (max-width: 480px) {
     .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .checks li { font-size: .82rem; padding: 6px 10px; gap: 5px; border-radius: 10px; }
-    .checks li:last-child { grid-column: 1 / -1; }
   }
+  .flagged { display: flex; gap: 8px; align-items: baseline; margin: -6px 0 20px; color: var(--muted); font-size: .95rem; }
+  .flagged::before { content: "⚠"; color: var(--amber); font-weight: 700; }
   .stat { display: inline-flex; align-items: center; gap: 8px; background: var(--brand-soft); color: var(--brand); font-weight: 600;
           padding: 6px 14px; border-radius: 999px; font-size: .92rem; }
   .stat .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
@@ -144,14 +145,14 @@
 
   <header class="hero">
     <h1>Find open-source API docs you can contribute to</h1>
-    <p>Tired of checking repo after repo for one that fits? DocScout checks new projects every day and lists only the ones that pass:</p>
+    <p>Tired of checking repo after repo for one that fits? DocScout checks new projects every day and lists the ones that pass:</p>
     <ul class="checks" aria-label="Every project listed">
       <li>Serves a REST API</li>
       <li>Actively maintained</li>
       <li>Docs gaps you can fix</li>
-      <li>Not already claimed</li>
-      <li>Merges outside contributions</li>
+      <li>Welcomes outside contributions</li>
     </ul>
+    <p class="flagged">If someone's already working on a project, it's flagged so you don't duplicate their work.</p>
     {% if total %}<p class="status"><span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} in the last 7 days{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span></p>{% endif %}
     {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
     {% if subscribed %}<p class="notice ok" role="status">Subscribed: every pick is shown. Thanks for supporting DocScout!</p>{% endif %}

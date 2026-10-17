@@ -60,3 +60,22 @@ Round 1 showed DocScout's blind spots, and they were fixed in 43965ee. Round 2 r
 - **Gemma reviews DocScout's candidates** on the laptop's available memory, as in round 1.
 - **Grading, fact-check and costs** follow the round 1 rules: blind grading by the author, every gap claim checked against the cited commit by a separate agent, and the same cost measures.
 - **Test 1 isn't repeated.** Neither the classifier nor the agent's definition of "serves an API" changed.
+
+## Round 3 (17 Oct): both sides updated
+
+Both sides changed after round 2, so Test 2 runs again with the versions that are submitted. Fixed before anything runs:
+
+- **DocScout** at `1aaec67`, with the hosted version's model: Gemma 4 31B on Google's API, and Gemma 4 26B when the 31B is busy ([deploy/render.toml](../../deploy/render.toml)). One `docscout run` in a fresh data folder, checking at most 60 repos as before. Up to 30 reviews and 30 new picks, so every project Gemma accepts is reported. New since round 2:
+  - gaps covering fewer than 5 operations or endpoints aren't reported;
+  - Gemma decides whether someone is already working on a gap;
+  - install commands aren't counted as endpoints;
+  - each pick leads with its biggest gap.
+- **The agent:** a Claude Code subagent (Claude Opus 5.5) given the public skill, [skills/find-api-docs-to-contribute/SKILL.md](../../skills/find-api-docs-to-contribute/SKILL.md), as a user of it would be:
+  - a shell, and the GitHub API through `curl` with the user's token (this laptop has no GitHub CLI);
+  - it may read a project's homepage, docs site and wiki, but may not use web search;
+  - it can't see DocScout's code, data or labels;
+  - the request: REST API docs, any language, 20–5,000 stars, up to 10 picks, at most 60 repos checked in depth.
+- **New projects only.** Both sides skip the 27 projects graded in rounds 1 and 2, and the 6 picks from the hosted version's first runs that the author saw on 17 Oct (shurco/mycart, smaramwbc/statewave, Emmy123222/Stellar-MarketPay-, vsys-host/shkeeper.io, ergochat/ergo, Bike4Mind/bike4mind), which would break the blinding. DocScout gets them as ignored in its fresh database; the agent gets the list.
+- **Grading, fact-check and objective checks** as in rounds 1 and 2: blind grading by the author, every gap claim checked against the cited commit by a separate agent, and the same health check. "Not already claimed" is judged with the claim rules in the public skill, which are the rules Gemma follows.
+- **Costs:** time, the agent's tokens, and DocScout's GitHub API calls and Gemma requests. The agent's GitHub calls aren't logged this round: it calls `curl` directly, as a user of the skill would.
+- **Test 1 isn't repeated.**

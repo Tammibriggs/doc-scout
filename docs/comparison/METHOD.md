@@ -79,3 +79,5 @@ Both sides changed after round 2, so Test 2 runs again with the versions that ar
 - **Grading, fact-check and objective checks** as in rounds 1 and 2: blind grading by the author, every gap claim checked against the cited commit by a separate agent, and the same health check. "Not already claimed" is judged with the claim rules in the public skill, which are the rules Gemma follows.
 - **Costs:** time, the agent's tokens, and DocScout's GitHub API calls and Gemma requests. The agent's GitHub calls aren't logged this round: it calls `curl` directly, as a user of the skill would.
 - **Test 1 isn't repeated.**
+
+**Added after DocScout's run, before any grading (17 Oct, 10:45 UTC).** DocScout's fixed run checked its 60 repos and reported nothing: 13 passed the health checks, and 11 of them keep their docs on a website DocScout can't read yet (M4), with no help request. That result stands as round 3's. One extra run, reported separately: the same search continued to 200 repos, the hosted version's daily setting, in the same data folder. Its picks join the blind grading, so the agent's picks aren't the only ones on the sheet.

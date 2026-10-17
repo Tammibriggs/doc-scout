@@ -18,7 +18,7 @@ You're helping a technical writer find open-source projects where a documentatio
 - a separate docs repo;
 - API docs in the README or in Markdown files on GitHub.
 
-Rank lower the projects whose API reference appears only in the running app (Swagger UI served by the app). The writer would have to install the app to see the docs, and the fix often means editing code annotations.
+**Don't recommend a project whose API reference can only be read by installing and running the app** (Swagger UI served by the app), unless part of the gap is in pages that are published. The writer would have to install the app to see the docs, and the fix often means editing code annotations. In testing, writers turned down every such pick. Swagger UI or Redoc on a public instance or demo site counts as published, since nothing needs installing.
 
 ## Before you start
 
@@ -35,8 +35,8 @@ If the user hasn't said, use these defaults and say you did:
   - `gh api graphql -f query='...'`
 
   Otherwise use `curl` with `-H "Authorization: Bearer $GITHUB_TOKEN"`. Without a token GitHub allows only 60 requests an hour, which isn't enough; ask the user for one (a fine-grained token with public read-only access is enough). Never print or save the token.
-- The search API allows 30 requests a minute.
-- REST lists of pull requests and commits are large (about 19 KB per pull request). List them through GraphQL, asking only for the fields you need.
+- The search API allows 30 requests a minute, but issue search hits GitHub's secondary rate limits (403) well before that. Space your searches out, and pause when you get a 403.
+- For one project's issues, pull requests and commits, query that repository through GraphQL instead of searching, asking only for the fields you need. REST lists are large (about 19 KB per pull request).
 - You may read a project's own homepage, docs site and GitHub wiki.
 - Save notes in the current folder as you go, so the work can continue if it's interrupted.
 
@@ -57,6 +57,7 @@ If the user hasn't said, use these defaults and say you did:
    - Commas mean "any of". `OR` between labels returns nothing.
    - Ignore bounty labels and dependency dashboards. Also ignore tiny repos where the owner tracks their own to-dos; most help requests are like that.
    - A request counts when an outsider opened it, or when it carries an outreach label (help wanted, good first issue).
+   - Most results come from student, hackathon, bounty or spam repos, and issue search can't filter by stars. Look up each result's repo (stars, archived, fork) before reading the issue.
    - **Read the issue.** It counts only when it asks for work on the API documentation. A docs label isn't enough: feature requests, bugs and other docs topics (installation, a licence badge, typos) don't count.
 
 Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of thousands of junk results.
@@ -64,10 +65,13 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
 ## Likely to accept a PR (check this before measuring gaps)
 
 - Not archived, not a fork, has a license, stars within the user's range, and pushed in the last 60 days.
-- At least 2 human committers (not bots) in the last 90 days.
+- At least 2 human committers in the last 90 days.
+  - Page through the commit history: `history(first: 100)` alone undercounts active repos.
+  - Leave out bots, including bot accounts that look like users (names ending in `-bot` or `-robot`), and AI co-authors such as `claude`, `cursor`, `codex` or `copilot`.
 - At least 1 pull request from an outsider merged in the last 180 days.
-  - An outsider's author association isn't OWNER, MEMBER or COLLABORATOR.
+  - An outsider's author association isn't OWNER, MEMBER or COLLABORATOR, **and** they haven't merged any pull request in the repo. GitHub shows maintainers whose org membership is private as CONTRIBUTOR; in testing, one project's "63 outside PRs" were all but one by the people who merge its PRs.
   - Ignore bots and dependency bumps (Dependabot, Renovate).
+  - If you only fetched the latest 100 merged PRs, say the count is "at least".
 - Exception: when a maintainer labeled a docs issue "help wanted" or "good first issue", 1 committer and no outside merges are enough.
 
 ## Finding the gap (measure, don't guess)
@@ -77,7 +81,7 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
   - any YAML or JSON file in an `openapi/` or `swagger/` folder;
   - files named like `api.yaml` or `public-api.yaml`.
 
-  Open each candidate to confirm it's a spec. Skip vendored copies, tests, examples, and specs with fewer than 3 operations. Then count the operations with:
+  Open each candidate to confirm it's a spec. Skip vendored copies, tests, examples, and specs with fewer than 3 operations. A spec generated at build time may not be committed at all: look for its URL on the docs site's Redoc or Swagger UI page. Then count the operations with:
   - no summary or description;
   - parameters without descriptions;
   - no examples;
@@ -85,6 +89,13 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
   - no 4xx or 5xx responses.
 
   Also check for an `info.description` under 50 characters, security schemes without descriptions, and no servers. Report counts, such as "21/38 operations have no description", with example operations.
+
+  How to count:
+  - **An example** is one anywhere in the operation: on a parameter, a request or response media type, a schema, or a schema's properties, following `$ref`s. Redoc and Swagger UI show property examples as example bodies, so a writer will see them. Say which kinds you found.
+  - **A 204 response** needs no schema; don't count it as "no 2xx schema".
+  - **`$ref`s inside a spec may be percent-encoded** (`#/paths/~1users~1%7Bid%7D`): decode them, or you'll undercount operations.
+  - **Errors described once for the whole API** (an "Errors" section) cover every endpoint. Say so instead of counting each endpoint as missing error codes.
+  - **Leave out endpoints that are deprecated or slated for removal** (an issue or a deprecation note), and say why.
 - **A generated spec:** the fix belongs in the code annotations it's generated from, so say so. Signs:
   - a "DO NOT EDIT" or "generated" header;
   - a CI job that regenerates the file;
@@ -103,6 +114,7 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
   - whether the app serves Swagger UI, ReDoc or `openapi.json` when it runs.
 
   If the docs live somewhere you can't read, say "check manually". **Never recommend a project only because you found no docs:** in testing, such a pick had its API docs in a GitHub wiki.
+- **Measure what readers see.** If the published API page isn't built from the spec in the repo (a hand-written page while the spec sits unused), the page is the docs readers use: measure it, and mention the spec as a separate fix.
 - **Too small:** skip a project when fewer than 5 operations or endpoints need work. One undocumented endpoint is a quick fix, not a project to contribute to.
 - An open issue from a maintainer about the API docs is the strongest gap evidence. Link it.
 
@@ -116,13 +128,16 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
   - offers on an issue about something other than this gap;
   - pull requests and offers with no activity for more than 3 months.
 
+  A maintainer's own work counts too: an open rewrite of the same docs is a claim. A maintainer's release or feature PR that edits the spec isn't, but say so under "Before you start", since the writer will need to rebase.
+
   When something is a claim, name the PR or comment and say how it overlaps. Rank claimed projects below the rest.
 - **Requirements:** a CLA to sign, a DCO sign-off on commits, or an AI-contribution policy. Quote the sentence you found.
-- **Local setup:** easy (Docker, compose or a devcontainer), documented, or unclear.
+- **Local setup:** easy (Docker, compose or a devcontainer), documented, or unclear. Read CONTRIBUTING's setup commands before saying "unclear".
+- **Where pull requests go:** if CONTRIBUTING asks for a branch other than the default one (`dev`, `develop`), say so, and flag it when the guide and the default branch disagree.
 
 ## Output
 
-A ranked list, best first. For each pick:
+Start with one line saying how you counted outside PRs. Then a ranked list, best first. For each pick:
 
 - the `owner/repo` link, stars, main language and last push;
 - **Serves an API because:** one line of evidence;
@@ -131,5 +146,7 @@ A ranked list, best first. For each pick:
 - **Likely to merge:** outside PRs merged in the last 180 days and committers in the last 90 days;
 - **Before you start:** whether it's claimed and by what, any CLA, DCO or AI policy, and the local setup;
 - **First steps:** up to 3 concrete steps toward a first small PR.
+
+End with the near-misses in one line each (failed the merge check, claimed, too small), so the writer can see what was ruled out and why.
 
 Every number and fact must come from something you fetched in this session. If you couldn't check something, say so. Fewer solid picks are better than ten weak ones.

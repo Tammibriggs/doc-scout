@@ -36,7 +36,7 @@ query($owner: String!, $name: String!, $states: [PullRequestState!], $after: Str
   repository(owner: $owner, name: $name) {
     pullRequests(states: $states, first: 50, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
-      nodes { number title headRefName createdAt updatedAt closedAt mergedAt authorAssociation author { login __typename } }
+      nodes { number title headRefName createdAt updatedAt closedAt mergedAt authorAssociation author { login __typename } mergedBy { login } }
     }
   }
 }"""
@@ -457,6 +457,7 @@ def _pull_as_rest(node: dict[str, Any]) -> dict[str, Any]:
         "created_at": node.get("createdAt"),
         "closed_at": node.get("closedAt"),
         "merged_at": node.get("mergedAt"),
+        "merged_by": {"login": (node.get("mergedBy") or {}).get("login")} if node.get("mergedBy") else None,
     }
 
 

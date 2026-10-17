@@ -44,6 +44,13 @@ def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").lower()
 
 
+def _address(url: str) -> str:
+    """The site and path, without the scheme, query or trailing slash: a bare host can be
+    the wrong page (eikek.github.io returns 404; the docs are at eikek.github.io/sharry)."""
+    parts = urlsplit(url)
+    return ((parts.hostname or "").lower() + parts.path.rstrip("/"))[:100]
+
+
 def _squash(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.lower())
 
@@ -63,13 +70,14 @@ def _repo_parts(name: str) -> set[str]:
 
 
 def doc_links(readme: str, full_name: str, limit: int = 2) -> list[str]:
-    """Websites the README links to for this project's docs (one entry per host).
+    """Addresses the README links to for this project's docs, as site and path (one per site).
 
     Only addresses that mention the project or its owner count, so links to the docs of
     a framework or library it uses (e.g. laravel.com/docs) are ignored.
     """
     tokens = _name_tokens(full_name)
     found: list[str] = []
+    sites: set[str] = set()
     for text, url in _MD_LINK.findall(readme):
         host = _host(url)
         parts = urlsplit(url)
@@ -81,8 +89,9 @@ def doc_links(readme: str, full_name: str, limit: int = 2) -> list[str]:
             continue  # same-repo files are analyzed directly; other repos are found by sibling_repos
         if host.endswith(_NOT_DOCS_HOSTS):
             continue
-        if (_DOC_WORDS.search(text) or _DOC_WORDS.search(parts.path) or _DOC_HOSTS.search(host)) and host not in found:
-            found.append(host)
+        if (_DOC_WORDS.search(text) or _DOC_WORDS.search(parts.path) or _DOC_HOSTS.search(host)) and host not in sites:
+            sites.add(host)
+            found.append(_address(url))
         if len(found) >= limit:
             break
     return found
@@ -125,16 +134,16 @@ def published_docs(repo: dict[str, Any], readme: str | None, tree: list[dict[str
         found.append(f"Docs site built from this repo ({configs[0]})")
     homepage = str(repo.get("homepage") or "").strip()
     home_host = _host(homepage) if homepage.startswith(("http://", "https://")) else ""
-    hosts = [home_host] if home_host and _DOC_HOSTS.search(home_host) else []
+    sites = [_address(homepage)] if home_host and _DOC_HOSTS.search(home_host) else []
     # A README link counts only when the site itself carries the project's or owner's name
     # (docs.churchcrm.io), not just the path (an article at smarthomescene.com/…/baby-buddy).
     tokens = _name_tokens(full_name)
     named = [
-        host for host in doc_links(readme or "", full_name, limit=5)
-        if host not in hosts and any(t in _squash("".join(host.split(".")[:-1])) for t in tokens)
+        address for address in doc_links(readme or "", full_name, limit=5)
+        if address.split("/")[0] != home_host and any(t in _squash("".join(address.split("/")[0].split(".")[:-1])) for t in tokens)
     ]
-    hosts += named[:2]
-    found += [f"Docs website: {host}" for host in hosts]
+    sites += named[:2]
+    found += [f"Docs website: {site}" for site in sites]
     found += [f"Separate docs repo: {name}" for name in sibling_repos(owner_repos, full_name)]
     return found
 
@@ -144,7 +153,7 @@ def docs_elsewhere(repo: dict[str, Any], readme: str | None, owner_repos: list[d
     homepage = str(repo.get("homepage") or "").strip()
     home_host = _host(homepage) if homepage.startswith(("http://", "https://")) else ""
     if home_host and home_host not in ("github.com", "www.github.com"):
-        reasons.append(f"Project website: {home_host}")
-    reasons += [f"Docs link in the README: {host}" for host in doc_links(readme or "", full_name) if host != home_host]
+        reasons.append(f"Project website: {_address(homepage)}")
+    reasons += [f"Docs link in the README: {address}" for address in doc_links(readme or "", full_name) if address.split("/")[0] != home_host]
     reasons += [f"Separate docs repo: {name}" for name in sibling_repos(owner_repos, full_name)]
     return reasons

@@ -5,8 +5,9 @@ from docscout.find.health import PRStats, gate_activity, gate_metadata, health_s
 HEALTH_CFG = {"star_ranges": [(20, 200), (200, 1000), (1000, 5000)], "pushed_within_days": 60, "min_human_committers_90d": 2, "min_outsider_merged_prs_180d": 1}
 
 
-def pr(assoc, merged_days_ago=None, closed_days_ago=10, created_days_ago=14, login="alice", user_type="User", title="Fix bug"):
+def pr(assoc, merged_days_ago=None, closed_days_ago=10, created_days_ago=14, login="alice", user_type="User", title="Fix bug", merged_by=None):
     return {
+        "merged_by": {"login": merged_by} if merged_by else None,
         "user": {"login": login, "type": user_type},
         "author_association": assoc,
         "created_at": iso(created_days_ago),
@@ -39,6 +40,19 @@ def test_outsiders_counted_insiders_and_bots_ignored(now):
     assert stats.docs_prs_merged == 1
     assert stats.human_committers_90d == 3
     assert stats.median_ttm_days is not None
+
+
+def test_people_who_merge_prs_are_not_outsiders_whatever_github_calls_them(now):
+    # zowe/api-layer (17 Oct): maintainers with private org membership show as CONTRIBUTOR.
+    pulls = [
+        pr("CONTRIBUTOR", merged_days_ago=10, login="pablo", merged_by="richard"),
+        pr("CONTRIBUTOR", merged_days_ago=9, login="richard", merged_by="Pablo"),  # both merge PRs here
+        pr("CONTRIBUTOR", merged_days_ago=8, login="elijah", merged_by="pablo"),  # a real outsider
+        pr("CONTRIBUTOR", merged_days_ago=7, login="zowe-robot", merged_by="pablo"),  # a bot on a user account
+        pr("CONTRIBUTOR", merged_days_ago=6, login="abbot", merged_by="pablo"),  # a person whose name ends in "bot"
+    ]
+    stats = pr_stats(pulls, [], now)
+    assert stats.outsider_merged_180d == 2
 
 
 def test_metadata_gate(now):

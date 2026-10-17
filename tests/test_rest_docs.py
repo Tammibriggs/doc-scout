@@ -77,7 +77,7 @@ def test_docs_elsewhere_signals():
         "See the [documentation](https://docs.myapp.example/api) and ![build](https://img.shields.io/x.svg) "
         "[code](https://github.com/org/app) and [framework docs](https://framework.org/docs)"
     )
-    assert doc_links(text, "org/myapp") == ["docs.myapp.example"]
+    assert doc_links(text, "org/myapp") == ["docs.myapp.example/api"]  # the page, not just the site
     owner = [{"full_name": "org/app"}, {"full_name": "org/app-docs"}, {"full_name": "org/website"}, {"full_name": "org/cli"}]
     assert sibling_repos(owner, "org/app") == ["org/app-docs", "org/website"]
     reasons = docs_elsewhere({"homepage": "https://app.example.com"}, text, owner, "org/myapp")
@@ -126,7 +126,7 @@ def test_docs_published_as_pages():
         "[A guide to it](https://smarthomescene.com/guides/app-setup/)\n"
         "[Documentation](https://app.dev/docs)\n"
     )
-    assert published_docs({}, text, [], [], "org/app") == ["Docs website: app.dev"]
+    assert published_docs({}, text, [], [], "org/app") == ["Docs website: app.dev/docs"]
 
 
 # ---------------------------------------------------------------------- RestApi.analyze
@@ -221,7 +221,7 @@ def test_framework_docs_links_and_docs_hosts_are_not_mistaken_for_project_docs()
         "Install via [Laravel docs](https://laravel.com/docs/installation). "
         "Full guide at [our docs](https://docs.2fauth.app/getting-started) and https://docs.2fauth.app."
     )
-    assert doc_links(text, "Bubka/2FAuth") == ["docs.2fauth.app"]
+    assert doc_links(text, "Bubka/2FAuth") == ["docs.2fauth.app/getting-started"]
     # Neither link is this project's docs ("org/app") nor a sign of Swagger UI: nothing to report.
     assert RestApi().analyze(ctx(FakeGitHub(), [], text, confidence=0.9)) is None
     fastapi = RestApi().analyze(ctx(FakeGitHub(), [], "Open http://localhost:8000/docs for the API.", confidence=0.9))

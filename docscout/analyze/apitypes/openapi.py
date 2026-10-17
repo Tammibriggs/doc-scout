@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import unquote
 
 from docscout.analyze.gaps import Finding, counted
 from docscout.analyze.safe_yaml import UnsafeYAML, load_untrusted
@@ -57,12 +58,17 @@ class Resolver:
 
     def _lookup(self, ref: str) -> Any:
         node: Any = self.doc
-        for part in ref[2:].split("/"):
-            part = part.replace("~1", "/").replace("~0", "~")
-            if isinstance(node, dict) and part in node:
-                node = node[part]
-            elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
-                node = node[int(part)]
+        for raw in ref[2:].split("/"):
+            # A pointer in a URI fragment may be percent-encoded: sharry's "#/paths/~1sec~1upload~1%7Bid%7D"
+            # (17 Oct) names "/sec/upload/{id}". The text as written is tried first.
+            for part in dict.fromkeys((raw, unquote(raw))):
+                part = part.replace("~1", "/").replace("~0", "~")
+                if isinstance(node, dict) and part in node:
+                    node = node[part]
+                    break
+                if isinstance(node, list) and part.isdigit() and int(part) < len(node):
+                    node = node[int(part)]
+                    break
             else:
                 return {}
         return node

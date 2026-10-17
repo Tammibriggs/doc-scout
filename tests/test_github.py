@@ -138,7 +138,7 @@ def graphql_handler(answers, seen):
 def test_pr_and_commit_lists_use_small_graphql_answers_in_the_rest_shape():
     pr = {"number": 7, "title": "docs: endpoints", "headRefName": "docs-api", "createdAt": "2026-10-01T00:00:00Z",
           "closedAt": "2026-10-02T00:00:00Z", "mergedAt": "2026-10-02T00:00:00Z", "authorAssociation": "CONTRIBUTOR",
-          "author": {"login": "ana", "__typename": "User"}}  # fmt: skip
+          "author": {"login": "ana", "__typename": "User"}, "mergedBy": {"login": "maintainer"}}  # fmt: skip
     bot_pr = dict(pr, number=8, author={"login": "dependabot", "__typename": "Bot"})
     commit = {"oid": "abc123", "author": {"email": "ana@example.com", "user": {"login": "ana"}}}
     unlinked = {"oid": "def456", "author": {"email": "x@example.com", "user": None}}
@@ -152,7 +152,7 @@ def test_pr_and_commit_lists_use_small_graphql_answers_in_the_rest_shape():
     pulls = gh.list_closed_pulls("org/app")
     assert pulls[0] == {"number": 7, "title": "docs: endpoints", "head": {"ref": "docs-api"}, "user": {"login": "ana", "type": "User"},
                         "author_association": "CONTRIBUTOR", "created_at": "2026-10-01T00:00:00Z",
-                        "closed_at": "2026-10-02T00:00:00Z", "merged_at": "2026-10-02T00:00:00Z"}  # fmt: skip
+                        "closed_at": "2026-10-02T00:00:00Z", "merged_at": "2026-10-02T00:00:00Z", "merged_by": {"login": "maintainer"}}  # fmt: skip
     assert pulls[1]["user"]["type"] == "Bot"
     assert seen[0] == {"owner": "org", "name": "app", "states": ["CLOSED", "MERGED"], "after": None}
     commits = gh.list_commits("org/app", "2026-07-01T00:00:00Z")

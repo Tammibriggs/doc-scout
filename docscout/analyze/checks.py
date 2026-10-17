@@ -25,10 +25,14 @@ REQUIREMENTS = {
     "CLA required": re.compile(r"contributor licen[cs]e agreement|\bCLA\b|cla[- ]assistant", re.IGNORECASE),
     "Commits need sign-off (DCO)": re.compile(r"signed-off-by|\bDCO\b|developer certificate of origin", re.IGNORECASE),
 }
+# Whole words only: "free-llm-api-hub" is a repo name, not a mention of LLMs (17 Oct).
 _AI_TERMS = re.compile(
-    r"\b(AI[- ]generated|generated (?:by|with|using) AI|AI[- ]assisted|AI tools?|LLMs?|large language models?|ChatGPT|Copilot|Claude|Gemini)\b",
+    r"(?<![\w/-])(AI[- ]generated|generated (?:by|with|using) AI|AI[- ]assisted|AI tools?|LLMs?|large language models?|ChatGPT|Copilot|Claude|Gemini)(?![\w/-])",
     re.IGNORECASE,
 )
+# Links are dropped before looking for an AI policy: a contributors badge for that repo was quoted
+# as one (17 Oct). CLA checks keep them, since a cla-assistant badge is a real sign of a CLA.
+_LINK = re.compile(r"\]\([^)\s]*\)|<?https?://[^\s)>\]]+>?")
 _AI_POLICY_WORDS = re.compile(r"\b(contribut\w*|pull requests?|PRs?|accept\w*|prohibit\w*|disclos\w*|ban\w*|not allowed|reject\w*)\b", re.IGNORECASE)
 _SETUP_HEADINGS = re.compile(r"^#{1,6}[ \t]+.*\b(development|developing|running locally|run locally|getting started|install\w*|build\w* from source|setup)\b", re.IGNORECASE | re.MULTILINE)
 CONTRIBUTING = re.compile(r"^(\.github/|docs/)?contributing(\.\w+)?$", re.IGNORECASE)
@@ -60,10 +64,11 @@ def find_requirements(text: str, source: str) -> list[str]:
         match = pattern.search(text)
         if match:
             found.append(f'{label} ("{_quote(text, match)}" in {source})')
-    for match in _AI_TERMS.finditer(text):
-        sentence = _quote(text, match, limit=400)
+    prose = _LINK.sub(" ", text)
+    for match in _AI_TERMS.finditer(prose):
+        sentence = _quote(prose, match, limit=400)
         if _AI_POLICY_WORDS.search(sentence):
-            found.append(f'AI-contribution policy ("{_quote(text, match)}" in {source})')
+            found.append(f'AI-contribution policy ("{_quote(prose, match)}" in {source})')
             break
     return found
 

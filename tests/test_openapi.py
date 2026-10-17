@@ -61,5 +61,7 @@ def test_resolver_stops_at_cycles_and_external_refs():
     assert r.resolve(doc["a"]) == {}
     assert r.resolve(doc["ext"]) == {}
     assert r.resolve(doc["c"]) == {"ok": 1}
+    encoded = {"paths": {"/sec/{id}": {"get": {}}, "/alias/{id}": {"$ref": "#/paths/~1sec~1%7Bid%7D"}}}  # sharry, 17 Oct
+    assert Resolver(encoded).resolve(encoded["paths"]["/alias/{id}"]) == {"get": {}}
     self_ref = {"definitions": {"Pet": {"properties": {"self": {"$ref": "#/definitions/Pet"}}}}}
     assert not has_example(self_ref["definitions"]["Pet"], Resolver(self_ref))  # terminates

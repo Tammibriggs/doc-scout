@@ -124,14 +124,13 @@ All three sources are above 50%, so all stay on.
   - **An extra run to 200 repos found 3 picks:** you'd act on 1, maybe 2, with 83% of claims right.
   - **The agent with the public skill found 10:** you'd act on 4, maybe 3, with 95% of claims right. It took 1 h 20 min and 361,000 tokens, against about 20 minutes and no tokens.
   - **The public skill ran end to end** without problems, and listed what it found unclear.
-  - **Fixes it points to (⏳):**
-    - outsiders must exclude people who merge PRs (zowe's "63 outside PRs" were maintainers with private org membership; both sides);
-    - endpoints written without an HTTP method, and endpoint tables in sub-folder READMEs, aren't found;
-    - `$ref`s to URL-encoded path names aren't followed (sharry: 57 operations, not 62);
-    - a badge URL was quoted as an AI policy;
-    - "Docs published" should keep the path (eikek.github.io/sharry, not the bare host, which returns 404);
-    - local setup should read CONTRIBUTING's commands;
-    - check that the published API page is built from the spec that's measured (sharry's isn't).
+  - **Fixed the same day** ✅, each checked on the round 3 project it came from:
+    - **outsiders** exclude anyone who merged a PR in the repo, and bot accounts named like users (`*-bot`, `*-robot`). zowe's "63 outside PRs" were maintainers with private org membership and `zowe-robot`; now it's 1, as the fact-check found;
+    - **`$ref`s to percent-encoded path names** are followed: sharry has 62 operations, not 57, and 4 with undescribed parameters, not 2;
+    - **AI policies** are looked for with links removed and whole words only: free-llm-api-hub's contributors badge (its name contains "llm") was quoted as one. Its real heading, "AI-assisted contributions are welcome", is found now;
+    - **docs links keep their path**: eikek.github.io/sharry, not the bare host, which returns 404;
+    - **the public skill**: what the agent found unclear (outsiders, paging commits, AI co-authors, secondary rate limits, star lookups for help requests, what counts as an example, 204s, encoded `$ref`s, uncommitted specs, error sections, deprecated endpoints, maintainers' own PRs, the PR branch), plus the writer's grades: don't recommend API docs readable only in the running app, and measure the page readers see.
+  - **After the deadline (⏳):** endpoints written without an HTTP method (`/api/v1/no-card.json`) and endpoint tables in sub-folder READMEs aren't found; local setup should read CONTRIBUTING's commands; check that the published API page is built from the spec that's measured (sharry's isn't).
 
 ## 3. Success criteria
 
@@ -262,7 +261,7 @@ All three sources are above 50%, so all stay on.
 **Health gate (code only):**
 - Not archived, not a fork, has a license, within your star ranges, and pushed in the last 60 days.
 - At least 2 human committers in the last 90 days.
-- At least 1 merged pull request from an outside contributor in the last 180 days.
+- At least 1 merged pull request from an outside contributor in the last 180 days. Outside means not OWNER, MEMBER or COLLABORATOR, and (since 17 Oct) not anyone who merged a PR in the repo, nor a bot account named like a user.
 
 Checks run cheapest first, so rejected repos cost few API calls.
 
@@ -503,7 +502,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
     hosted/   picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 210 tests (193 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 211 tests (194 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks

@@ -7,11 +7,15 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import asdict, dataclass
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 OUTSIDERS = {"CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "NONE"}
 BOT_NAMES = {"dependabot", "renovate", "github-actions", "pre-commit-ci", "snyk-bot", "greenkeeper", "imgbot"}
+# Bots that run as ordinary user accounts: zowe/api-layer's "zowe-robot" opened 40 of the PRs
+# that counted as outside contributions (17 Oct).
+_BOT_LIKE = re.compile(r"(^|[-_])(ro)?bots?$")
 
 
 def parse_time(value: str | None) -> datetime | None:
@@ -24,7 +28,7 @@ def _is_bot_login(login: str | None) -> bool:
     if not login:
         return False
     login = login.lower()
-    return login.endswith("[bot]") or login in BOT_NAMES
+    return login.endswith("[bot]") or login in BOT_NAMES or bool(_BOT_LIKE.search(login))
 
 
 def star_range_reason(stars: int, ranges: list) -> str | None:
@@ -76,11 +80,15 @@ def pr_stats(closed_pulls: list[dict[str, Any]], commits: list[dict[str, Any]], 
     stats = PRStats()
     since = now - timedelta(days=180)
     ttm: list[float] = []
+    # GitHub shows maintainers whose org membership is private as CONTRIBUTOR: zowe/api-layer's
+    # "63 outside PRs" (17 Oct) were nearly all by the 7 people who merge its PRs. Whoever merged
+    # a PR here is a maintainer, whatever the association says. (REST lists lack merged_by.)
+    mergers = {str((pr.get("merged_by") or {}).get("login") or "").lower() for pr in closed_pulls} - {""}
     for pr in closed_pulls:
         user = pr.get("user") or {}
         if user.get("type") != "User" or _is_bot_login(user.get("login")):
             continue
-        if pr.get("author_association") not in OUTSIDERS:
+        if pr.get("author_association") not in OUTSIDERS or str(user.get("login") or "").lower() in mergers:
             continue
         closed = parse_time(pr.get("closed_at"))
         if closed is None or closed < since:

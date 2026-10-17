@@ -231,6 +231,29 @@ def test_done_projects_drop_out_and_reported_ones_stay_listed(cfg, store, now, m
     assert "org/spec-app" not in [f.full_name for f in store.still_open(999, 5)]
 
 
+def test_earlier_picks_are_checked_again_for_claims_once_a_day(cfg, store, now, monkeypatch):
+    class Claimed(RunGitHub):  # after org/spec-app was reported, someone opened a docs PR
+        def list_open_pulls(self, name):
+            return [{"number": 9, "title": "docs: describe every endpoint", "head": {"ref": "docs"}}] if name == "org/spec-app" else []
+
+    def claims(name):
+        return next(f for f in store.reported_since(now - timedelta(days=7)) if f.full_name == name).details["checks"]["claimed"]
+
+    monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app"))
+    first = pipeline.run(RunGitHub(), cfg, store, now, limit=10, sources=["repo_search"])
+    assert first.summary.claims_rechecked == 0 and claims("org/spec-app") == []  # checked when reported
+    monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app-2"))
+    later = now + timedelta(days=1)
+    second = pipeline.run(Claimed(), cfg, store, later, limit=10, sources=["repo_search"])
+    assert second.summary.claims_rechecked == 1 and claims("org/spec-app") == ["Open PR #9: docs: describe every endpoint"]
+    report = second.report_path.read_text()
+    assert "## Still open from earlier" in report and "⚠️ Open PR" in report and "earlier picks checked again for claims" in report
+    earlier = store.reported_since(now - timedelta(days=7))
+    assert pipeline.recheck_claims(Claimed(), store, earlier, later + timedelta(hours=2)) == 0  # once a day
+    assert pipeline.recheck_claims(RunGitHub(), store, earlier, later + timedelta(days=1)) == 2  # the PR was closed
+    assert claims("org/spec-app") == []
+
+
 def test_rate_limit_keeps_results_and_auth_failure_is_raised(cfg, store, now, monkeypatch):
     class Limited(RunGitHub):
         def list_closed_pulls(self, name):

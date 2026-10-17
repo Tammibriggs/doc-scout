@@ -88,8 +88,11 @@ def _too_small(finding: StoredFinding, min_units: int) -> bool:
 
 
 def weekly_picks(store: Store, now: datetime, min_units: int = 0) -> list[dict[str, Any]]:
-    """Every project reported in the last 7 days and still open, best first, leaving out gaps
-    covering fewer than ``min_units`` operations or endpoints (``[report] min_effort_units``;
-    the same rule a run applies, so projects reported before it came in drop out too)."""
+    """Every project reported in the last 7 days and still open, best first with the ones someone
+    may be on last. Gaps covering fewer than ``min_units`` operations or endpoints are left out
+    (``[report] min_effort_units``: the rule a run applies, so earlier picks drop out too)."""
     found = [f for f in store.reported_since(now - WEEK) if not _too_small(f, min_units)]
+    # Projects someone may already be on go after the rest (best first within each), so the
+    # free picks are ones a writer can start. The daily run checks every pick again for claims.
+    found.sort(key=lambda f: bool((f.details.get("checks") or {}).get("claimed")))
     return [pick(f, rank, now) for rank, f in enumerate(found, 1)]

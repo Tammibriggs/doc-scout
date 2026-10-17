@@ -79,6 +79,7 @@ readme_chars = 1500
 
 [checks]
 claim_and_policy = true         # for reported items: open docs PRs, claims, CLA/DCO/AI-policy notes (~2-3 API calls each)
+recheck_claims_days = 7         # after that, check them for claims again once a day for this many days (the website's list)
 
 [scoring]
 language_bonus = 5              # added to the score of repos in one of your languages

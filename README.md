@@ -84,7 +84,7 @@ Settings are saved in `config.toml` and secrets in `secrets.env`, both in your c
 - **"Docs published":** where the docs can be read as pages without installing the project: a docs site built from the repo (MkDocs, Sphinx, Docusaurus, Mintlify…), a docs website, a separate docs repo, or Markdown API docs on GitHub. These projects rank higher (`[scoring] published_docs_bonus`), because you can see the gap in a browser and the fix is Markdown;
 - **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
 - **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
-- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally;
+- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. For 7 days after a project is reported, each run checks it again once a day for anyone who has started (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;
 - **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet, so it reports these only when maintainers asked for help.
 
 **Small gaps are skipped:** a project is reported only when at least 5 operations or endpoints need work (`[report] min_effort_units`). One undocumented endpoint is a quick fix, not a project to contribute to. A skipped project is checked again after 90 days, in case its API grows.

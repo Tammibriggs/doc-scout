@@ -308,8 +308,9 @@ def test_eval_llm_flag_is_not_mistaken_for_the_model_setting(tmp_path, monkeypat
     assert args.with_llm and cli.llm_overrides(args) == {}
 
 
-def test_dependency_bumps_in_docs_tooling_are_not_someone_writing_docs():
-    # Seen on babybuddy (13 Oct): "chore(deps): bump mkdocs-material ... in /docs" was flagged as a claim.
+def test_dependency_bumps_and_typo_fixes_are_not_someone_writing_docs():
+    # Seen on babybuddy (13 Oct): "chore(deps): bump mkdocs-material ... in /docs" was flagged as a claim,
+    # and on ergo (17 Oct): "docs: fix receive spelling in CTCP mode section".
     from docscout.analyze.checks import Checks, paid_checks
 
     class Pulls(RunGitHub):
@@ -319,6 +320,8 @@ def test_dependency_bumps_in_docs_tooling_are_not_someone_writing_docs():
                  "user": {"login": "dependabot", "type": "Bot"}},
                 {"number": 1171, "title": "Bump the docs group", "head": {"ref": "renovate/docs"}, "user": {"login": "someone", "type": "User"}},
                 {"number": 1172, "title": "docs: describe the feeding endpoints", "head": {"ref": "api-docs"}, "user": {"login": "ana", "type": "User"}},
+                {"number": 1173, "title": "docs: fix receive spelling in CTCP mode section", "head": {"ref": "patch-1"}, "user": {"login": "bo", "type": "User"}},
+                {"number": 1174, "title": "Fix typos in README", "head": {"ref": "readme-typos"}, "user": {"login": "cy", "type": "User"}},
             ]  # fmt: skip
 
     checks = paid_checks(Pulls(), "org/app", Checks(), {}, [], None)

@@ -28,7 +28,7 @@ SECRET = "test-secret"
 PUBLIC = "https://docscout.test"
 
 
-def details(name, *, description="Self-hosted uptime app", html_url=None, effort_units=None, findings=None):
+def details(name, *, description="Self-hosted uptime app", html_url=None, effort_units=None, findings=None, claimed=None):
     return {
         "api_type": "rest",
         "api_label": "REST",
@@ -40,7 +40,7 @@ def details(name, *, description="Self-hosted uptime app", html_url=None, effort
         },
         "repo": {"stars": 412, "language": "Go", "description": description},
         "review": {"model": "openai_compatible:gemma-4-31b-it", "why": "Users need the webhook payloads.", "first_steps": ["Read CONTRIBUTING.md", "Describe POST /checks"]},
-        "checks": {"claimed": [], "requirements": [], "local_setup": "easy (docker-compose)", "claim_checked": True},
+        "checks": {"claimed": claimed or [], "requirements": [], "local_setup": "easy (docker-compose)", "claim_checked": True},
         "issues": [{"number": 214, "title": "Document webhook payloads", "html_url": html_url or f"https://github.com/{name}/issues/214"}],
     }
 
@@ -140,6 +140,13 @@ def test_gaps_too_small_to_be_worth_a_contribution_are_left_out(tmp_path, now):
     report(store, now, "org/tiny", score=90, effort_units=1)  # reported before the cutoff existed
     report(store, now, "org/unknown", score=30)  # size unknown: kept
     assert [p["full_name"] for p in weekly_picks(store, now, min_units=5)] == ["org/big", "org/unknown"]
+
+
+def test_picks_someone_may_be_on_go_after_the_rest(tmp_path, now):
+    store = Store(tmp_path / "docscout.db")
+    report(store, now, "org/taken", score=90, claimed=["Open PR #9: docs: describe every endpoint"])
+    report(store, now, "org/open", score=40)
+    assert [(p["full_name"], p["rank"]) for p in weekly_picks(store, now)] == [("org/open", 1), ("org/taken", 2)]
 
 
 def test_the_headline_is_the_biggest_gap(tmp_path, now):

@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 
 from docscout.analyze import apitypes
-from docscout.analyze.checks import Checks, free_checks, paid_checks
+from docscout.analyze.checks import Checks, find_claims, free_checks, paid_checks
 from docscout.analyze.gaps import Gap, effort_label
 from docscout.analyze.apitypes import ApiType
 from docscout.analyze.apitypes.base import DocsContext
@@ -134,14 +134,41 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
     return Analysis(gap, score, details)
 
 
-def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding]) -> None:
+CLAIMS_RECHECK_HOURS = 20  # one claim check a day per project, however many runs there are
+
+
+def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime | None = None) -> None:
     """Claim and requirement checks for reported items (about 2-3 API calls each)."""
     for finding in findings:
         d = finding.details
         checks = Checks(**d.get("checks", {}))
         paid_checks(gh, finding.full_name, checks, d.get("check_paths", {}), d.get("issues", []), d.get("head_sha"))
         d["checks"] = checks.as_dict()
+        if checks.claim_checked and now is not None:
+            d["claims_checked"] = now.isoformat(timespec="seconds")
         store.update_details(finding.run_id, finding.full_name, d)
+
+
+def recheck_claims(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime) -> int:
+    """Check projects reported earlier again for signs someone has started: a docs PR, or an
+    offer to help on the issue. A claim that has gone (the PR was closed) is cleared. At most
+    once a day per project. Returns how many were checked."""
+    checked = 0
+    for finding in findings:
+        d = finding.details
+        last = d.get("claims_checked")
+        if last and now - datetime.fromisoformat(last) < timedelta(hours=CLAIMS_RECHECK_HOURS):
+            continue
+        try:
+            claimed = find_claims(gh, finding.full_name, d.get("issues", []))
+        except GitHubError as exc:
+            log.info("couldn't check %s for claims again: %s", finding.full_name, exc)
+            continue
+        d["checks"] = {**d.get("checks", {}), "claimed": claimed, "claim_checked": True}
+        d["claims_checked"] = now.isoformat(timespec="seconds")
+        store.update_details(finding.run_id, finding.full_name, d)
+        checked += 1
+    return checked
 
 
 @dataclass
@@ -290,10 +317,18 @@ def run(
     findings = store.pending_findings(now, min_score, max_items)
     if findings and cfg["checks"]["claim_and_policy"] and auth_error is None and not offline:
         try:
-            before_you_start(gh, store, findings)
+            before_you_start(gh, store, findings, now)
         except Exception as exc:  # optional extras: never lose the report over them
             log.warning("skipped some before-you-start checks: %s", exc)
         findings = store.pending_findings(now, min_score, max_items)
+    if cfg["checks"]["claim_and_policy"] and auth_error is None and not offline:
+        # Earlier picks can be claimed after they're reported, by anyone, including other
+        # DocScout users: the website lists them for 7 days.
+        try:
+            earlier = store.reported_since(now - timedelta(days=int(cfg["checks"]["recheck_claims_days"])))
+            summary.claims_rechecked = recheck_claims(gh, store, earlier, now)
+        except Exception as exc:  # optional: never lose the report over it
+            log.warning("skipped some claim re-checks: %s", exc)
     still_open = store.still_open(run_id, int(report_cfg["still_open_count"]))
     report_path = None
     if findings:

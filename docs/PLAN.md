@@ -325,7 +325,12 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 
 ## 10. Before you contribute (M1; top 10 only, about 3 API calls each)
 
-- **Already claimed?** Checks open PRs that touch docs or the spec, and phrases like "I'll take this" in the issue's comments. PRs by bots and dependency updates don't count (13 Oct).
+- **Already claimed?** Checks open PRs that touch docs or the spec, and phrases like "I'll take this" in the issue's comments. PRs by bots and dependency updates don't count (13 Oct), nor do typo, spelling and broken-link fixes (17 Oct: ergo's "docs: fix receive spelling…").
+- **Checked again every day** ✅ (17 Oct): once a day for `[checks] recheck_claims_days` (7) after a project is reported, so a pick can be claimed after it's shown, including by another DocScout user. A claim that has gone (the PR was closed) is cleared.
+  - The laptop report's "Still open from earlier" lines show ⚠️ with what was found.
+  - The website moves claimed picks below the rest, so the free 3 are ones a writer can start.
+  - On Render's 6 picks it took 5.5 s and 9 GitHub requests.
+  - It sees only public signs: an open PR, or an offer in the issue's comments. It doesn't measure the gap again (section 19).
 - **Requirements, shown only when found.** They never change a repo's score, and each quotes the sentence it matched:
   - a **CLA** to sign;
   - a **DCO sign-off** on every commit;
@@ -470,7 +475,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
     hosted/   picks.py ✅ atlas.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 203 tests (187 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 205 tests (188 and 1 skipped without the `hosted` extras) · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
 ```
 
 ## 17. Risks
@@ -538,6 +543,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - subscribers can switch to newest first (17 Oct): the day it was found, then best score. Every card says when it was found, and a "New" label marks the last 24 hours;
   - the paywall is enforced on the server, so the page holds only what the visitor may see;
   - subscribers page through the list, 10 picks a page (server-side pages: infinite scrolling would need JavaScript);
+  - picks someone may already be on go below the rest (17 Oct), because every pick is checked for claims again each day (section 10);
   - each card's "What needs doing" names the biggest gap (17 Oct; it was the first one, so statewave showed "2/19 endpoints have no description" instead of "19/19 endpoints have no response example");
   - the page states Gemma's role plainly: it reviews every candidate and turns away the ones that aren't real apps with an API, which raised precision from 76% to 85%.
   - no JavaScript, and a Content-Security-Policy that allows no scripts;

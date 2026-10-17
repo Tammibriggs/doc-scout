@@ -32,6 +32,8 @@ _AI_POLICY_WORDS = re.compile(r"\b(contribut\w*|pull requests?|PRs?|accept\w*|pr
 _DOCS_WORK = re.compile(r"\b(docs?|documentation|openapi|swagger|api[- ]docs|readme)\b", re.IGNORECASE)
 # Dependency updates that touch docs tooling ("bump mkdocs-material in /docs") aren't someone writing docs.
 _DEPENDENCY_UPDATE = re.compile(r"\b(bump|bumps|deps?|dependenc(y|ies)|dependabot|renovate)\b|\(deps\)", re.IGNORECASE)
+# Nor are small fixes ("docs: fix receive spelling", ergo, 17 Oct): they leave the API docs gap open.
+_SMALL_FIX = re.compile(r"\b(typos?|spelling|misspell\w*|grammar|broken links?|dead links?)\b", re.IGNORECASE)
 _CLAIM = re.compile(
     r"\b(i'?ll take|i will take|i'?d like to (?:work|take)|i am working on|i'?m working on|working on (?:this|it)|"
     r"assign (?:this|it)? ?to me|assign me|can i (?:take|work on))\b",
@@ -102,21 +104,29 @@ def free_checks(tree: list[dict[str, Any]], readme: str | None) -> tuple[Checks,
     return checks, paths
 
 
+def find_claims(gh: GitHub, full_name: str, issues: list[dict[str, Any]]) -> list[str]:
+    """Signs someone is already on it: open docs PRs, and offers to help in the comments of the
+    first 2 help-request issues. About 1-3 API calls; raises GitHubError."""
+    claimed = []
+    for pr in gh.list_open_pulls(full_name):
+        user = pr.get("user") or {}
+        if user.get("type") == "Bot" or str(user.get("login", "")).endswith("[bot]"):
+            continue
+        title_and_branch = f"{pr.get('title', '')} {(pr.get('head') or {}).get('ref', '')}"
+        if _DOCS_WORK.search(title_and_branch) and not _DEPENDENCY_UPDATE.search(title_and_branch) and not _SMALL_FIX.search(title_and_branch):
+            claimed.append(f"Open PR #{pr.get('number')}: {pr.get('title', '')}")
+    for issue in issues[:2]:
+        for comment in gh.list_issue_comments(full_name, int(issue["number"])):
+            if _CLAIM.search(str(comment.get("body") or "")):
+                claimed.append(f"Someone offered to work on #{issue['number']}")
+                break
+    return claimed
+
+
 def paid_checks(gh: GitHub, full_name: str, checks: Checks, paths: dict[str, str], issues: list[dict[str, Any]], head_sha: str | None) -> Checks:
     """Open docs PRs, claims in issue comments, and requirements in CONTRIBUTING and the PR template."""
     try:
-        for pr in gh.list_open_pulls(full_name):
-            user = pr.get("user") or {}
-            if user.get("type") == "Bot" or str(user.get("login", "")).endswith("[bot]"):
-                continue
-            title_and_branch = f"{pr.get('title', '')} {(pr.get('head') or {}).get('ref', '')}"
-            if _DOCS_WORK.search(title_and_branch) and not _DEPENDENCY_UPDATE.search(title_and_branch):
-                checks.claimed.append(f"Open PR #{pr.get('number')}: {pr.get('title', '')}")
-        for issue in issues[:2]:
-            for comment in gh.list_issue_comments(full_name, int(issue["number"])):
-                if _CLAIM.search(str(comment.get("body") or "")):
-                    checks.claimed.append(f"Someone offered to work on #{issue['number']}")
-                    break
+        checks.claimed += find_claims(gh, full_name, issues)
         checks.claim_checked = True
     except GitHubError:
         pass

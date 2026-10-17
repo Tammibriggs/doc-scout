@@ -31,6 +31,7 @@ class RunSummary:
     model: str | None = None  # the reviewing model, e.g. "Gemma"
     reviewed: int = 0
     accepted: int = 0
+    claims_rechecked: int = 0  # earlier picks checked again for claims
 
 
 _STYLE_NAMES = {"rest": "REST", "graphql": "GraphQL", "grpc": "gRPC", "event": "event", "rpc": "RPC"}
@@ -161,7 +162,9 @@ def render(
         for finding in still_open:
             gap = finding.details.get("gap") or {}
             kind = kind_label(gap.get("kind", ""), finding.details.get("api_label", "API"))
-            lines.append(f"- {link(text(finding.full_name, 140), repo_url(finding.full_name))} · score {finding.score:.0f} · {text(kind)}")
+            claimed = (finding.details.get("checks") or {}).get("claimed")
+            warning = f" · ⚠️ {text(claimed[0], 140)}" if claimed else ""
+            lines.append(f"- {link(text(finding.full_name, 140), repo_url(finding.full_name))} · score {finding.score:.0f} · {text(kind)}{warning}")
         lines.append("")
     lines += [
         "---",
@@ -179,9 +182,10 @@ def _footer(summary: RunSummary) -> str:
     calls = ", ".join(f"{k} {v}" for k, v in sorted(summary.api_calls.items())) or "none"
     minutes, seconds = divmod(int(summary.seconds), 60)
     reviewed = f"{text(summary.model, 60)} reviewed {summary.reviewed} ({summary.accepted} accepted) · " if summary.model else ""
+    rechecked = f"{summary.claims_rechecked} earlier picks checked again for claims · " if summary.claims_rechecked else ""
     footer = (
         f"*Checked {summary.evaluated} repos · {summary.passed} passed the health checks · "
-        f"{summary.with_gaps} with docs gaps · {reviewed}GitHub API calls: {calls} · took {minutes}m{seconds:02d}s*"
+        f"{summary.with_gaps} with docs gaps · {reviewed}{rechecked}GitHub API calls: {calls} · took {minutes}m{seconds:02d}s*"
     )
     if summary.stopped_early:
         footer += f"\n\n*Stopped early: {text(summary.stopped_early, 200)}*"

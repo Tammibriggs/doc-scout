@@ -115,6 +115,10 @@ All three sources are above 50%, so all stay on.
     - API docs in a GitHub wiki not read;
     - another product's docs repo counted;
     - the only rejected pick was the unverified "no docs found" kind (✅ decided 16 Oct: no longer reported).
+- **The skill is public** (17 Oct): [skills/find-api-docs-to-contribute/SKILL.md](../skills/find-api-docs-to-contribute/SKILL.md), for writers who'd rather use their own agent (Claude Code or any tool that supports Agent Skills); the README says how to install it.
+  - It adds what DocScout learned after the comparison: the size cutoff, the claim rules Gemma follows, help requests that must be about the API docs, install commands and hidden agent folders that aren't docs, GitHub wikis, another product's docs repo, swag's `docs.go`, comparing documented endpoints with the routes in the code, and never recommending a project only because no docs were found.
+  - It uses `gh api` or a token instead of the comparison's `ghapi` wrapper, and its frontmatter keeps to the fields other tools accept (`name`, `description`, `license`, `compatibility`).
+  - The comparison's copy ([comparison/skill/SKILL.md](comparison/skill/SKILL.md)) stays as it was tested, so the results can be repeated. The public skill hasn't been run end to end yet.
 
 ## 3. Success criteria
 
@@ -471,7 +475,8 @@ The model's reviews are stored in `findings.details`, so no separate `llm_review
 ```
 hacktoberfest/
   pyproject.toml ✅  LICENSE ✅  README.md ✅  CLAUDE.md ✅  render.yaml ✅  deploy/render.toml ✅  .github/workflows/ci.yml (M5)
-  docs/ PLAN.md ✅  comparison/ METHOD.md ✅ RESULTS.md ✅ skill/SKILL.md ✅
+  docs/ PLAN.md ✅  comparison/ METHOD.md ✅ RESULTS.md ✅ skill/SKILL.md ✅ (as tested; frozen)
+  skills/find-api-docs-to-contribute/SKILL.md ✅   # the public skill, for Claude Code and other Agent Skills tools
   docscout/
     cli.py ✅  __main__.py ✅  errors.py ✅      # init set profile run status schedule draft done ignore score discover eval bench-llm
     settings/ config.py ✅ profile.py ✅ languages.py ✅ setup_wizard.py ✅ default_config.toml ✅
@@ -533,6 +538,12 @@ hacktoberfest/
 - **M5:** a fresh `pipx` install on a Mac and a Windows machine works, including on battery and after sleep; CI is green on 3 operating systems.
 
 ## 19. Later (after M5)
+
+**Gemma for the two judgments code still makes from words** (decided 17 Oct, after the deadline):
+- **Is the help request about the API docs?** Today a docs label or docs words in the title are enough. statewave's "Maintainers asked for help" came from #481, an issue about a licence badge, not its API docs. Gemma would read the issue and say whether it asks for work on the API documentation; only then would it count as a help request and earn the bonus.
+- **Which prose lines are real endpoints?** Today patterns find them (`GET /path`, `curl` lines). Gemma would confirm which of the found lines are the project's own API endpoints, catching what the install-command rule doesn't. Prompt v3 showed Gemma copying measured facts instead of judging, so the question would be narrow (one line at a time, or a list to accept or reject), and measured before it's switched on.
+
+Both add Gemma requests and time to every run.
 
 Re-checking still-open items for changes (docs fixed by someone else, a PR merged); pre-contribution message drafts; learning from merged or rejected PRs; running the LLM only when plugged in or idle; new API types (GraphQL, gRPC, AsyncAPI, OpenRPC, library/SDK docs via help requests); Up For Grabs as a seed; GitLab and Codeberg; a dashboard; Spectral lint; standalone executables.
 

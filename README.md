@@ -148,6 +148,24 @@ Problem notifications can't be turned off.
 
 On macOS and Windows, daily runs come in a later version (stage M5). Until then, run `docscout run` yourself.
 
+## Use it from your own AI agent
+
+If you'd rather ask an AI agent such as Claude Code, the same method is available as a skill: [skills/find-api-docs-to-contribute/SKILL.md](skills/find-api-docs-to-contribute/SKILL.md). It tells the agent where to look, how to check a project will merge outside help, how to count the gaps in a spec or in prose docs, and what does and doesn't count as someone already working on them.
+
+**Install it for Claude Code** (for all your projects):
+
+```bash
+mkdir -p ~/.claude/skills/find-api-docs-to-contribute
+curl -fsSL https://raw.githubusercontent.com/Tammibriggs/doc-scout/main/skills/find-api-docs-to-contribute/SKILL.md \
+  -o ~/.claude/skills/find-api-docs-to-contribute/SKILL.md
+```
+
+Then ask, for example, "Find me open-source API docs I could contribute to", or type `/find-api-docs-to-contribute`. To use it in a single project instead, put the folder in that project's `.claude/skills/`. The skill follows the open [Agent Skills](https://agentskills.io) format, so other agents that support it can use the same folder.
+
+The agent needs the GitHub API: the GitHub CLI logged in (`gh auth login`), or a token in `GITHUB_TOKEN`.
+
+**DocScout or the skill?** In the comparison ([results](docs/comparison/RESULTS.md), round 2), an agent with an earlier version of this skill found twice as many projects worth acting on (6 against 3) and got more of its gap claims right (96% against 81%). DocScout's picks were worth acting on more often (3 of 4, against 6 of 10), and it took 8.5 minutes and no tokens, where the agent took 46 minutes and about 324,000 tokens. DocScout runs every day by itself; the agent searches when you ask.
+
 ## Stage M0: check the tool finds the right projects
 
 ```bash

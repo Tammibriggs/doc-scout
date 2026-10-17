@@ -613,4 +613,5 @@ In the first run, 16 of the 60 passed the health checks. Render started with an 
 - ✅ Gemma 4 31B on the 58 labels: 85% precision, 90% recall (section 2);
 - ✅ deployed: the public GitHub repo, the Render Blueprint, Atlas access for Render;
 - a real end-to-end test payment on the live site, in test mode;
+- before real payments (after the deadline): subscribers are recognized only by a signed cookie in their browser, so they lose access on another device or after clearing cookies; renewal doesn't extend the 31-day pass, and cancelling doesn't end it early. A "restore access" step through Stripe's customer portal, and passes that follow the Stripe subscription's status, fix all three;
 - after the deadline: check published projects again after 90 days, like the others, so one that still has the gap and isn't claimed can come back.

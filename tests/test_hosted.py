@@ -166,6 +166,7 @@ def test_visitors_see_the_top_picks_and_an_offer_for_the_rest():
     assert f"{7 - FREE_PICKS} more projects to choose from" in resp.text and 'action="/subscribe"' in resp.text
     assert f"org/app{FREE_PICKS}<" in resp.text and f"org/app{FREE_PICKS + 1}<" not in resp.text  # the rest never reach the page
     assert "4242 4242 4242 4242" in resp.text  # test mode is labeled
+    assert '<a href="https://github.com/org/app1" target="_blank" rel="noopener">org/app1</a>' in resp.text  # GitHub opens in a new tab
     csp = resp.headers["content-security-policy"]
     assert "default-src 'none'" in csp and "script-src" not in csp  # no scripts allowed at all
 

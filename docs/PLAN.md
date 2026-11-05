@@ -585,7 +585,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - each card's "What needs doing" names the biggest gap (17 Oct; it was the first one, so statewave showed "2/19 endpoints have no description" instead of "19/19 endpoints have no response example");
   - the page states Gemma's role plainly: it reviews every candidate and turns away the ones that aren't real apps with an API, which raised precision from 76% to 85%.
   - no JavaScript, and a Content-Security-Policy that allows no scripts;
-  - text escaped, and links only to GitHub URLs DocScout trusts.
+  - text escaped, and links only to GitHub URLs DocScout trusts. They open in a new tab (5 Nov), so the list stays where the reader left it.
 - **Subscriber pass:** an HMAC-signed, HttpOnly cookie for 31 days, issued only after Stripe confirms the session is complete and paid.
 
 **Decisions:**
@@ -613,6 +613,8 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 | 17 Oct, 04:15 UTC (scheduled) | 60 | 3 | 7 min | 216 |
 
 In the first run, 16 of the 60 passed the health checks. Render started with an empty memory. The rehearsal had published picks from a database on this laptop without saving that database to Atlas, so Render's first run replaced the 42 rehearsal picks with its own 3.
+
+**The candidate pool ran dry by 24 Oct** (found 5 Nov). The runs of 17–23 Oct checked the full 200 repos and published 5–15 picks each, and the 7-day list grew to about 70. By 24 Oct DocScout had checked about 3,000 repos: every awesome-selfhosted app in the star range (1,115) and every page of the 24 repo-search slices, each gone through 2–4 times. A checked repo isn't checked again for 90 days (`recheck_after_days`), so since 25 Oct a run finds only the repos new to its sources: 9–152 (about 50 on average) instead of 200, and 0–3 new picks. The older picks left the 7-day list, which fell to 9 on 5 Nov. Nothing was deleted: the picks are still in Atlas. ⏳ Decide: more sources, a longer list, or both.
 
 **⏳ Still to do:**
 - ✅ Gemma 4 31B on the 58 labels: 85% precision, 90% recall (section 2);

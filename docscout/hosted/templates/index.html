@@ -140,7 +140,7 @@
       <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#3d5afe"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="#fff" stroke-width="3"/><path d="M19 19l6 6" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
       DocScout
     </a>
-    {% if source_url %}<a class="plain" href="{{ source_url }}">Run it yourself, free</a>{% endif %}
+    {% if source_url %}<a class="plain" href="{{ source_url }}" target="_blank" rel="noopener">Run it yourself, free</a>{% endif %}
   </nav>
 
   <header class="hero">
@@ -198,7 +198,7 @@
         <div class="card-head">
           <span class="rank" aria-label="Rank {{ p.rank }} by score" title="Rank by score">{{ p.rank }}</span>
           <div>
-            <h3>{% if p.url %}<a href="{{ p.url }}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}</h3>
+            <h3>{% if p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}</h3>
             {% if p.description %}<p class="desc">{{ p.description }}</p>{% endif %}
           </div>
         </div>
@@ -218,7 +218,7 @@
         <div class="todo">
           <p class="label">What needs doing</p>
           <p>{{ p.headline }}</p>
-          <p class="file">{{ p.gap_heading }}{% if p.gap_file %}: {% if p.gap_file_url %}<a href="{{ p.gap_file_url }}"><code>{{ p.gap_file }}</code></a>{% else %}<code>{{ p.gap_file }}</code>{% endif %}{% endif %}</p>
+          <p class="file">{{ p.gap_heading }}{% if p.gap_file %}: {% if p.gap_file_url %}<a href="{{ p.gap_file_url }}" target="_blank" rel="noopener"><code>{{ p.gap_file }}</code></a>{% else %}<code>{{ p.gap_file }}</code>{% endif %}{% endif %}</p>
         </div>
 
         {% if p.why %}
@@ -238,7 +238,7 @@
             <ul>
               {% for c in p.claimed %}<li class="warn">{{ c }}</li>{% endfor %}
               {% for r in p.requirements %}<li class="warn">{{ r }}</li>{% endfor %}
-              {% for i in p.issues %}<li>Maintainers asked for help: {% if i.url %}<a href="{{ i.url }}">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</li>{% endfor %}
+              {% for i in p.issues %}<li>Maintainers asked for help: {% if i.url %}<a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</li>{% endfor %}
               {% for d in p.published %}<li>{{ d }}</li>{% endfor %}
               {% for d in p.check_manually %}<li>Check manually: {{ d }}</li>{% endfor %}
               {% if p.local_setup %}<li>Running it locally: {{ p.local_setup }}</li>{% endif %}
@@ -284,7 +284,7 @@
 
   <footer>
     <p>Made for technical writers who want to contribute to open source. DocScout's code counts the gaps in each project's specs and docs. Gemma 4, an open-weight model, reviews every candidate: it decides which projects are real apps with an API worth documenting, and writes why the docs matter and the first steps. On 58 hand-labeled projects, Gemma's review cut wrong picks while keeping recall: 85% precision against 76% for the code alone.</p>
-    <p>Prefer to run it yourself? The {% if source_url %}<a href="{{ source_url }}">command-line version</a>{% else %}command-line version{% endif %} is open source and free.</p>
+    <p>Prefer to run it yourself? The {% if source_url %}<a href="{{ source_url }}" target="_blank" rel="noopener">command-line version</a>{% else %}command-line version{% endif %} is open source and free.</p>
   </footer>
 </div>
 </body>

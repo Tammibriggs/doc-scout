@@ -21,6 +21,7 @@ import logging
 
 from docscout.analyze.checks import claim_signals
 from docscout.find.github import GitHub, GitHubError
+from docscout.llm import help_requests
 from docscout.llm.base import ClaimContext, LLMClient, LLMError, LLMUnavailable
 from docscout.run.db import StoredFinding
 from docscout.run.sanitize import clean
@@ -30,6 +31,12 @@ log = logging.getLogger(__name__)
 MAX_PULLS = 15  # the most recently updated open PRs
 MAX_COMMENTS = 8  # the latest comments on the docs issues
 EXCERPT = 250  # characters of each description or comment
+
+
+def counted_issues(details: dict[str, Any]) -> list[dict[str, Any]]:
+    """The help requests whose comments can hold a claim: only ones asking for this work (an
+    offer on an issue about a licence badge isn't an offer to write the API docs)."""
+    return [i for i in details.get("issues") or [] if help_requests.counts(i)]
 
 
 def signature(pulls: list[dict[str, Any]], comments: list[dict[str, Any]]) -> str:
@@ -85,7 +92,7 @@ def judge(client: LLMClient, details: dict[str, Any], full_name: str, pulls: lis
         full_name=full_name,
         today=now.date().isoformat(),
         gap=[gap.get("summary", "")] + [f.get("text", "") for f in biggest[:5]],
-        issues=[f"#{i.get('number')} {i.get('title', '')}" for i in (details.get("issues") or [])[:2]],
+        issues=[f"#{i.get('number')} {i.get('title', '')}" for i in counted_issues(details)[:2]],
         items=items,
     )
     claimed: dict[str, str] = {}
@@ -103,7 +110,7 @@ def check(gh: GitHub, client: LLMClient, finding: StoredFinding, now: datetime) 
     unchecked) and a later run asks again. LLMUnavailable is raised: stop asking this run."""
     d = finding.details
     try:
-        pulls, comments = claim_signals(gh, finding.full_name, d.get("issues") or [])
+        pulls, comments = claim_signals(gh, finding.full_name, counted_issues(d))
     except GitHubError as exc:
         log.info("couldn't read the open PRs and comments of %s: %s", finding.full_name, exc)
         return False

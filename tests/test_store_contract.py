@@ -114,6 +114,7 @@ def test_reported_projects_are_listed_until_marked(store, now):
     store.set_status("org/b", "reported", now)
     week = store.reported_since(now - timedelta(days=7))
     assert [(f.full_name, f.reported) for f in week] == [("org/b", now.isoformat(timespec="seconds")), ("org/a", now.isoformat(timespec="seconds"))]
+    assert [f.finding_id for f in week] == [store.latest_finding("org/b").finding_id, store.latest_finding("org/a").finding_id]  # so a check can rescore them
     assert [f.full_name for f in store.still_open(run, 5)] == ["org/old"]  # reported by an earlier run
     store.set_status("org/old", "done", now)
     assert [f.full_name for f in store.still_open(run + 1, 5)] == ["org/b", "org/a"]  # done: no longer listed

@@ -548,6 +548,28 @@ def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
     return 0 if precision is not None and precision >= TARGET_PRECISION else 1
 
 
+def _cmd_eval_claims(cfg: Config, args: argparse.Namespace) -> int:
+    """Measure Gemma's M6 questions on the labeled test set (live; see docscout.measure.claims_eval)."""
+    import json
+
+    from docscout.llm import memory, review
+    from docscout.measure import claims_eval
+
+    short = memory.shortage(cfg["llm"])
+    if short:
+        print(f"Can't ask the model: {short}.")
+        return 1
+    data = json.loads(Path(args.path).read_text(encoding="utf-8"))
+    client = review.open_reviewer(cfg)
+    try:
+        results = claims_eval.measure_help(client, data, list(cfg["discovery"]["issue_label_denylist"]))
+    finally:
+        client.unload()
+        client.close()
+    print(claims_eval.format_help(results))
+    return 0 if claims_eval.passed(results) else 1
+
+
 def _eval_llm(cfg: Config, args: argparse.Namespace, rows: list) -> int:
     from docscout.analyze import apitypes
     from docscout.measure import llm_eval
@@ -712,6 +734,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--llm", dest="with_llm", action="store_true", help="also measure the model's review on the labeled repos (about 45 s per repo on a small laptop; cached)")
     p.add_argument("--think", choices=["off", "borderline", "on"], help="thinking for --llm (default: [llm] think)")
     p.set_defaults(func=_cmd_eval)
+
+    p = sub.add_parser("eval-claims", help="measure Gemma's help-request answers on the labeled test set (live)")
+    p.add_argument("path", nargs="?", default="tests/fixtures/m6/help_requests.json", help="the labeled help requests (default: the M6 test set)")
+    p.set_defaults(func=_cmd_eval_claims)
 
     p = sub.add_parser("bench-llm", help="measure LLM speed and memory on this machine")
     p.add_argument("--runs", type=int, default=3, choices=[1, 2, 3])

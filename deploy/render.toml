@@ -21,6 +21,7 @@ fallback_model = "gemma-4-26b-a4b-it"  # when the 31B is busy or down after its 
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 timeout_seconds = 90            # a review takes 20-40 s; a request that hangs is retried after a pause
 reviews_per_run = 30            # the rest wait for the next run
+checks_per_run = 30             # questions about earlier picks per run
 
 [storage]
 backend = "atlas"               # DocScout's memory in Atlas collections: a cron job starts on an empty machine

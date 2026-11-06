@@ -254,7 +254,7 @@ All three sources are above 50%, so all stay on.
 2. **Repo search slices:** each enabled API type's queries × your star bands (plus language filters when required), always active, not archived and not forks. M1 adds a cursor that works through a few slices each day.
 3. **Help requested:** open, unassigned issues with no linked PR.
    - One query per label family (`documentation,docs` or `"help wanted","good first issue"`) × keyword (`api` plus each API type's own keywords).
-   - An issue counts only if it has an outreach label or was opened by someone outside the project. Bots, dependency dashboards and bounty labels are ignored.
+   - An issue counts only if it has an outreach label or was opened by someone outside the project. Bots, dependency dashboards, bounty labels and (since 6 Nov) bounty programs such as Stellar Wave, whose issues collect applications for points, are ignored.
    - ✅ (16 Oct) It must also be about docs: a docs label, or a docs word in the title ("document", "docs", "examples", "reference"…). The comparison showed "help wanted" plus "api" finding a feature request (traceroot #2579) and a bug (mycelium #279). Docs labels are matched as words, so "docker" isn't one.
    - When a maintainer has labeled an issue "help wanted" or "good first issue", the activity check is looser (1 committer, no merged outside PRs needed).
 4. **Code search for definition files** (optional, needs a token): each API type's `definition_filenames`, sliced by file size.
@@ -375,6 +375,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 2. **Guide:** why its docs matter, and up to 3 first steps based on the gaps code found.
 3. ✅ **`docscout draft owner/repo`** (on demand, after you pick a project): a short first message asking the maintainers whether a docs PR is welcome, using the current issue and PR state. DocScout never posts anything itself. It replies on an open "help wanted" or docs issue when there is one, otherwise it drafts a new issue. The claim check runs again first and warns if someone has started, and CLA or AI-policy notes are shown. The draft is printed with control characters removed.
 4. ✅ **Claims** (17 Oct): whether someone is already working on the gap, from the open PRs and issue comments (section 10). On the laptop this uses the local model: one question per new pick and per earlier pick whose PRs or comments changed, with an 8,192-token context (bike4mind's question was about 3,100 tokens, too close to the 4,096 used for reviews).
+5. ✅ **Help requests** (6 Nov, M6 step 6b): whether each maintainer's request asks for the work DocScout found (section 21). Asked in the review, once the project itself is accepted, and once for projects reported earlier; again only when an issue's text changes. Only a request for this work earns the bonus, the looser activity check and the "Maintainers asked for help" line; claims are read only from its comments.
 
 **Thinking:** Gemma 4 supports it (on by default in the model; DocScout turns it off). ✅ Measured (section 2): no more accurate, 2.6 times slower, so `think = "off"`. The setting stays for faster machines and hosted models.
 
@@ -498,13 +499,13 @@ hacktoberfest/
               sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
     analyze/  tree.py ✅ gaps.py ✅ elsewhere.py ✅ checks.py ✅ scoring.py ✅ safe_yaml.py ✅
               apitypes/ base.py ✅ rest.py ✅ openapi.py ✅ rest_prose.py ✅     # graphql.py, grpc.py, … (later)
-    llm/      base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ review.py ✅ draft.py ✅ claims.py ✅
+    llm/      base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ review.py ✅ draft.py ✅ claims.py ✅ help_requests.py ✅ (M6)
     run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅
               scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)
-    measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
+    measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅ claims_eval.py ✅ (M6: `docscout eval-claims`)
     hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 230 tests (204 and 9 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
+  tests/ ✅ 243 tests (217 and 9 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
 ```
 
 ## 17. Risks
@@ -751,10 +752,10 @@ Each step can ship on its own.
 | Step | What | Exit check |
 |---|---|---|
 | **6a. Test set** | The 23 help requests and 15 claimed picks labeled from their full text (first pass done 6 Nov; you label the 6 borderline ones). **Real claims too:** all 15 claims of 6 Nov are wrong, so a check that never flags anything would pass a test set made only of them. Real ones are rare, since none of the 48 changed specs gained a request or success example. So the set uses open-wearables PR #1976 (merged 4 Nov: error responses documented for 32 operations, plus one shared error example that must not count as 119 examples), real offers placed next to a gap they match, and made-up cases. Small specs, before and after, kept as test fixtures. ✅ Built 6 Nov: [help_requests.json](../tests/fixtures/m6/help_requests.json) (25 issues) and [claims.json](../tests/fixtures/m6/claims.json) (the 15 flagged picks, 21 comments with names replaced, 3 PRs on a generated spec; 8 real claims to find) | Labels agreed: help requests ✅; claims ⏳ your review |
-| **6b. Help requests** | The bounty filter, Gemma's question and its effects, the health-check order. Existing picks' requests asked once | At least 21 of 23 agree; none of the 10 non-API-docs requests counts |
+| **6b. Help requests** | ✅ Built 6 Nov: the bounty filter, Gemma's question ([llm/help_requests.py](../docscout/llm/help_requests.py)) and its effects (bonus, activity check, listing, claims, drafts, cards), the health-check order, and `docscout eval-claims`. Existing picks' requests are asked about once, up to `[llm] checks_per_run` a run. **When deployed**, of the 23 listed picks with a help request: 3 keep it (OpsiMate, zowe, Drix10), 11 stay listed without the bonus and the line, and 9 leave the list, since their docs may be elsewhere and their only request doesn't count (sciencediscovery and solongate are on the site now) | ✅ Passed 6 Nov with Gemma 4 31B: 21 of 23 picks agree; the 2 misses (bernstein, atom) are C answered B, which don't count either way; none of the 10 C picks counted; every quote found; 53 s a question on the free tier. The first try reached 18 of 23: Gemma counted requests about another API (Tauri commands, a Node.js library) because the question didn't say which spec the gaps were in, so it now names the measured spec and its file. The categories in the prompt were written with these labels in view, so the result is optimistic: new help requests are checked as they come (6e) |
 | **6c. Claims per gap** | The measuring changes (examples in two lines, field descriptions, error bodies, the new weights; section 9 updated), gap keys, measuring PRs, per-gap questions for offers and generated specs, the 30-day offer rule, claim lines on cards | At most 1 wrong of the 15; every real claim in the test set found; the 14 PRs measured again under the new rules |
 | **6d. Open picks stay listed** | The look every 6 hours (the cron's new schedule and the daily-run rule), gap and health checks, leaving the list, renames, caps, the free 3, card dates and wording. The 120 earlier picks go through their first checks over the first few runs, oldest first, and each is listed again once it passes | A dry run on a copy of Atlas: every pick that leaves has a reason you agree with; the daily run at most 10 minutes longer, the others at most 5 minutes |
-| **6e. Docs and launch** | The README, the public skill (claims per gap, help requests, bounty programs) and this plan; deploy, then watch 3 days of runs | 3 days of clean runs, Gemma within its caps |
+| **6e. Docs and launch** | The README, the public skill (claims per gap, help requests, bounty programs) and this plan; deploy, then watch 3 days of runs. You label the next new help requests as they arrive, a check of 6b's question on cases it wasn't written with | 3 days of clean runs, Gemma within its caps; at least 9 of the next 10 new help requests answered as you label them |
 
 - **Why this order:** each step goes live when it's done. 6c reads comments only on help requests that pass 6b. 6d brings the list back, and comes after 6b and 6c, so the picks that return carry correct claims and help requests (confirmed 6 Nov).
 - **Tests:** unit tests for each part (recorded GraphQL answers, the PR fixtures, the merge rule, caps and priorities, the cards) and contract tests for both stores. `docscout eval-claims` measures Gemma's two new questions on the test set: live, never in the test suite, like `eval --llm`.

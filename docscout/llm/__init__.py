@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from docscout.errors import ConfigError
-from docscout.llm.base import ClaimCheck, ClaimContext, Draft, LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review
+from docscout.llm.base import ClaimCheck, ClaimContext, Draft, HelpAnswer, HelpContext, LLMClient, LLMError, LLMUnavailable, RepoContext, Review, apply_review
 
 __all__ = ["Draft", "LLMClient", "LLMError", "LLMUnavailable", "RepoContext", "Review", "apply_review", "make_client"]
 
@@ -41,6 +41,9 @@ class FallbackClient:
 
     def claims(self, ctx: ClaimContext) -> ClaimCheck:
         return self._ask("claims", ctx)
+
+    def help_request(self, ctx: HelpContext) -> HelpAnswer:
+        return self._ask("help_request", ctx)
 
     def unload(self) -> None:
         self.primary.unload()

@@ -33,6 +33,7 @@ from docscout.settings.profile import language_policy, one_line
 from docscout.run.report import RunSummary, render, write
 from docscout.llm import LLMClient, LLMError, LLMUnavailable, memory
 from docscout.llm import claims as claims_mod
+from docscout.llm import help_requests
 from docscout.llm import review as reviews_mod
 from docscout.llm.review import ReviewOutcome, Reviewer, model_label, potential_confidence, review_waiting
 from docscout.analyze.scoring import Score, opportunity_score
@@ -107,6 +108,12 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
         int(cfg["scoring"]["language_bonus"]),
         int(cfg["scoring"]["published_docs_bonus"]) if gap.published else 0,
     )
+    # Gemma's review asks whether each help request is about this work (help_requests), so it
+    # needs the issue's text: one request per issue, only for findings that get this far.
+    issues = [dict(issue) for issue in ev.candidate.issues[:3]]
+    if cfg["checks"].get("help_requests_by_gemma", True):
+        for issue in issues:
+            help_requests.fetch_text(gh, ev.candidate.full_name, issue)
     repo = ev.repo
     details = {
         "api_type": api_type.key,
@@ -126,7 +133,7 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
             "topics": list(repo.get("topics") or [])[:15],
         },
         "stats": ev.stats.as_dict() if ev.stats else {},
-        "issues": ev.candidate.issues[:3],
+        "issues": issues,
         "head_sha": ev.head_sha,
         "reasons": ev.classification.reasons,
     }
@@ -155,6 +162,48 @@ def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding], no
 def _claims_due(finding: StoredFinding, now: datetime) -> bool:
     last = finding.details.get("claims_checked")
     return not last or now - datetime.fromisoformat(last) >= timedelta(hours=CLAIMS_RECHECK_HOURS)
+
+
+def help_due(store: Store, cfg: Config, now: datetime) -> list[StoredFinding]:
+    """Projects reported earlier whose help requests Gemma hasn't been asked about (they were
+    reported before 6 Nov), or whose text changed, up to ``[llm] checks_per_run``."""
+    denylist = list(cfg["discovery"]["issue_label_denylist"])
+    due = [f for f in store.reported_since(now - timedelta(days=3650)) if help_requests.needs_check(f.details, denylist)]
+    return due[: int(cfg["llm"].get("checks_per_run", 5))]
+
+
+def recheck_help(gh: GitHub, store: Store, cfg: Config, findings: list[StoredFinding], now: datetime, client: LLMClient) -> int:
+    """Ask Gemma about the help requests of projects reported earlier, and apply its answers as
+    the review does: only a request for this work earns the bonus. A project listed only because
+    of a request that doesn't count leaves the list, back into the pool to be checked again after
+    ``recheck_after_days``. Returns how many projects were checked."""
+    denylist = list(cfg["discovery"]["issue_label_denylist"])
+    checked = 0
+    for finding in findings:
+        d = finding.details
+        for issue in d.get("issues") or []:
+            if "text" not in issue and not help_requests.is_bounty(issue, denylist):
+                help_requests.fetch_text(gh, finding.full_name, issue)
+        try:
+            help_requests.check(client, d, finding.full_name, denylist)
+        except LLMUnavailable:
+            raise
+        except LLMError as exc:
+            log.info("%s couldn't judge the help requests of %s: %s", client.name, finding.full_name, exc)
+            continue
+        counted, reason = help_requests.effects(d, cfg["health"])
+        score = help_requests.rescore(d, cfg, counted)
+        if finding.finding_id is None:
+            store.update_details(finding.run_id, finding.full_name, d)
+        elif reason:
+            d["help_rejected"] = reason
+            store.set_review(finding.finding_id, "rejected", score.total, d)
+            store.set_status(finding.full_name, "new", now, reason=reason)
+            log.info("%s leaves the list: %s", finding.full_name, reason)
+        else:
+            store.set_review(finding.finding_id, "accepted", score.total, d)
+        checked += 1
+    return checked
 
 
 def recheck_claims(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime, client: LLMClient) -> int:
@@ -313,13 +362,19 @@ def run(
     report_cfg = cfg["report"]
     min_score, max_items = float(report_cfg["min_score"]), int(report_cfg["max_items"])
     findings = store.pending_findings(now, min_score, max_items)
-    if cfg["checks"]["claim_and_policy"] and auth_error is None and not offline:
+    claims_on = bool(cfg["checks"]["claim_and_policy"])
+    help_on = bool(cfg["checks"].get("help_requests_by_gemma", True))
+    if (claims_on or help_on) and auth_error is None and not offline:
         # Earlier picks can be claimed after they're reported, by anyone, including other
         # DocScout users: the website lists them for 7 days. Whether someone is on a gap is
-        # the model's call; without it, a claim stays unchecked until a later run.
-        earlier = [f for f in store.reported_since(now - timedelta(days=int(cfg["checks"]["recheck_claims_days"]))) if _claims_due(f, now)]
+        # the model's call; without it, a claim stays unchecked until a later run. Their help
+        # requests are asked about first (once each), since claims are read only from the
+        # ones that count.
+        recheck_since = now - timedelta(days=int(cfg["checks"]["recheck_claims_days"]))
+        helps = help_due(store, cfg, now) if help_on else []
+        earlier = [f for f in store.reported_since(recheck_since) if _claims_due(f, now)] if claims_on else []
         client, why_not = None, None
-        if findings or earlier:
+        if (findings and claims_on) or earlier or helps:
             why_not = memory.shortage(cfg["llm"])
             if why_not is None:
                 try:
@@ -327,9 +382,13 @@ def run(
                 except LLMError as exc:
                     why_not = str(exc)
         try:
-            if findings:
+            if client is not None and helps:
+                summary.help_rechecked = recheck_help(gh, store, cfg, helps, now, client)
+                if claims_on:  # their details changed, and some may have left the list
+                    earlier = [f for f in store.reported_since(recheck_since) if _claims_due(f, now)]
+            if findings and claims_on:
                 before_you_start(gh, store, findings, now, client)
-            if client is not None:
+            if client is not None and claims_on:
                 summary.claims_rechecked = recheck_claims(gh, store, earlier, now, client)
         except LLMUnavailable as exc:
             why_not = str(exc)

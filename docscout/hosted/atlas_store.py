@@ -231,11 +231,11 @@ class AtlasStore:
 
     def still_open(self, before_run: int, limit: int) -> list[StoredFinding]:
         docs = self._latest({"run_id": {"$lt": before_run}}, {"repo.status": "reported"}, limit)
-        return [self._finding(d, with_id=False) for d in docs]
+        return [self._finding(d) for d in docs]
 
     def reported_since(self, since: datetime) -> list[StoredFinding]:
         docs = self._latest({}, {"repo.status": "reported", "repo.last_reported": {"$gte": _iso(since)}})
-        return [self._finding(d, with_id=False, reported=True) for d in docs]
+        return [self._finding(d, reported=True) for d in docs]
 
     # ------------------------------------------------------------------ moving from SQLite
 

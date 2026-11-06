@@ -15,6 +15,7 @@ from typing import Any
 from docscout.analyze.gaps import Gap, kind_label
 from docscout.run.db import StoredFinding
 from docscout.find.health import parse_time
+from docscout.llm import help_requests
 from docscout.run.sanitize import blob_url, code, link, repo_url, text
 
 
@@ -32,6 +33,7 @@ class RunSummary:
     reviewed: int = 0
     accepted: int = 0
     claims_rechecked: int = 0  # earlier picks checked again for claims
+    help_rechecked: int = 0  # earlier picks whose help requests Gemma was asked about
 
 
 _STYLE_NAMES = {"rest": "REST", "graphql": "GraphQL", "grpc": "gRPC", "event": "event", "rpc": "RPC"}
@@ -128,14 +130,18 @@ def render_item(index: int, finding: StoredFinding, now: datetime) -> list[str]:
         parts.append(f"local setup: {text(checks.get('local_setup', 'unclear'))}")
         lines.append("**Before you start:** " + " · ".join(parts))
 
+    # Only a help request that asks for this work is one (help_requests); other API-docs issues
+    # are shown as related, and the rest not at all.
     issues = d.get("issues") or []
-    if issues:
+    for heading, chosen in (("Maintainers asked for help", [i for i in issues[:3] if help_requests.counts(i)]),
+                            ("Related issue", [i for i in issues[:3] if help_requests.related(i)])):  # fmt: skip
         parts = []
-        for issue in issues[:3]:
+        for issue in chosen:
             label_md = text(f"#{issue.get('number')} {issue.get('title', '')}", 120)
             outreach = f" ({text(', '.join(issue.get('outreach') or []))})" if issue.get("outreach") else ""
             parts.append(link(label_md, str(issue.get("html_url", ""))) + outreach)
-        lines.append("**Maintainers asked for help:** " + " · ".join(parts))
+        if parts:
+            lines.append(f"**{heading}:** " + " · ".join(parts))
     lines.append(f"*Score: {text(d.get('breakdown', ''))}*")
     return lines
 
@@ -185,6 +191,8 @@ def _footer(summary: RunSummary) -> str:
     minutes, seconds = divmod(int(summary.seconds), 60)
     reviewed = f"{text(summary.model, 60)} reviewed {summary.reviewed} ({summary.accepted} accepted) · " if summary.model else ""
     rechecked = f"{summary.claims_rechecked} earlier picks checked again for claims · " if summary.claims_rechecked else ""
+    if summary.help_rechecked:
+        rechecked += f"{summary.help_rechecked} earlier picks' help requests checked · "
     footer = (
         f"*Checked {summary.evaluated} repos · {summary.passed} passed the health checks · "
         f"{summary.with_gaps} with docs gaps · {reviewed}{rechecked}GitHub API calls: {calls} · took {minutes}m{seconds:02d}s*"

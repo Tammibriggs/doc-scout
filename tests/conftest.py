@@ -36,6 +36,15 @@ def judge_claims_like_gemma(ctx):
     return ClaimCheck(claims=claims)
 
 
+def judge_help_like_gemma(ctx):
+    """Stands in for the model's help-request question in tests: an issue about documenting the
+    API asks for this work, and anything else isn't API docs. The quote is the issue's title."""
+    from docscout.llm.base import HelpAnswer
+
+    about_docs = any(word in f"{ctx.title} {ctx.text}".lower() for word in ("document", "docs", "examples", "openapi", "reference"))
+    return HelpAnswer(verdict="this_work" if about_docs else "not_api_docs", quote=ctx.title, reason="a stand-in answer")
+
+
 class AgreeingModel:
     """Stands in for the local model in tests: confirms every project as a REST API."""
 
@@ -44,10 +53,15 @@ class AgreeingModel:
     def __init__(self):
         self.reviewed: list[str] = []
         self.claim_checks: list[str] = []
+        self.help_checks: list[str] = []
 
     def claims(self, ctx):
         self.claim_checks.append(ctx.full_name)
         return judge_claims_like_gemma(ctx)
+
+    def help_request(self, ctx):
+        self.help_checks.append(ctx.full_name)
+        return judge_help_like_gemma(ctx)
 
     def review(self, ctx, readme_chars=1500, think=False):
         from docscout.llm.base import Review

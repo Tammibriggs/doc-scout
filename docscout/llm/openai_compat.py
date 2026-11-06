@@ -25,19 +25,24 @@ MAX_RETRY_AFTER = 120.0
 from docscout.llm.base import (
     CLAIM_SCHEMA,
     DRAFT_SCHEMA,
+    HELP_SCHEMA,
     REVIEW_SCHEMA,
     ClaimCheck,
     ClaimContext,
     Draft,
+    HelpAnswer,
+    HelpContext,
     LLMError,
     LLMUnavailable,
     RepoContext,
     Review,
     build_claim_messages,
     build_draft_messages,
+    build_help_messages,
     build_messages,
     parse_claims,
     parse_draft,
+    parse_help,
     parse_review,
 )
 
@@ -89,6 +94,9 @@ class OpenAICompatClient:
 
     def claims(self, ctx: ClaimContext) -> ClaimCheck:
         return parse_claims(self._structured(build_claim_messages(ctx), CLAIM_SCHEMA, "claims"))
+
+    def help_request(self, ctx: HelpContext) -> HelpAnswer:
+        return parse_help(self._structured(build_help_messages(ctx), HELP_SCHEMA, "help_request"))
 
     def _structured(self, messages: list[dict[str, str]], schema: dict[str, Any], name: str) -> str:
         payload: dict = {"model": self.model, "messages": messages, "temperature": 0}

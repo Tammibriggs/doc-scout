@@ -14,6 +14,7 @@ from typing import Any
 
 from docscout.analyze.gaps import Gap, kind_label
 from docscout.run.db import Store, StoredFinding
+from docscout.llm import help_requests
 from docscout.llm.review import model_label
 from docscout.run.sanitize import blob_url, clean, is_github_url, repo_url
 
@@ -76,11 +77,15 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
         "claim_checked": bool(checks.get("claim_checked")),  # by Gemma; unchecked picks show no claim label
         "requirements": [clean(r, 220) for r in checks.get("requirements") or []],
         "local_setup": clean(checks.get("local_setup") or "", 60) or None,
-        "issues": [
-            {"title": clean(f"#{i.get('number')} {i.get('title', '')}", 140), "url": _trusted(str(i.get("html_url", "")))}
-            for i in (d.get("issues") or [])[:3]
-        ],
+        # Only a help request that asks for this work is shown as one (help_requests); other
+        # API-docs issues are shown as related, and the rest not at all.
+        "issues": [_issue(i) for i in (d.get("issues") or [])[:3] if help_requests.counts(i)],
+        "related": [_issue(i) for i in (d.get("issues") or [])[:3] if help_requests.related(i)],
     }
+
+
+def _issue(issue: dict[str, Any]) -> dict[str, Any]:
+    return {"title": clean(f"#{issue.get('number')} {issue.get('title', '')}", 140), "url": _trusted(str(issue.get("html_url", "")))}
 
 
 def _too_small(finding: StoredFinding, min_units: int) -> bool:

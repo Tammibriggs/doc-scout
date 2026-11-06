@@ -39,7 +39,9 @@ code_search_size_bands = ["<5000", "5000..20000", "20000..100000", ">100000"]
 # help_requested: open, unassigned issues where maintainers ask for API docs help.
 issue_label_families = ['documentation,docs', '"help wanted","good first issue"']
 help_requested_keywords = ["api"]   # generic title keywords; each API type adds its own
-issue_label_denylist = ["bounty", "tier:", "points"]
+# Bounty programs too: their issues collect applications for points (Stellar Wave, 6 Nov), so they
+# aren't help requests, and their applicants aren't claims.
+issue_label_denylist = ["bounty", "tier:", "points", "stellar wave", "drips", "onlydust", "gitcoin", "algora"]
 issue_title_denylist = ["dependency dashboard"]
 issue_lookback_days = 60        # help requests updated within this many days
 
@@ -72,6 +74,7 @@ fallback_model = ""             # another model of the same provider, asked when
 base_url = "http://localhost:11434"
 api_key_env = "DOCSCOUT_LLM_API_KEY"
 reviews_per_run = 11            # about 10 minutes at 51 s per review (measured); `docscout bench-llm` measures yours
+checks_per_run = 5              # questions about projects reported earlier (their help requests); the rest wait for the next run
 think = "off"                   # off | borderline | on. Measured: no more accurate, 2.6 times slower
 min_free_memory_gb = 6          # a local model waits until this much memory is free; gemma4:e2b used 5.5-5.9 GB
 num_ctx = 4096
@@ -84,6 +87,7 @@ backend = "sqlite"              # sqlite: a file in your data folder | atlas: Mo
 [checks]
 claim_and_policy = true         # for reported items: open docs PRs, claims, CLA/DCO/AI-policy notes (~2-3 API calls each)
 recheck_claims_days = 7         # after that, check them for claims again once a day for this many days (the website's list)
+help_requests_by_gemma = true   # Gemma reads each help request; only one asking for the work DocScout found counts
 
 [scoring]
 language_bonus = 5              # added to the score of repos in one of your languages

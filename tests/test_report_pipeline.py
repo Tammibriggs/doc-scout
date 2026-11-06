@@ -181,6 +181,9 @@ class RunGitHub(FakeGitHub):
     def list_issue_comments(self, name, number):
         return []
 
+    def get_issue(self, name, number):
+        return {"number": number, "state": "open", "body": "The endpoints need descriptions and examples.", "updated_at": "2026-10-10T00:00:00Z"}
+
 
 def fake_sources(*names):
     def source(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):

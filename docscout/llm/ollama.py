@@ -16,19 +16,24 @@ from typing import Any
 from docscout.llm.base import (
     CLAIM_SCHEMA,
     DRAFT_SCHEMA,
+    HELP_SCHEMA,
     REVIEW_SCHEMA,
     ClaimCheck,
     ClaimContext,
     Draft,
+    HelpAnswer,
+    HelpContext,
     LLMError,
     LLMUnavailable,
     RepoContext,
     Review,
     build_claim_messages,
     build_draft_messages,
+    build_help_messages,
     build_messages,
     parse_claims,
     parse_draft,
+    parse_help,
     parse_review,
 )
 
@@ -74,6 +79,9 @@ class OllamaClient:
 
     def claims(self, ctx: ClaimContext) -> ClaimCheck:
         return parse_claims(self._structured(build_claim_messages(ctx), CLAIM_SCHEMA, False, num_ctx=max(self.num_ctx, CLAIMS_NUM_CTX)))
+
+    def help_request(self, ctx: HelpContext) -> HelpAnswer:
+        return parse_help(self._structured(build_help_messages(ctx), HELP_SCHEMA, False))
 
     def _structured(self, messages: list[dict[str, str]], schema: dict[str, Any], think: bool, num_ctx: int | None = None) -> str:
         """The model's JSON answer, shaped by ``schema``."""

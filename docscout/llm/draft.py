@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from docscout.analyze.checks import Checks, requirement_checks
+from docscout.llm import help_requests
 from docscout.run.db import StoredFinding
 from docscout.find.github import GitHub
 from docscout.find.health import utcnow
@@ -38,7 +39,9 @@ def pick_issue(issues: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 def write_draft(client: LLMClient, gh: GitHub | None, finding: StoredFinding, api_label: str) -> DraftResult:
     d = finding.details
-    issue = pick_issue(d.get("issues") or [])
+    # Reply only on a help request that asks for this work (M6): a comment offering API docs on
+    # an issue about a licence badge would be off topic. Otherwise the draft opens a new issue.
+    issue = pick_issue([i for i in d.get("issues") or [] if help_requests.counts(i)])
     warnings: list[str] = []
     if gh is not None:
         checks = Checks(**(d.get("checks") or {}))

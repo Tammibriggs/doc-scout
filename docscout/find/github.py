@@ -390,6 +390,15 @@ class GitHub:
             return [_open_pull_as_rest(node) for node in nodes if node]
         return self.get_json(f"/repos/{full_name}/pulls", params={"state": "open", "sort": "updated", "direction": "desc", "per_page": 30}, retry_not_found=True)
 
+    def get_issue(self, full_name: str, number: int) -> dict | None:
+        """One issue with its text, or None if it was deleted or moved (404 or 410)."""
+        try:
+            return self.get_json(f"/repos/{full_name}/issues/{number}")
+        except GitHubError as exc:
+            if exc.status in (404, 410):
+                return None
+            raise
+
     def list_issue_comments(self, full_name: str, number: int) -> list[dict]:
         return self.get_json(f"/repos/{full_name}/issues/{number}/comments", params={"per_page": 100})
 

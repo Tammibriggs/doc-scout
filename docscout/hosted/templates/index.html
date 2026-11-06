@@ -239,6 +239,7 @@
               {% for c in p.claimed %}<li class="warn">{{ c }}</li>{% endfor %}
               {% for r in p.requirements %}<li class="warn">{{ r }}</li>{% endfor %}
               {% for i in p.issues %}<li>Maintainers asked for help: {% if i.url %}<a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</li>{% endfor %}
+              {% for i in p.related %}<li>Related issue: {% if i.url %}<a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</li>{% endfor %}
               {% for d in p.published %}<li>{{ d }}</li>{% endfor %}
               {% for d in p.check_manually %}<li>Check manually: {{ d }}</li>{% endfor %}
               {% if p.local_setup %}<li>Running it locally: {{ p.local_setup }}</li>{% endif %}

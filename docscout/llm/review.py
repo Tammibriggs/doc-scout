@@ -24,7 +24,7 @@ from docscout.analyze.apitypes import ApiType
 from docscout.settings.config import Config
 from docscout.run.db import Store, StoredFinding
 from docscout.llm import LLMClient, LLMError, LLMUnavailable, RepoContext, apply_review, make_client
-from docscout.llm import memory
+from docscout.llm import help_requests, memory
 from docscout.llm.base import review_with_retry
 from docscout.analyze.scoring import opportunity_score
 
@@ -141,12 +141,21 @@ def assess(
     verdict = api_type.llm_verdict(review, float(classify["llm_veto_confidence"]))
     final = apply_review(code_confidence, review, verdict=verdict, raise_cap=float(classify["llm_raise_cap"]))
     accepted = final >= min_confidence
+    # Only a help request that asks for this work counts (help_requests): asked once the project
+    # itself is accepted, so a project that isn't an API costs no more questions.
+    counted, help_asked = d.get("issues") or [], 0
+    if accepted and d.get("issues") and cfg["checks"].get("help_requests_by_gemma", True):
+        help_asked = help_requests.check(client, d, finding.full_name, list(cfg["discovery"]["issue_label_denylist"]))
+        counted, reason = help_requests.effects(d, cfg["health"])
+        if reason:
+            accepted = False
+            d["help_rejected"] = reason
     score_parts = d.get("score") or {}
     score = opportunity_score(
         float((d.get("gap") or {}).get("score", 0)),
         float(score_parts.get("health", 0)),
         final,
-        d.get("issues") or [],
+        counted,
         (d.get("repo") or {}).get("language_match"),
         int(cfg["scoring"]["language_bonus"]),
         int(score_parts.get("published_bonus", 0)),  # as found when the docs were analyzed
@@ -165,6 +174,7 @@ def assess(
         "final_confidence": final,
         "thinking": think,
         "seconds": round(seconds, 1),
+        "help_requests_asked": help_asked,
     }
     return Assessment(accepted, score.total, d)
 
@@ -201,7 +211,7 @@ def _review_one(
         outcome.accepted += 1
     else:
         outcome.rejected += 1
-    verdict = "reported" if result.accepted else "not reported"
+    verdict = "reported" if result.accepted else f"not reported ({result.details['help_rejected']})" if result.details.get("help_rejected") else "not reported"
     progress(
         f"{model_label(client.name)}: {finding.full_name} is {r['project_type']}/{r['api_style']} "
         f"({r['code_confidence']:.2f} -> {r['final_confidence']:.2f}), {verdict} ({r['seconds']:.0f}s)"

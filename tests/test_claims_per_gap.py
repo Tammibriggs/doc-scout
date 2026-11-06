@@ -170,3 +170,29 @@ def test_gemma_judges_prs_on_a_generated_spec_that_dont_change_it(now):
     assert claims.check(gh, model, f, now)
     assert [label for label, _ in model.contexts[0].items] == ["PR #5"]
     assert f.details["checks"]["claimed"] == ['Open PR #5 "docs: docstrings and examples for the user routes" (descriptions, response examples): r']
+
+
+def test_a_pr_with_no_activity_for_90_days_claims_nothing_and_isnt_measured(now):
+    old = {**pr(8), "updated_at": iso(120), "created_at": iso(300)}
+    gh = GitHub(pulls=[old])
+    f = finding(issues=[])
+    assert claims.check(gh, Model(), f, now, min_units=1)
+    assert f.details["checks"]["claimed"] == [] and gh.compared == [] and f.details["claims"]["prs"][0]["stale"]
+
+
+def test_large_specs_parse_fast_and_still_refuse_aliases():
+    import json
+    import time
+
+    from docscout.analyze.safe_yaml import UnsafeYAML, load_untrusted
+
+    big = {"openapi": "3.0.3", "paths": {f"/items/{i}": {"get": {"summary": f"Item {i}", "responses": {"200": {"description": "ok"}}}} for i in range(3000)}}
+    as_json = json.dumps(big).encode()
+    started = time.monotonic()
+    assert load_untrusted(as_json) == big and time.monotonic() - started < 1  # JSON: the JSON parser
+    assert load_untrusted(b"{a: 1}") == {"a": 1}  # YAML that only starts like JSON
+    try:
+        load_untrusted("a: &x [1]\nb: *x\n")
+        raise AssertionError("an alias was accepted")
+    except UnsafeYAML as exc:
+        assert "aliases are not allowed (line 2)" in str(exc)

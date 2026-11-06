@@ -34,6 +34,7 @@ from docscout.run.report import RunSummary, render, write
 from docscout.llm import LLMClient, LLMError, LLMUnavailable, memory
 from docscout.llm import claims as claims_mod
 from docscout.llm import help_requests
+from docscout.run import keep_open
 from docscout.llm import review as reviews_mod
 from docscout.llm.review import ReviewOutcome, Reviewer, model_label, potential_confidence, review_waiting
 from docscout.analyze.scoring import Score, opportunity_score
@@ -266,7 +267,12 @@ def run(
     offline = False
     resume_after: datetime | None = None
     seen: set[str] = set()
+    keeping = bool(cfg["picks"].get("keep_open", False))
     try:
+        if keeping:  # the website: every listed pick is looked at first, and acted on within caps (M6)
+            kept = keep_open.step(gh, store, cfg, now, reviewer or (lambda: reviews_mod.open_reviewer(cfg)), by_key, keep_open.caps_for(cfg, daily=True), progress)
+            summary.notes.append(f"Listed picks: {kept.looked} looked at, {kept.rechecked} checked again, {kept.claims_checked} claim checks, "
+                                 f"{len(kept.left)} left the list{f', {kept.waiting} waiting for the next run' if kept.waiting else ''}")  # fmt: skip
         for cand in interleave(streams if limit > 0 else []):
             if summary.analyzed >= limit:
                 break
@@ -372,8 +378,9 @@ def run(
         # requests are asked about first (once each), since claims are read only from the
         # ones that count.
         recheck_since = now - timedelta(days=int(cfg["checks"]["recheck_claims_days"]))
-        helps = help_due(store, cfg, now) if help_on else []
-        earlier = [f for f in store.reported_since(recheck_since) if _claims_due(f, now)] if claims_on else []
+        # On the website the listed picks were looked after above (keep_open); here only new ones.
+        helps = help_due(store, cfg, now) if help_on and not keeping else []
+        earlier = [f for f in store.reported_since(recheck_since) if _claims_due(f, now)] if claims_on and not keeping else []
         client, why_not = None, None
         if (findings and claims_on) or earlier or helps:
             why_not = memory.shortage(cfg["llm"])
@@ -385,7 +392,7 @@ def run(
         try:
             if client is not None and helps:
                 summary.help_rechecked = recheck_help(gh, store, cfg, helps, now, client)
-                if claims_on:  # their details changed, and some may have left the list
+                if claims_on and not keeping:  # their details changed, and some may have left the list
                     earlier = [f for f in store.reported_since(recheck_since) if _claims_due(f, now)]
             if findings and claims_on:
                 before_you_start(gh, store, findings, now, client, int(cfg["report"]["min_effort_units"]))

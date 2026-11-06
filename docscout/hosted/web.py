@@ -27,7 +27,7 @@ from starlette.responses import PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 from starlette.templating import Jinja2Templates
 
-from docscout.hosted import required_secret
+from docscout.hosted import atlas_database, required_secret
 from docscout.hosted.billing import PRICE_CENTS, BillingError
 from docscout.hosted.picks import FREE_PICKS
 from docscout.run.sanitize import is_github_url
@@ -45,6 +45,24 @@ SECURITY_HEADERS = {
 }
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
+
+
+def ago(iso: str | None, now: float) -> str | None:
+    """"2 hours ago", for when a pick was last checked; None when unknown."""
+    from datetime import datetime
+
+    if not iso:
+        return None
+    try:
+        seconds = now - datetime.fromisoformat(iso).timestamp()
+    except ValueError:
+        return None
+    if seconds < 3600:
+        return "within the hour"
+    hours = int(seconds // 3600)
+    if hours < 48:
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    return f"{hours // 24} days ago"
 
 def sign_pass(subscription_id: str, expires: int, secret: str) -> str:
     payload = f"{subscription_id}.{expires}"
@@ -85,8 +103,9 @@ def create_app(
             requested = request.query_params.get("page", "1")
             number = min(pages, max(1, int(requested))) if requested.isdigit() else 1
             shown = picks[(number - 1) * PER_PAGE : number * PER_PAGE]
-        else:
-            shown = picks[:FREE_PICKS]
+        else:  # the free picks (M6: the best found this week); a list published before has no flags
+            shown = [p for p in picks if p.get("free")][:FREE_PICKS] or picks[:FREE_PICKS]
+        shown = [{**p, "checked_ago": ago(p.get("checked"), clock())} for p in shown]
         return page(
             request,
             picks=shown,
@@ -143,7 +162,7 @@ def from_env() -> Starlette:
     stripe = Stripe(key)
     stripe.test_mode = not key.startswith("sk_live_")  # type: ignore[attr-defined]
     return create_app(
-        Atlas(required_secret("MONGODB_URI")),
+        Atlas(required_secret("MONGODB_URI"), database=atlas_database()),
         stripe,
         secret=required_secret("SESSION_SECRET"),
         public_url=os.environ.get("PUBLIC_URL", "http://localhost:8000"),

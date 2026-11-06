@@ -75,11 +75,20 @@ base_url = "http://localhost:11434"
 api_key_env = "DOCSCOUT_LLM_API_KEY"
 reviews_per_run = 11            # about 10 minutes at 51 s per review (measured); `docscout bench-llm` measures yours
 checks_per_run = 5              # questions about projects reported earlier (their help requests); the rest wait for the next run
+checks_per_look = 0             # the same, in the shorter runs between main runs (the website: every 6 hours)
 think = "off"                   # off | borderline | on. Measured: no more accurate, 2.6 times slower
 min_free_memory_gb = 6          # a local model waits until this much memory is free; gemma4:e2b used 5.5-5.9 GB
 num_ctx = 4096
 timeout_seconds = 300
 readme_chars = 1500
+
+[picks]
+# The website keeps every open pick listed and checks it again (M6); the laptop writes daily reports.
+keep_open = false
+rechecks_per_run = 40           # re-checks (health, then the docs measured again) in the day's main run
+rechecks_per_look = 20          # in each of the shorter runs between, every 6 hours
+claims_per_run = 40             # claim checks of listed picks whose PRs or comments changed
+claims_per_look = 20
 
 [storage]
 backend = "sqlite"              # sqlite: a file in your data folder | atlas: MongoDB Atlas collections (the hosted version; needs MONGODB_URI)

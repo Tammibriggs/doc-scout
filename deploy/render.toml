@@ -22,6 +22,10 @@ base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 timeout_seconds = 90            # a review takes 20-40 s; a request that hangs is retried after a pause
 reviews_per_run = 30            # the rest wait for the next run
 checks_per_run = 30             # questions about earlier picks per run
+checks_per_look = 10            # and in each shorter run between, every 6 hours
+
+[picks]
+keep_open = true                # every open pick stays listed, checked again (M6)
 
 [storage]
 backend = "atlas"               # DocScout's memory in Atlas collections: a cron job starts on an empty machine

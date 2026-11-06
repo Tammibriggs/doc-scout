@@ -79,6 +79,7 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
         "work_left": (d.get("claims") or {}).get("work_left"),
         "work": (d.get("claims") or {}).get("work"),
         "work_noun": (d.get("claims") or {}).get("noun") or "operations",
+        "checked": (d.get("watch") or {}).get("looked") or d.get("claims_checked"),  # when it was last checked (M6)
         "claim_checked": bool(checks.get("claim_checked")),  # unchecked picks show no claim label
         "requirements": [clean(r, 220) for r in checks.get("requirements") or []],
         "local_setup": clean(checks.get("local_setup") or "", 60) or None,
@@ -91,6 +92,24 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
 
 def _issue(issue: dict[str, Any]) -> dict[str, Any]:
     return {"title": clean(f"#{issue.get('number')} {issue.get('title', '')}", 140), "url": _trusted(str(issue.get("html_url", "")))}
+
+
+def open_picks(store: Store, now: datetime, min_units: int = 0) -> list[dict[str, Any]]:
+    """Every open pick (M6, ``[picks] keep_open``): reported and not since taken off the list, and
+    either found in the last 7 days or through its first checks under M6. Best first, with the
+    ones someone is on last. The free 3 are the best found in the last 7 days, topped up with
+    older picks when the week has fewer; they're marked ``free``."""
+    found = []
+    for f in store.reported_since(now - 520 * WEEK):
+        recent = bool(f.reported) and now - datetime.fromisoformat(f.reported).astimezone(timezone.utc) < WEEK
+        if _too_small(f, min_units) or not (recent or (f.details.get("watch") or {}).get("listed")):
+            continue
+        found.append((f, recent))
+    found.sort(key=lambda pair: claimed_out(pair[0]))  # stable: best first within each
+    startable = [f.full_name for f, _ in found if not claimed_out(f)]
+    week = [f.full_name for f, recent in found if recent and not claimed_out(f)]
+    free = set((week + [name for name in startable if name not in week])[:FREE_PICKS])
+    return [{**pick(f, rank, now), "free": f.full_name in free} for rank, (f, _) in enumerate(found, 1)]
 
 
 def claimed_out(finding: StoredFinding) -> bool:

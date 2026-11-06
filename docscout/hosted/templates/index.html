@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DocScout: find open-source API docs you can contribute to</title>
-<meta name="description" content="Open-source projects that serve a REST API, are actively maintained, have docs gaps you can fix and welcome outside contributions. New projects every day.">
+<meta name="description" content="Open-source projects that serve a REST API, are actively maintained, have docs gaps you can fix and welcome outside contributions. New projects every day, and every open pick checked again every 6 hours.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d5afe'/%3E%3Ccircle cx='14' cy='14' r='6.5' fill='none' stroke='white' stroke-width='3'/%3E%3Cpath d='M19 19l6 6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -153,7 +153,7 @@
       <li>Welcomes outside contributions</li>
     </ul>
     <p class="flagged">If someone's already working on a project, it's flagged so you don't duplicate their work.</p>
-    {% if total %}<p class="status"><span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} project{{ "" if total == 1 else "s" }} in the last 7 days{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span></p>{% endif %}
+    {% if total %}<p class="status"><span class="stat"><span class="dot" aria-hidden="true"></span>{{ total }} open project{{ "" if total == 1 else "s" }}, each checked every 6 hours{% if updated %} · updated {{ updated.strftime("%-d %b, %H:%M UTC") }}{% endif %}</span></p>{% endif %}
     {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
     {% if subscribed %}<p class="notice ok" role="status">Subscribed: every pick is shown. Thanks for supporting DocScout!</p>{% endif %}
 
@@ -175,8 +175,8 @@
 
   <main>
     <div class="section-head" id="picks">
-      <h2>Picks from the last 7 days</h2>
-      {% if hidden > 0 %}<span class="note">The top {{ picks | length }} are free. Subscribers see all {{ total }}.</span>
+      <h2>Open picks</h2>
+      {% if hidden > 0 %}<span class="note">The best {{ picks | length }} found this week are free. Subscribers see all {{ total }}.</span>
       {% elif subscribed and total > 1 %}
       <div class="tools">
         <nav class="sort" aria-label="Order">
@@ -212,7 +212,7 @@
           {% if p.issues %}<li class="chip blue">Maintainers asked for help</li>{% endif %}
           {% if p.claimed_out %}<li class="chip amber" title="Open PRs or offers cover nearly all of the work: see Before you start">Someone is on it</li>{% elif p.claimed %}<li class="chip amber" title="Open PRs or offers cover part of the work: see Before you start">Partly claimed</li>{% elif p.claim_checked %}<li class="chip green" title="DocScout checks the open PRs and comments every day">Not claimed</li>{% endif %}
           {% if p.outside_prs %}<li class="chip">{{ p.outside_prs }} outside PR{{ "" if p.outside_prs == 1 else "s" }} merged lately</li>{% endif %}
-          {% if p.found %}<li class="chip">Found {{ p.found }}</li>{% endif %}
+          {% if p.found %}<li class="chip">Found {{ p.found }}{% if p.checked_ago %} · checked {{ p.checked_ago }}{% endif %}</li>{% endif %}
         </ul>
 
         <div class="todo">
@@ -236,6 +236,7 @@
             {% if p.suggestion %}<p>{{ p.suggestion }}</p>{% endif %}
             <h4>Before you start</h4>
             <ul>
+              <li>Comment on the issue, or open one, before you start. That's how the next writer, and DocScout, see someone is on it.</li>
               {% for c in p.claimed %}<li class="warn">{{ c }}</li>{% endfor %}
               {% if p.claimed and p.work_left is not none %}<li>Work left once these are counted: {{ p.work_left }} of {{ p.work }} {{ p.work_noun }}</li>{% endif %}
               {% for c in p.stale_offers %}<li>{{ c }}</li>{% endfor %}
@@ -269,7 +270,7 @@
         <h2 id="offer-title">{{ hidden }} more project{{ "" if hidden == 1 else "s" }} to choose from</h2>
         <p class="desc">Subscribe to see every pick DocScout and Gemma find.</p>
         <ul>
-          <li>Every pick from the last 7 days, checked every day for anyone already on it</li>
+          <li>Every open pick, checked every 6 hours for anyone already on it</li>
           <li>Newest first, to see what was just found</li>
           <li>Gemma's first steps for each project</li>
           <li>Nothing to install, and cancel anytime</li>

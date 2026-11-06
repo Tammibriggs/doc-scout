@@ -162,7 +162,9 @@ def open_store(cfg: Config):
             raise ConfigError('[storage] backend = "atlas" needs the MONGODB_URI secret, as an environment variable or in secrets.env.')
         from docscout.hosted.atlas_store import AtlasStore
 
-        return AtlasStore.connect(uri)
+        from docscout.hosted import atlas_database
+
+        return AtlasStore.connect(uri, atlas_database())
     if backend != "sqlite":
         raise ConfigError(f'unknown [storage] backend {backend!r} (use "sqlite" or "atlas")')
     return Store(store_path())
@@ -548,6 +550,41 @@ def _cmd_eval(cfg: Config, args: argparse.Namespace) -> int:
     return 0 if precision is not None and precision >= TARGET_PRECISION else 1
 
 
+def _cmd_look(cfg: Config, args: argparse.Namespace) -> int:
+    """The website's shorter runs between main runs (M6): look at every listed pick and act on what
+    changed, within the smaller caps. Nothing new is searched for."""
+    from docscout.analyze import apitypes
+    from docscout.find.health import utcnow
+    from docscout.llm import review
+    from docscout.run import keep_open
+
+    if not cfg["picks"].get("keep_open"):
+        print("Nothing to look at: [picks] keep_open is off. It's the website's setting; the laptop writes daily reports instead.")
+        return 0
+    store = open_store(cfg)
+    now = utcnow()
+    run_id = store.start_run(now, run_limit=0, started_by="look")
+    types = {t.key: t for t in apitypes.enabled_types(cfg["api_types"])}
+    status, error, outcome = "failed", None, None
+    try:
+        with _github(cfg) as gh:
+            try:
+                outcome = keep_open.step(gh, store, cfg, now, lambda: review.open_reviewer(cfg), types, keep_open.caps_for(cfg, daily=False), progress=print)
+                status = "ok"
+            except Exception as exc:
+                error = repr(exc)[:300]
+                raise
+            finally:
+                store.finish_run(run_id, utcnow(), status=status, analyzed=0, new_items=0, api_calls=sum(gh.calls.values()), error=error)
+    finally:
+        store.close()
+    if outcome.skipped:
+        print(f"Gemma's questions wait for a later run: {outcome.skipped}")
+    for repo, why in outcome.left:
+        print(f"{repo} left the list: {why}")
+    return 0
+
+
 def _cmd_eval_claims(cfg: Config, args: argparse.Namespace) -> int:
     """Measure Gemma's M6 questions on the labeled test set (live; see docscout.measure.claims_eval)."""
     import json
@@ -748,6 +785,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--llm", dest="with_llm", action="store_true", help="also measure the model's review on the labeled repos (about 45 s per repo on a small laptop; cached)")
     p.add_argument("--think", choices=["off", "borderline", "on"], help="thinking for --llm (default: [llm] think)")
     p.set_defaults(func=_cmd_eval)
+
+    p = sub.add_parser("look", help="look at every listed pick and act on what changed (the website's runs between main runs)")
+    p.set_defaults(func=_cmd_look)
 
     p = sub.add_parser("eval-claims", help="measure Gemma's help-request and claim answers on the labeled test set (live)")
     p.add_argument("path", nargs="?", default="tests/fixtures/m6/help_requests.json", help="the labeled help requests (default: the M6 test set)")

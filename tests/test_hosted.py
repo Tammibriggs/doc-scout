@@ -50,6 +50,7 @@ def report(store, now, name, *, score=50.0, status="reported", **kw):
     store.save_repo(name, now, source="awesome_selfhosted")
     store.save_finding(run, name, now, api_type="rest", kind="spec", gap=60, score=score, effort="M", details=details(name, **kw))
     store.set_status(name, status, now)
+    store.finish_run(run, now, status="ok", analyzed=1, new_items=1, api_calls=0)  # as `docscout run` does
 
 
 def sample_picks(n):

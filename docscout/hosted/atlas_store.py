@@ -157,6 +157,22 @@ class AtlasStore:
             upsert=True,
         )
 
+    def rename(self, old: str, new: str) -> None:
+        """A repo renamed on GitHub keeps its record and findings under the new name (M6). If the
+        new name was already remembered, as another repo found under it, that record gives way."""
+        old_key, new_key = old.lower(), new.lower()
+        doc = self.db.repos.find_one({"_id": old_key})
+        if doc is None:
+            return
+        if old_key != new_key:
+            self.db.findings.delete_many({"repo_key": new_key})
+            self.db.repos.delete_one({"_id": new_key})
+            self.db.repos.insert_one({**doc, "_id": new_key, "full_name": new})
+            self.db.repos.delete_one({"_id": old_key})
+            self.db.findings.update_many({"repo_key": old_key}, {"$set": {"repo_key": new_key}})
+        else:
+            self.db.repos.update_one({"_id": new_key}, {"$set": {"full_name": new}})
+
     def set_status(self, full_name: str, status: str, now: datetime, reason: str | None = None) -> None:
         if status not in ("new", "reported", *FINAL_STATUSES):
             raise ValueError(status)

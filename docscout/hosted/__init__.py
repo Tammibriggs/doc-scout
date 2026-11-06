@@ -11,6 +11,15 @@ Install with ``pip install -e ".[hosted]"``. The command-line tool doesn't need 
 """
 
 
+def atlas_database() -> str:
+    """The Atlas database DocScout uses: "docscout", or ``DOCSCOUT_ATLAS_DATABASE`` for a dry run
+    on a copy. The job, the commands it starts and the website all read it, so a dry run can't
+    write to the real one."""
+    import os
+
+    return os.environ.get("DOCSCOUT_ATLAS_DATABASE") or "docscout"
+
+
 def required_secret(name: str) -> str:
     """From the environment (Render's settings) or DocScout's secrets.env (a local test)."""
     from docscout.settings.config import load_config

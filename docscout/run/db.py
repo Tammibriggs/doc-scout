@@ -232,6 +232,23 @@ class Store:
             assignments = ", ".join(f"{name}=?" for name in columns)
             self.conn.execute(f"UPDATE repos SET {assignments} WHERE key=?", (*columns.values(), key))
 
+    def rename(self, old: str, new: str) -> None:
+        """A repo renamed on GitHub keeps its record and findings under the new name (M6). If the
+        new name was already remembered, as another repo found under it, that record gives way."""
+        old_key, new_key = old.lower(), new.lower()
+        with self.conn:
+            if old_key != new_key:
+                # Findings point at their repo, so: copy the record under the new name, move the
+                # findings, then drop the old record.
+                self.conn.execute("DELETE FROM findings WHERE repo_key=?", (new_key,))
+                self.conn.execute("DELETE FROM repos WHERE key=?", (new_key,))
+                columns = [r["name"] for r in self.conn.execute("PRAGMA table_info(repos)") if r["name"] != "key"]
+                listed = ", ".join(columns)
+                self.conn.execute(f"INSERT INTO repos (key, {listed}) SELECT ?, {listed} FROM repos WHERE key=?", (new_key, old_key))
+                self.conn.execute("UPDATE findings SET repo_key=? WHERE repo_key=?", (new_key, old_key))
+                self.conn.execute("DELETE FROM repos WHERE key=?", (old_key,))
+            self.conn.execute("UPDATE repos SET full_name=? WHERE key=?", (new, new_key))
+
     def set_status(self, full_name: str, status: str, now: datetime, reason: str | None = None) -> None:
         if status not in ("new", "reported", *FINAL_STATUSES):
             raise ValueError(status)

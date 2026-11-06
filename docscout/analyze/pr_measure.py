@@ -13,7 +13,9 @@ them fixed a gap. They were features and fixes that edit the spec for their own 
 
 from __future__ import annotations
 
+import hashlib
 import logging
+from collections import OrderedDict
 from typing import Any
 
 from docscout.analyze.apitypes.openapi import SpecReport, score_spec
@@ -24,6 +26,21 @@ from docscout.find.github import GitHub, GitHubError
 log = logging.getLogger(__name__)
 
 SPEC_LEVEL = ("overview", "security", "tags", "servers")  # checks on the whole spec, not on operations
+_MEASURED: OrderedDict[tuple[str, str], Any] = OrderedDict()  # the same file version, measured once (PRs often share a merge base)
+_KEPT = 16
+
+
+def _scored(content: bytes, path: str) -> SpecReport | None:
+    """``score_spec``, remembered for the last few file versions. Its result is only read here."""
+    key = (hashlib.sha256(content).hexdigest(), path)
+    if key in _MEASURED:
+        _MEASURED.move_to_end(key)
+        return _MEASURED[key]
+    report = score_spec(content, path)
+    _MEASURED[key] = report
+    while len(_MEASURED) > _KEPT:
+        _MEASURED.popitem(last=False)
+    return report
 MAX_LISTED = 2000  # operations or fields kept per gap key in a stored result
 
 
@@ -98,7 +115,7 @@ def measure(gh: GitHub, full_name: str, gap: dict[str, Any], pr: dict[str, Any])
         result["readable"] = False
         return result
     if gap.get("kind") == "spec":
-        then, now = score_spec(before, path), score_spec(after, path)
+        then, now = _scored(before, path), _scored(after, path)
         if then is None or now is None:
             result["readable"] = False
             return result
@@ -121,7 +138,7 @@ def main_failing(gh: GitHub, full_name: str, gap: dict[str, Any]) -> dict[str, l
     if content is None:
         return None
     if gap.get("kind") == "spec":
-        report = score_spec(content, path)
+        report = _scored(content, path)
         return report.failing if report else None
     failing: dict[str, list[str]] = {}
     for label, missing in _endpoints(path, content).items():

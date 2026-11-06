@@ -269,6 +269,29 @@ class GitHub:
             raise GitHubError(400, f"GraphQL: {message}")
         raise GitHubError(400, "GraphQL: gave up after repeated failures")
 
+    def graphql_batch(self, query: str) -> tuple[dict[str, Any], set[str]]:
+        """Run a GraphQL query that asks about many repos at once (M6's look for changes). Returns
+        its ``data`` and the aliases GitHub couldn't find (a deleted or private repo or issue
+        fails only its own part of the answer). Other errors raise as in :meth:`graphql`."""
+        for _ in range(4):
+            resp = self.request("POST", "/graphql", json={"query": query}, resource="graphql")
+            body = resp.json()
+            errors = body.get("errors") or []
+            missing = {".".join(str(p) for p in e.get("path") or []) for e in errors if e.get("type") == "NOT_FOUND"}
+            others = [e for e in errors if e.get("type") != "NOT_FOUND"]
+            if not others:
+                return body.get("data") or {}, missing
+            if any(e.get("type") == "RATE_LIMITED" for e in others):
+                reset = float(resp.headers.get("X-RateLimit-Reset", "0"))
+                wait = max(60.0, reset - self._clock() + 1)
+                if wait > self._max_wait:
+                    raise RateLimited("graphql", wait)
+                log.info("GitHub graphql rate limit reached; waiting %ds", int(wait))
+                self._sleep(wait)
+                continue
+            raise GitHubError(400, "GraphQL: " + "; ".join(str(e.get("message", "")) for e in others)[:300])
+        raise GitHubError(400, "GraphQL: gave up after repeated failures")
+
     def _pulls(self, full_name: str, states: list[str], *, max_pages: int, updated_since: str | None = None) -> list[dict]:
         """Newest-updated PRs first; a further page only while they're newer than ``updated_since``."""
         owner, name = full_name.split("/", 1)

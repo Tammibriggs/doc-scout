@@ -26,7 +26,7 @@ services:
     name: docscout-daily
     runtime: python
     plan: starter
-    schedule: "15 4 * * *"   # 04:15 UTC every day
+    schedule: "15 4,10,16,22 * * *"   # every 6 hours from 04:15 UTC: the first run of the day is the main one, the others only look (M6)
     buildCommand: pip install ".[hosted]"
     startCommand: python -m docscout.hosted.job
     envVars:

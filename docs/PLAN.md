@@ -501,7 +501,7 @@ hacktoberfest/
     analyze/  tree.py ✅ gaps.py ✅ elsewhere.py ✅ checks.py ✅ scoring.py ✅ safe_yaml.py ✅ pr_measure.py ✅ (M6)
               apitypes/ base.py ✅ rest.py ✅ openapi.py ✅ rest_prose.py ✅     # graphql.py, grpc.py, … (later)
     llm/      base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ review.py ✅ draft.py ✅ claims.py ✅ help_requests.py ✅ (M6)
-    run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅
+    run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅ watch.py ✅ keep_open.py ✅ (M6)
               scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅ claims_eval.py ✅ (M6: `docscout eval-claims`)
     hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
@@ -569,7 +569,7 @@ Re-checking still-open items for changes (docs fixed by someone else, a PR merge
 For writers who'd rather not run anything: no terminal, and no 6 GB of free memory, which Gemma pushed this laptop to its limit for in every comparison run. It also serves the challenge's "something someone would actually pay for".
 
 **Built on branch `hosted`:**
-- **Daily job** (`docscout.hosted.job`, a Render cron job): `docscout run` with [deploy/render.toml](../deploy/render.toml), whose memory is in Atlas collections (`[storage] backend = "atlas"`), then publish the picks from the last 7 days. Publishing also happens after a failed run.
+- **The job** (`docscout.hosted.job`, a Render cron job; every 6 hours since M6 step 6d): the first run of the day that finds the day's main run not done runs `docscout run` with [deploy/render.toml](../deploy/render.toml), whose memory is in Atlas collections (`[storage] backend = "atlas"`); the other runs run `docscout look` (section 21). Each publishes the open picks, also after a failed run. `DOCSCOUT_ATLAS_DATABASE` points the job, the commands it starts and the website at another database, for a dry run on a copy.
 - **Model:** Gemma 4 31B (`gemma-4-31b-it`) through Google's OpenAI-compatible Gemini API endpoint, on the free tier. Google lists `gemma-4-31b-it` and `gemma-4-26b-a4b-it` for the key. Under load it answered 500 or 503 to about half the requests (16 Oct), so busy answers (429, 5xx) are retried after 5, 20 and 60 s, or after the provider's `Retry-After`, and then Gemma 4 26B is asked instead (17 Oct, `fallback_model`). Only schema mode returned clean JSON; JSON mode on the 26B returned its "thoughts".
 - **MongoDB Atlas** (free tier):
   - **DocScout's memory, in collections** ✅ (17 Oct; until then a SQLite file in GridFS, copied in and out around each run). Render cron jobs start on an empty machine, so everything DocScout remembers lives in Atlas:
@@ -679,10 +679,11 @@ Every listed pick is still open, and every line on its card was checked recently
   - a help-request issue closed or deleted: off the card, and the score's bonus recomputed;
   - repo renamed, archived or gone: as in 1;
   - nothing changed: no further requests.
-- Prose docs span several files, so prose picks (23 of 120) are measured again every 7 days instead.
+- Prose docs span several files, which the look can't see, so the weekly re-check covers them (3).
 
-**3. The gap check.**
-- The docs are measured again, by the same code that found the gap, in the same run that spots the change: within about 6 hours of it. If more changes are waiting than the run's cap allows, the rest are measured in the next run. The health checks (committers, outside merges) run every 7 days, in the daily run; the look already covers pushes and archiving.
+**3. The re-check** ✅ (built 6 Nov as one check, [run/keep_open.py](../docscout/run/keep_open.py)).
+- A re-check runs the checks a new candidate gets: health from GitHub now (licence, stars, committers, outside merges), then the docs measured again by the same code that found the gap. It runs in the run that spots a docs change (within about 6 hours of it), the first time a pick is looked at under M6, and at least every 7 days. If more are due than the run's cap allows, the rest wait for the next run. The look itself covers pushes and archiving.
+- A pick whose docs got fixed (no gap, or less than the size cutoff left), that fails the health checks, or whose docs may be elsewhere with no help request that counts, leaves the list.
 - The pick keeps its found date, its Gemma review and its place in the list. The new numbers replace the old ones, and a short history is kept (`details.history`: date, operations needing work, score).
 - When the numbers move by a fifth or more, Gemma rewrites why the docs matter and the first steps, which quote the numbers.
 - The measuring itself changes (confirmed 6 Nov, "Measuring changes" at the end of this section): examples are counted the way a reader needs them, so a shared error example can't look like hundreds of documented operations, and two gaps DocScout missed are counted, fields without descriptions and error bodies.
@@ -723,7 +724,7 @@ Every listed pick is still open, and every line on its card was checked recently
   4. finds new repos with the GitHub budget left, then Gemma reviews them, as today.
 - **The other three runs** only look, act on what changed with smaller caps (20 gap checks, 20 claim checks, 10 Gemma questions), and publish the picks again. Most claims need no Gemma question, since PRs are measured.
 - **A run still going** when the next one starts: the new run sees it in the memory and stops at once.
-- **Within a cap**, the picks free visitors see go first, then the newest, then the longest unchecked. The rest wait for the next run, and each card says when it was last checked.
+- **Within a cap**, the picks free visitors see go first, then the newest. The rest wait for the next run, and each card says when it was last checked.
 
 Projected from the 6 Nov checks, per day:
 

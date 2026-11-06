@@ -120,6 +120,19 @@ def test_reported_projects_are_listed_until_marked(store, now):
     assert [f.full_name for f in store.still_open(run + 1, 5)] == ["org/b", "org/a"]  # done: no longer listed
 
 
+def test_a_renamed_repo_keeps_its_pick_under_the_new_name(store, now):
+    run = store.start_run(now)
+    finding(store, run, now, "Org/Old-Name", 70, review="accepted")
+    store.set_status("Org/Old-Name", "reported", now)
+    store.save_repo("org/new-name", now, rejected="no license")  # the new name was found as another repo meanwhile
+    store.rename("Org/Old-Name", "Org/New-Name")
+    assert store.repo("org/old-name") is None and store.repo("org/new-name")["status"] == "reported"
+    assert [f.full_name for f in store.reported_since(now - timedelta(days=1))] == ["Org/New-Name"]
+    assert store.latest_finding("org/new-name").score == 70
+    store.rename("Org/New-Name", "org/new-name")  # only the case changed
+    assert store.repo("org/new-name")["full_name"] == "org/new-name"
+
+
 def test_the_atlas_store_takes_over_a_sqlite_memory(tmp_path, now):
     mongomock = pytest.importorskip("mongomock")
     pytest.importorskip("pymongo")

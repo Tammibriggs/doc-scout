@@ -40,6 +40,7 @@ MAX_PULLS = 15  # the most recently updated open PRs
 MAX_COMMENTS = 8  # the latest comments on the docs issues
 EXCERPT = 250  # characters of each description or comment
 OFFER_DAYS = 30  # an offer without a PR counts this long after the person's last comment
+PR_STALE_DAYS = 90  # a PR with no activity for this long isn't someone working on the gap (the rule Gemma followed until 6 Nov)
 INSIDERS = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 # "adds response examples to 12 operations"
@@ -104,13 +105,19 @@ def _fix_phrase(fixed: dict[str, list[str]], fields: list[str], noun: str) -> st
     return "adds " + (", ".join(parts[:-1]) + " and " + parts[-1] if len(parts) > 1 else parts[0])
 
 
-def measure_pulls(gh: GitHub, full_name: str, details: dict[str, Any], pulls: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Each open PR's measured result, reusing a stored one while the PR's head commit is the same."""
+def measure_pulls(gh: GitHub, full_name: str, details: dict[str, Any], pulls: list[dict[str, Any]], now: datetime | None = None) -> list[dict[str, Any]]:
+    """Each open PR's measured result, reusing a stored one while the PR's head commit is the same.
+    A PR with no activity for ``PR_STALE_DAYS`` isn't measured: it claims nothing."""
     gap = details.get("gap") or {}
     earlier = {p.get("number"): p for p in (details.get("claims") or {}).get("prs") or []}
     results = []
     for pr in pulls[:MAX_PULLS]:
         if _is_bot(pr):
+            continue
+        active = parse_time(pr.get("updated_at") or pr.get("created_at"))
+        if now is not None and active is not None and now - active > timedelta(days=PR_STALE_DAYS):
+            results.append({"number": pr.get("number"), "head": None, "touches": False, "readable": True, "fixed": {}, "fixed_fields": [],
+                            "stale": True, "title": clean(pr.get("title", ""), 120), "author": _login(pr)})  # fmt: skip
             continue
         head = (pr.get("head") or {}).get("sha")
         stored = earlier.get(pr.get("number"))
@@ -157,12 +164,13 @@ def _offer_state(comment: dict[str, Any], comments: list[dict[str, Any]], pulls:
     return ("live" if last and now - last <= timedelta(days=OFFER_DAYS) else "stale"), when
 
 
-def check(gh: GitHub, client: LLMClient, finding: StoredFinding, now: datetime, min_units: int = 5) -> bool:
+def check(gh: GitHub, client: LLMClient, finding: StoredFinding, now: datetime, min_units: int = 5, can_ask: bool = True) -> bool:
     """Work out who is on which of the pick's gaps, and record it in the finding's details:
     ``details["claims"]`` (measured PRs, offers, the work left) and the lines a card shows.
     Skips asking when the open PRs and comments haven't changed since the last answer. False
     when GitHub or Gemma failed: the answer stays as it was and a later run tries again.
-    LLMUnavailable is raised: stop asking this run."""
+    LLMUnavailable is raised: stop asking this run. With ``can_ask`` False (no questions left
+    this run), a check that needs Gemma returns False and waits; one that doesn't still runs."""
     d = finding.details
     try:
         pulls, comments = claim_signals(gh, finding.full_name, counted_issues(d))
@@ -176,7 +184,7 @@ def check(gh: GitHub, client: LLMClient, finding: StoredFinding, now: datetime, 
         return True
 
     gap = d.get("gap") or {}
-    measured = measure_pulls(gh, finding.full_name, d, pulls)
+    measured = measure_pulls(gh, finding.full_name, d, pulls, now)
     by_number = {m.get("number"): m for m in measured}
     # Gemma reads the comments (not bots'), and the PRs on a generated spec that don't change it.
     items: list[tuple[str, str]] = []
@@ -188,7 +196,8 @@ def check(gh: GitHub, client: LLMClient, finding: StoredFinding, now: datetime, 
         said[f"comment {i}"] = comment
     if gap.get("generated"):
         for pr in pulls[:MAX_PULLS]:
-            if _is_bot(pr) or (by_number.get(pr.get("number")) or {}).get("touches"):
+            m = by_number.get(pr.get("number")) or {}
+            if _is_bot(pr) or m.get("touches") or m.get("stale"):
                 continue
             lines = [f"Title: {pr.get('title', '')}", f"By {_login(pr)}, opened {_day(pr.get('created_at'))}, last updated {_day(pr.get('updated_at'))}"]
             if pr.get("files"):
@@ -197,6 +206,8 @@ def check(gh: GitHub, client: LLMClient, finding: StoredFinding, now: datetime, 
                 lines.append("Description: " + _excerpt(pr.get("body")))
             items.append((f"PR #{pr.get('number')}", "\n".join(lines)))
             said[f"PR #{pr.get('number')}"] = pr
+    if items and not can_ask:
+        return False
     try:
         judged = judge(client, d, finding.full_name, items, now)
     except LLMUnavailable:

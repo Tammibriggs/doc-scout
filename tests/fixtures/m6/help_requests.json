@@ -1,0 +1,670 @@
+{
+ "about": "M6 test set (6a): every help request on a listed pick, as of 6 Nov 2026, labeled. A: asks for the work DocScout found (for a 'docs elsewhere' pick: work on the API reference). B: other API-docs work. C: not API docs. 'bounty' issues are filtered by code before Gemma sees them. Texts are the first 1,500 characters, HTML comments removed; a deleted issue keeps only its title.",
+ "issues": [
+  {
+   "repo": "smaramwbc/statewave",
+   "number": 481,
+   "title": "[Docs][personal-assistant]: README badge and OpenAPI metadata say MIT, LICENSE and pyproject say Apache-2.0",
+   "labels": [
+    "help wanted",
+    "good first issue"
+   ],
+   "state": "open",
+   "text": "### Affected Component\n`statewave-personal-assistant` — `README.md`, `app/main.py`\n\n### Bug Description\nThe repo states two different licenses:\n\n| Where | Says |\n|---|---|\n| `LICENSE` | Apache License 2.0 |\n| `pyproject.toml` | `license = { text = \"Apache-2.0\" }` + Apache classifier |\n| `README.md:8` | badge **\"License: MIT\"** linking to `LICENSE` |\n| `app/main.py:83` | `license_info={\"name\": \"MIT\"}` — shown in the OpenAPI `/docs` page |\n\nSo the README badge and the API docs say MIT, while the actual license file says Apache 2.0.\n\n### Expected Behavior\nEverything says Apache-2.0, matching `LICENSE`.\n\n### Suggested fix\n- `README.md:8`: change the badge to `license-Apache--2.0-blue`.\n- `app/main.py:83`: `license_info={\"name\": \"Apache-2.0\", \"url\": \"https://www.apache.org/licenses/LICENSE-2.0\"}`.\n\n### Environment\n`main` @ `e89f33b`.\n\n### Severity\nLow — but license metadata is something people check before adopting code.",
+   "pick": {
+    "kind": "prose",
+    "gaps": [
+     "2/19 endpoints have no description",
+     "18/19 endpoints have no request example",
+     "19/19 endpoints have no response example",
+     "18/19 endpoints list no status or error codes",
+     "16/19 endpoints don't say how to authenticate"
+    ],
+    "check_manually": [
+     "The README mentions Swagger UI, ReDoc or an OpenAPI URL, so a spec may be generated when the app runs",
+     "Project website: statewave.ai",
+     "Separate docs repo: smaramwbc/statewave-docs"
+    ]
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "A licence mismatch between the README badge and the LICENSE file."
+  },
+  {
+   "repo": "0xfurai/peekaping",
+   "number": 244,
+   "title": "Documentation Suggestion: Exposing the API Port",
+   "labels": [
+    "documentation",
+    "enhancement",
+    "good first issue"
+   ],
+   "state": "open",
+   "text": "I was looking for monitoring solution with an API I could access and use in my own project's. Peekaping is great for this purpose but the only thing is the documentation currently doesn't mention how to expose the API anywhere when running it in a Docker container. Took me awhile to figure it out but it was so easy and I think it should definitely be part of the documentation. If you want to expose the API just add port 8034 to the docker container its ports and after that the entire API is available at localhost:8034/api/v1/ and the docs are viewable at localhost:8034/swagger/index.html.\n\nDocker Command: \n`docker run -d --restart=always \\\n  -p 8383:8383 \\\n  -p 8034:8034 \\\n  -e DB_NAME=/app/data/peekaping.db \\\n  -v $(pwd)/.data/sqlite:/app/data \\\n  --name peekaping \\\n  0xfurai/peekaping-bundle-sqlite:latest`\n\nAt first I was completely confused and thought I had to run a dev server for this. But if you just want to access the API without changing anything to Peekaping itself exposing the port is all you have to do really. Here an example of an ESP32 based display fetching the latest heartbeat of a monitor(using one monitor for all 8 services as a proof of concept): \n\n![Image](https://github.com/user-attachments/assets/c4e82fce-adb9-4f99-aecf-ad3f131138e8)",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "48/59 operations have no request or response examples",
+     "2/59 operations document no error responses",
+     "The API overview (info.description) is missing or very short",
+     "1/1 authentication schemes have no description",
+     "9 operation groups (tags) have no description",
+     "No server address is given, so readers can't tell where to send requests"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "you",
+   "reason": "How to expose the API port when running in Docker: setup docs, not the API reference."
+  },
+  {
+   "repo": "0xfurai/peekaping",
+   "number": 238,
+   "title": "Swagger doc.json has hard coded host to localhost:8034",
+   "labels": [
+    "bug",
+    "help wanted",
+    "good first issue"
+   ],
+   "state": "open",
+   "text": "**Describe the bug**\nI am testing running the API through a reverse proxy domain using the microservice docker images, however the Swagger host seems to be hard coded, e.g. in `doc.json`:\n\n```json\n{\n  \"schemes\": [],\n  \"swagger\": \"2.0\",\n  \"info\": {\n    \"description\": \"\",\n    \"title\": \"Peekaping API\",\n    \"contact\": {},\n    \"version\": \"0.0.44\"\n  },\n  \"host\": \"localhost:8034\",\n  \"basePath\": \"/api/v1\",\n  \"paths\": {\n...\n```\n\nThis means I can't actually run requests through myapiurl.com/swagger/index.html because it tries to connect to `localhost:8034` instead of `myapiurl.com`.\n\n**Database**\n- postgresql\n\n**To Reproduce**\nSteps to reproduce the behavior:\n1. Have the API proxying through a domain, eg. https://myapiurl.com.\n2. Visit https://myapiurl.com/swagger/index.html\n3. See the base URL does not match domain.\n4. Visit https://myapiurl.com/swagger/doc.json\n5. See the host property is hard coded: ` \"host\": \"localhost:8034\",`\n\n**Expected behavior**\nThe Swagger Base URL should match the domain so requests can be sent using the Swagger UI to the domain instead of http://localhost:8034\n\n**Screenshots**\n<img width=\"372\" height=\"128\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/9b251302-53a5-42d2-8ff6-a1b5c55d52a5\" />\n\n**Desktop (please complete the following information):**\n - OS: Linux\n - Browser: Brave\n - Version: 1.84 / Chromium 142.0.7444.176\n\n**Additional context**\nNone",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "48/59 operations have no request or response examples",
+     "2/59 operations document no error responses",
+     "The API overview (info.description) is missing or very short",
+     "1/1 authentication schemes have no description",
+     "9 operation groups (tags) have no description",
+     "No server address is given, so readers can't tell where to send requests"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "you",
+   "reason": "A bug: the Swagger file's host is hard-coded to localhost. Touches the 'no server address' gap, but it's a fix, not docs writing."
+  },
+  {
+   "repo": "OpsiMate/OpsiMate",
+   "number": 1229,
+   "title": "Docs: add an API reference page (Swagger UI at /api/docs, OpenAPI at /api/openapi.json)",
+   "labels": [
+    "bug",
+    "documentation",
+    "good first issue",
+    "question",
+    "Server",
+    "hacktoberfest"
+   ],
+   "state": "open",
+   "text": "> 📍 **Where this lives:** the change goes in the docs repository — https://github.com/OpsiMate/documentation (Docusaurus; pages under `opsimate-docs/docs/`). Fork it, run `npm install && npm start` inside `opsimate-docs/` to preview, and open your PR there with `Closes OpsiMate/OpsiMate#<this issue number>` in the description so this issue closes automatically.\n\n## Problem\nEvery OpsiMate server ships an interactive API reference, but the docs site never mentions it: there is no page for it, and a search for `/api/docs`, `openapi` or `API_DOCS_ENABLED` across `opsimate-docs/docs/` finds nothing. Today the only way in is a book icon in the app's sidebar, and #1208 removes that button because the reference is \"reachable by URL\". Once it is gone, people can only find the URL if the docs tell them.\n\nWhat the server does (main repo, `apps/server/src/api/openapi/serve.ts`, mounted in `apps/server/src/app.ts` ~line 256):\n- `GET /api/docs/` is Swagger UI (`/api/docs` redirects there). Its assets are bundled, so it also works on installs with no internet access.\n- `GET /api/openapi.json` is the OpenAPI 3.1 document. You can import it into Postman or use it to generate a client.\n- Both are public: the document lists routes and shapes, never data. Every **Try it out** call still needs a valid token.\n- `API_DOCS_ENABLED=false` (environment variable) turns both off.\n- Auth (described at the top of the document, `apps/server/src/api/openapi/document.ts` ~line 17): the instance API token (`s",
+   "pick": {
+    "kind": "elsewhere",
+    "gaps": [],
+    "check_manually": [
+     "The README mentions Swagger UI, ReDoc or an OpenAPI URL, so a spec may be generated when the app runs",
+     "Project website: www.opsimate.dev",
+     "Docs link in the README: docs.opsimate.dev/docs/getting-started/deploy"
+    ]
+   },
+   "bounty": false,
+   "label": "A",
+   "labeled_by": "first pass",
+   "reason": "Asks for an API reference page; the pick's docs are elsewhere, so any API reference work is the work."
+  },
+  {
+   "repo": "docling-project/docling-pipelines",
+   "number": 296,
+   "title": "bug(api): document-libraries routes deviate from their OpenSpec (name filter, unknown sets, status codes, size)",
+   "labels": [
+    "good first issue",
+    "hacktoberfest",
+    "chore"
+   ],
+   "state": "open",
+   "text": "## Bug\n\nWhile writing route tests for #276, I ran the `/document-libraries` routes against the production `DocumentLibraryService` and `DuckDBAssetRepository` (DuckDB file in a temp dir, FastAPI `TestClient`). Four behaviours differ from `openspec/specs/backend/document-libraries-api/spec.md`:\n\n| Request | Spec | Actual |\n|---|---|---|\n| `GET /document-libraries?name=Research` | \"only libraries whose name contains 'Research' are returned\" | all libraries are returned: `list_libraries` accepts the `name` filter (`FiltersDep`) but never uses it |\n| `PUT /document-libraries/{id}/document-sets?document_sets_ids={unknown_set_id}` | 404 | 204: `get_document_library_service()` in `api/dependencies.py` builds `DocumentLibraryService(repository=...)` without a `document_set_service`, so the existence check in `add_document_sets_bulk` never runs |\n| `DELETE /document-libraries/{id}/document-sets?document_sets_ids={set_not_in_library}` | 400 | 404 (`document_set_not_found`) |\n| `PATCH /document-libraries/{id}` with a `name` that belongs to another library | 409 | 400: `DuckDBAssetRepository.update()` raises `AssetInvalidDataException` for the name conflict |\n\nA fifth issue is not covered by the spec but is clearly unintended: `GET /document-libraries/{id}/document-sets` always returns `documents.size` as `null`. The route builds `{\"count\": ..., \"size_bytes\": ...}`, but the `Document` DTO field is `size`, so the size is dropped.\n\nThe 204-instead-of-404 for deleting an unknown library is ",
+   "pick": {
+    "kind": "prose",
+    "gaps": [
+     "3/50 endpoints have no description",
+     "42/50 endpoints have no request example",
+     "46/50 endpoints have no response example",
+     "49/50 endpoints list no status or error codes"
+    ],
+    "check_manually": [
+     "Project website: docling-project.github.io/docling-pipelines",
+     "Separate docs repo: docling-project/website"
+    ]
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "A code bug: routes behave differently from their spec."
+  },
+  {
+   "repo": "EarnQuestOne/stellar_Earn",
+   "number": 2767,
+   "title": "Document the backend API-key issuance and revocation policy",
+   "labels": [
+    "documentation",
+    "Stellar Wave",
+    "backend",
+    "difficulty:easy",
+    "governance",
+    "priority:low"
+   ],
+   "state": "deleted",
+   "text": "",
+   "pick": {
+    "kind": "prose",
+    "gaps": [
+     "5/5 endpoints have no request example",
+     "5/5 endpoints have no response example",
+     "5/5 endpoints list no status or error codes",
+     "4/5 endpoints don't say how to authenticate"
+    ],
+    "check_manually": [
+     "The README mentions Swagger UI, ReDoc or an OpenAPI URL, so a spec may be generated when the app runs"
+    ]
+   },
+   "bounty": true,
+   "label": "B",
+   "labeled_by": "first pass",
+   "reason": "A policy document on issuing and revoking API keys, not the endpoint docs measured. Issue deleted since; bounty program."
+  },
+  {
+   "repo": "openJiuwen-ai/sciencediscovery",
+   "number": 841,
+   "title": "[Bug] The artifact preview endpoint silently clamps `?maxRows=` to 100 and caps the column set at 1,001, so an outside API caller gets less than it asked for",
+   "labels": [
+    "bug",
+    "documentation",
+    "priority/unspecified",
+    "need-human",
+    "bot-reviewed"
+   ],
+   "state": "open",
+   "text": "## What happens\n\n`GET` artifact version preview (`services/api/src/artifact-dashboard.ts`, `buildArtifactVersionPreview` → `parseDelimitedTable` / `recordArrayTable`) now bounds its payload with two server-side constants:\n\n- `const maxRows = Math.min(MAX_PREVIEW_ROWS, parsePositiveInt(maxRowsParam, DEFAULT_MAX_ROWS));` — `MAX_PREVIEW_ROWS = DEFAULT_MAX_ROWS = 100` (`artifact-dashboard.ts:719` at `0477d328`)\n- `const width = Math.min(totalColumns, MAX_PREVIEW_COLUMNS);` — `MAX_PREVIEW_COLUMNS = 1_001` (`artifact-dashboard.ts:398`)\n\nA caller that asks for more gets less, with no error: the response just carries `truncated` and `clippedColumns`/`clippedCells`.\n\n## Measured at `0477d328`\n\n- 1,500-column CSV → `columns 1001`, `clippedColumns {shown 1001, total 1500}`, `clippedCells 499` (named columns past 1,001 are dropped).\n- 401-row CSV at `?maxRows=400` → `rows 100`, `totalRows 400`, `truncated true`.\n- 500-record JSON at `?maxRows=400` → the same 100 rows (the clamp applies to the record-array path too).\n\n## Why it matters\n\nThe bundled web client never sends `maxRows` (`apps/web/src/api/artifacts.ts:201` forwards an optional value only, and `apps/desktop` reads local CSV), so there is no in-repo regression — but for any other API caller this is a silent contract change: asking for 400 rows returns 100, and a legitimately wide table loses named columns. `#829` asked for a preview that keeps every row as wide as the columns it advertises; the bound is what makes the payload fin",
+   "pick": {
+    "kind": "prose",
+    "gaps": [
+     "7/40 endpoints have no description",
+     "38/40 endpoints have no request example",
+     "37/40 endpoints have no response example",
+     "3/40 endpoints list no status or error codes"
+    ],
+    "check_manually": [
+     "Docs link in the README: sciencediscovery.github.io/index.html"
+    ]
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "you",
+   "reason": "A code bug: an endpoint silently caps maxRows at 100."
+  },
+  {
+   "repo": "ArcadeData/arcadedb",
+   "number": 10684,
+   "title": "SQL on an edge: `out` and `in` silently return null (the endpoints are `@out` / `@in`); a docs line or an error would help",
+   "labels": [
+    "documentation",
+    "enhancement",
+    "sql",
+    "severity:minor"
+   ],
+   "state": "closed",
+   "text": "On an edge, SQL reads the endpoints as `@out` and `@in` (the docs use them throughout, e.g. `CREATE INDEX ... (@out, @in)` and `WHERE @out = #12:0`), and `outV()` / `inV()` work too. Plain `out` and `in` are not fields of an edge, but reading them is not an error: they return null, and so does every path through them. A query written the OrientDB way, or by someone who guesses the field name, silently returns nulls instead of failing.\n\n**Reproducer** (ArcadeDB 26.10.2 through the Python bindings `arcadedb-embedded` 26.10.2.post1; the statements are plain SQL, so any client shows the same):\n\n```python\nimport arcadedb_embedded as arcadedb\nwith arcadedb.create_database(\"./t\") as db:\n    db.command(\"sql\", \"CREATE VERTEX TYPE A\"); db.command(\"sql\", \"CREATE VERTEX TYPE B\"); db.command(\"sql\", \"CREATE EDGE TYPE E\")\n    with db.transaction():\n        db.command(\"sql\", \"INSERT INTO A SET id = 1\"); db.command(\"sql\", \"INSERT INTO B SET name = 'x'\")\n        db.command(\"sql\", \"CREATE EDGE E FROM (SELECT FROM A) TO (SELECT FROM B) SET qty = 7\")\n    for q in (\"SELECT out.id FROM E\", \"SELECT in.name FROM E\", \"SELECT out FROM E\", \"SELECT @out.id FROM E\", \"SELECT outV().id FROM E\"):\n        print(q, [r.to_dict() for r in db.query(\"sql\", q)])\n```\n\n| Query | Result |\n|---|---|\n| `SELECT out.id FROM E` | `[{'out.id': None}]` |\n| `SELECT in.name FROM E` | `[{'in.name': None}]` |\n| `SELECT out FROM E` | `[{'out': None}]` |\n| `SELECT @out.id FROM E` | `[{'@out.id': 1}]` |\n| `SELECT outV().id FROM E` ",
+   "pick": {
+    "kind": "prose",
+    "gaps": [
+     "4/94 endpoints have no description",
+     "94/94 endpoints have no request example",
+     "94/94 endpoints have no response example",
+     "63/94 endpoints list no status or error codes",
+     "1/94 endpoints don't say how to authenticate"
+    ],
+    "check_manually": [
+     "Project website: arcadedb.com",
+     "Docs link in the README: docs.arcadedb.com",
+     "Separate docs repo: ArcadeData/arcadedb-docs"
+    ]
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "SQL behaviour on edges; a docs line would help, but it's the SQL docs, not the HTTP API reference."
+  },
+  {
+   "repo": "amd/gaia",
+   "number": 4434,
+   "title": "docs: remaining user-facing strings point at gaia vlm, Llama Hybrid and OPENAI_API_KEY",
+   "labels": [
+    "good first issue"
+   ],
+   "state": "closed",
+   "text": "A few user-facing strings still point people at things GAIA no longer has. The Agent UI suggests running `gaia vlm`, which isn't a command. The docs also show a Llama \"Hybrid\" model example, define an `OPENAI_API_KEY` nothing reads, and a testing guide tells testers to run `lemonade-server serve`.\n\nNext step: fix the four strings below.\n\n<details>\n<summary>🔍 Technical details</summary>\n\n`main @f4924e35`.\n\n- `src/gaia/apps/webui/src/components/UnsupportedFeature.tsx:31`: \"Use GAIA's VLM agent for image analysis: gaia vlm\". There is no `gaia vlm` subcommand. Point to the flagship agent (vision is in `VLMToolsMixin`), or remove the hint.\n- `docs/reference/features.mdx:58`: Llama Hybrid model example. The current default is `Gemma-4-E4B-it-GGUF`.\n- `docs/glossary.mdx:340`: defines `OPENAI_API_KEY`. The `openai` provider was retired in #3899.\n- `docs/plans/transcription-testing-guide.md:233`: tells testers to run `lemonade-server serve`. This is a working guide, not a historical plan.\n\nTracked elsewhere, not repeated here: the FAQ model list (`docs/reference/faq.mdx:153,159,232`, raised in #2298 and closed as not planned, but still wrong on `main`), `install.mdx` naming Qwen3-0.6B as the first download (#3472 / #3205), the chat guide's vision model (#3445), and `gaia tui` (#3219 / #3434, PR #3812).\n</details>",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "5/12 operations have parameters without descriptions",
+     "11/12 operations have no request or response examples",
+     "6/12 operations document no error responses",
+     "1/1 authentication schemes have no description",
+     "1 operation groups (tags) have no description",
+     "No server address is given, so readers can't tell where to send requests"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "Outdated user-facing strings and commands."
+  },
+  {
+   "repo": "zowe/api-layer",
+   "number": 4159,
+   "title": "expand description of swagger /auth/query to add  retrieve information",
+   "labels": [
+    "bug",
+    "good first issue",
+    "Priority: Medium",
+    "V3",
+    "size/XS"
+   ],
+   "state": "open",
+   "text": "**Describe the bug**\nA clear and concise description of what the bug is.\n\nI think I have done a certificate sign-on - but would like to display the userid which was activated. I could not find a  REST request for this.\n\nI found [/auth/query](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/zowe/docs-site/docs-staging/api_definitions/gateway.json#/Security/validateUsingGET)\n**Validate the authentication token.** - but I did not want to validate - I wanted to display...\n\nAfter half an hour, and google, I found\n\nhttps://petstore.swagger.io/?url=https://raw.githubusercontent.com/zowe/docs-site/docs-staging/api_definitions/gateway.json#/Security/validateUsingGET\n\nwhich says\n\nUse the /query API to validate the token and retrieve the information associated with the token.\n\nPlease can you change the swagger definitions\nfrom \n**Validate the authentication token.**\nto \n**Validate the token and retrieve the information associated with the token**",
+   "pick": {
+    "kind": "elsewhere",
+    "gaps": [],
+    "check_manually": [
+     "Docs link in the README: docs.zowe.org"
+    ]
+   },
+   "bounty": false,
+   "label": "A",
+   "labeled_by": "you",
+   "reason": "Asks for one endpoint's description to be expanded; the pick's docs are elsewhere. Small, and partly fixed by maintainer PR #4515 (comparison round 3)."
+  },
+  {
+   "repo": "Emmy123222/Stellar-MarketPay-",
+   "number": 1857,
+   "title": "Document the public API of core backend services with JSDoc",
+   "labels": [
+    "documentation",
+    "help wanted",
+    "Stellar Wave"
+   ],
+   "state": "deleted",
+   "text": "",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "83/162 operations have parameters without descriptions",
+     "155/162 operations have no request or response examples",
+     "137/162 operations have no schema for a successful response",
+     "109/162 operations document no error responses",
+     "1 operation groups (tags) have no description"
+    ],
+    "check_manually": []
+   },
+   "bounty": true,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "JSDoc comments on internal backend services, not the REST API. Repo deleted since; bounty program."
+  },
+  {
+   "repo": "Agora-Events/agora",
+   "number": 1572,
+   "title": "[DOCS] Document the backend API error response format in docs/api.md",
+   "labels": [
+    "good first issue",
+    "Stellar Wave"
+   ],
+   "state": "closed",
+   "text": "Description\nThe backend API error format (JSON) is not documented. Add a section to docs/api.md that explains the error schema (code, message, details).\n\nFile: docs/api.md",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "1/9 operations have parameters without descriptions",
+     "9/9 operations have no request or response examples",
+     "9/9 operations have no schema for a successful response",
+     "9/9 operations document no error responses",
+     "1/1 authentication schemes have no description",
+     "3 operation groups (tags) have no description"
+    ],
+    "check_manually": []
+   },
+   "bounty": true,
+   "label": "A",
+   "labeled_by": "first pass",
+   "reason": "Document the API's error response format; the measured spec has 9/9 operations without error responses. Bounty program."
+  },
+  {
+   "repo": "pacocartones/free-llm-api-hub",
+   "number": 180,
+   "title": "[good first issue] Add copy buttons and curl snippets to the /api/ docs page",
+   "labels": [
+    "feature",
+    "good first issue",
+    "hacktoberfest"
+   ],
+   "state": "open",
+   "text": "## What\nThe /api/ page lists endpoints but a visitor must type the URLs by hand.\n\n## Task\nAdd a one-click copy button next to each endpoint on `site/api/index.html` (generated by `scripts/build.mjs`), plus a `curl` example row. Match existing styling in `site/styles.css`. Run `npm run build && npm test`.",
+   "pick": {
+    "kind": "elsewhere",
+    "gaps": [],
+    "check_manually": [
+     "Project website: freellmapihub.com"
+    ]
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "Copy buttons and curl rows on the page of a static JSON dataset (no server, no parameters): a docs-site feature, not API docs writing. You weren't sure; proposed 6 Nov."
+  },
+  {
+   "repo": "sipyourdrink-ltd/bernstein",
+   "number": 5546,
+   "title": "OrcaRouter provider support for Bernstein (as an OpenAI-compatible endpoint)",
+   "labels": [
+    "size/s",
+    "docs",
+    "needs-better-brief"
+   ],
+   "state": "open",
+   "text": "### Problem\n\nBernstein tackles a problem few orchestrators address head-on: coordination that stays fully deterministic while the models doing the work remain interchangeable. Policy-as-code plus a plain-Python scheduler makes a run replay to the same task graph, and signed receipts let an operator verify a run offline from the artifacts alone — the README's origin story of parallel coding agents producing nondeterministic merges is the exact failure mode it removes.\n\nThat same operator is why I think Bernstein gains from more provider choice. `provider_availability` already gives each role an ordered fallback chain of `(adapter, model)` pairs, health-probed before dispatch and recorded as a routing receipt. The missing piece is more certified endpoints to place in that chain.\n\n### Proposed solution\n\nAdd OrcaRouter as an **optional** provider that operators can point a Bernstein adapter at. It would not replace or alter any existing provider, adapter behaviour, or scope boundary. Concretely:\n\n- Document pointing an adapter at OrcaRouter's OpenAI-compatible endpoint in `bernstein.yaml`, the token supplied through an env-var name (as with `api_key_env`) rather than an inline secret, mirroring the `clm`/Ollama lanes.\n- Let operators qualify it with tooling Bernstein already ships for any OpenAI-compatible server — `bernstein endpoints certify` / `bernstein doctor --endpoint` — so an OrcaRouter entry reaches a `provider_availability` chain only after passing the conformance probe",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "238/515 operations have parameters without descriptions",
+     "515/515 operations have no request or response examples",
+     "256/515 operations have no schema for a successful response",
+     "199/515 operations document no error responses",
+     "16 operation groups (tags) have no description",
+     "No server address is given, so readers can't tell where to send requests"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "A feature request: a new model provider."
+  },
+  {
+   "repo": "docs-plus/docs.plus",
+   "number": 235,
+   "title": "Correct three stale API documentation claims",
+   "labels": [
+    "documentation",
+    "good first issue"
+   ],
+   "state": "closed",
+   "text": "## Problem\n\nTwo published statements contradict the code.\n\n**1. The auth page overstates the service-role key.** `docs/api/authentication.md` §Keep the service-role key on a server says the key \"passes every document, public and private\". §What each credential can call repeats it for export and import. But §Private documents are owner-only says the slug read ignores the key. A reader who trusts the first line expects the key to open a private document by slug.\n\n**2. `API.md` names the wrong media path.** §Error envelope lists \"media-upload guards\" among the ad-hoc `{ \"error\": \"...\" }` shapes. The upload route returns the house envelope (`src/api/routers/hypermultimedia.router.ts`). The ad-hoc shape comes from media file reads (`src/lib/storage/storage.local.ts`, `storage.s3.ts`).\n\n## What to do\n\nDocumentation only.\n\n1. Qualify each \"passes every document\" sentence: on the routes it can call, with the slug read as the one exception. Link to §Private documents are owner-only.\n2. In `API.md`, replace \"media-upload guards\" with \"media file reads\".\n\n## Acceptance\n\n- [ ] `docs/api/authentication.md` never says the key opens every document without naming the slug-read exception.\n- [ ] `API.md` §Error envelope lists media file reads, not media-upload guards.\n\n## Notes\n\nThe rate-limit item is done: `API.md` §Rate limiting states the production value, `500`.",
+   "pick": {
+    "kind": "prose",
+    "gaps": [
+     "2/106 endpoints have no description",
+     "106/106 endpoints have no request example",
+     "102/106 endpoints have no response example",
+     "85/106 endpoints list no status or error codes"
+    ],
+    "check_manually": [
+     "Project website: docs.plus"
+    ]
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "first pass",
+   "reason": "Three outdated statements in the API docs: API docs work, but not the gaps measured."
+  },
+  {
+   "repo": "eugenioenko/autentico",
+   "number": 436,
+   "title": "docs: correct README instructions for opening Swagger UI",
+   "labels": [
+    "documentation",
+    "help wanted",
+    "good first issue"
+   ],
+   "state": "open",
+   "text": "## Problem\n\nThe [README API Documentation section](https://github.com/eugenioenko/autentico/blob/6408466e4ac349701feb5789a9f8708229f0925e/README.md#L1063) says:\n\n```bash\nmake docs\n# Opens at http://localhost:8888/swagger/index.html\n```\n\nThere is no `docs` target in the Makefile. Because the repository has a `docs/` directory, running `make docs` simply reports that there is nothing to do; it does not start a documentation server.\n\nSwagger is served by the running Autentico application at `/swagger/index.html`: see [route registration](https://github.com/eugenioenko/autentico/blob/6408466e4ac349701feb5789a9f8708229f0925e/pkg/cli/start.go#L125) and [startup URL output](https://github.com/eugenioenko/autentico/blob/6408466e4ac349701feb5789a9f8708229f0925e/pkg/cli/start.go#L309). The default local app port is 9999, not 8888.\n\n## Suggested change\n\nUpdate the README to explain how to open Swagger on an initialized, running Autentico instance. Link to Getting Started for setup and show the default URL `http://localhost:9999/swagger/index.html`, noting that the host/port follows the instance configuration.\n\nIf mentioning regeneration, distinguish the existing `make generate-docs` target from serving the UI.\n\n## Acceptance criteria\n\n- [ ] Instructions use existing commands and the app's actual Swagger URL.\n- [ ] The nonexistent `make docs` workflow and hard-coded port 8888 are removed.\n- [ ] Regenerating API artifacts is not described as starting a server.\n\nDocumentation-only fix; no ",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "90/90 operations have no request or response examples",
+     "1/90 operations have no schema for a successful response",
+     "25/90 operations document no error responses",
+     "2 operation groups (tags) have no description"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "first pass",
+   "reason": "The README's instructions for opening Swagger UI are wrong: docs about reaching the API docs."
+  },
+  {
+   "repo": "Drix10/ai-resources",
+   "number": 31,
+   "title": "Add `openapi.yaml` for the public API (custom GPT Actions, codegen)",
+   "labels": [
+    "documentation",
+    "enhancement",
+    "help wanted"
+   ],
+   "state": "open",
+   "text": "## Context\nThe JSON API at `https://blogs.drix10.com` (documented in [USE-WITH-AI.md](https://github.com/Drix10/ai-resources/blob/main/USE-WITH-AI.md#json-api)) has no machine-readable spec. An OpenAPI 3.1 file would let people add it as a ChatGPT custom GPT Action, generate clients, and import it into Postman or other agent frameworks.\n\n## Task\nAdd `openapi.yaml` at the repo root describing:\n- `GET /api/articles` with `q`, `category`, `since`, `limit`, `page`, `slug` and both response shapes (list; single item with `content`).\n- `GET /api/categories`.\nCheck every field against the live API (`curl \"https://blogs.drix10.com/api/articles?q=anthropic&limit=1\"`, `curl \"https://blogs.drix10.com/api/articles?slug=<a slug>\"`, `curl https://blogs.drix10.com/api/categories`). Use `operationId`s and descriptions that read well to an LLM.\n\n## Acceptance criteria\n- [ ] Validates with a standard linter (for example `npx @redocly/cli lint openapi.yaml`); say which in the PR.\n- [ ] Imported into a custom GPT Action (or another OpenAPI-based agent tool) and called once; describe the result in the PR.\n- [ ] Linked from USE-WITH-AI.md (JSON API section).\n\nSee [CONTRIBUTING.md](https://github.com/Drix10/ai-resources/blob/main/CONTRIBUTING.md) for setup. Comment here to claim it, so two people do not do the same work.",
+   "pick": {
+    "kind": "elsewhere",
+    "gaps": [],
+    "check_manually": [
+     "Project website: blogs.drix10.com"
+    ]
+   },
+   "bounty": false,
+   "label": "A",
+   "labeled_by": "first pass",
+   "reason": "Asks for an OpenAPI file for the 4-endpoint JSON API; the pick's docs are elsewhere."
+  },
+  {
+   "repo": "solongate/agent-security",
+   "number": 353,
+   "title": "shared/dlp: exported pattern-lookup API has no doc comments",
+   "labels": [
+    "documentation",
+    "good first issue"
+   ],
+   "state": "open",
+   "text": "None of the exported functions in packages/shared/dlp.go carry a doc comment. DLPPatternCount, DLPPatternNames, DLPPatternAt, DLPPatternIndex, DLPHitRank, DLPScan, DLPScanViews, and GlobToRegexp are the public surface other packages use to drive DLP scanning, but their parameters and return semantics are only discoverable by reading the body. For example DLPHitRank's returned int is a priority rank used to pick the \"earliest\" pattern match, and GlobToRegexp only treats runs of \"*\" as a wildcard and quotes everything else literally, and neither fact is stated anywhere near the function signature.\n\nAdd a short doc comment above each exported function in dlp.go stating what it does, what its parameters mean, and what its return value represents, so a new contributor can use the API without tracing through the implementation.",
+   "pick": {
+    "kind": "elsewhere",
+    "gaps": [],
+    "check_manually": [
+     "Project website: solongate.com"
+    ]
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "first pass",
+   "reason": "Go doc comments on an internal package, not the REST API."
+  },
+  {
+   "repo": "AOSSIE-Org/PictoPy",
+   "number": 1664,
+   "title": "DOC: Update Rust backend API documentation for Tauri v2 and missing IPC commands",
+   "labels": [
+    "bug",
+    "documentation",
+    "possible-duplicate"
+   ],
+   "state": "open",
+   "text": "### What's wrong with the existing documentation\n\nCurrently, `docs/backend/backend_rust/api.md` contains several critical inaccuracies and is severely out of date:\n\n1. **Outdated Tauri v1 API imports**: The usage example imports `invoke` from `@tauri-apps/api/tauri` (Tauri v1), whereas PictoPy has migrated to Tauri v2 where commands must be invoked via `@tauri-apps/api/core`.\n2. **Broken code example**: The example references an undefined variable `serverPath` instead of `resourcesFolderPath` (`console.log(\"Resources folder path:\", serverPath)`), causing a runtime `ReferenceError` when executed.\n3. **Missing 12 of 13 registered IPC commands**:\n   The documentation only lists `get_resources_folder_path`. The remaining 12 commands defined and registered in `frontend/src-tauri/src/main.rs` (`invoke_handler!`) are completely undocumented:\n   - **File System / Media**: `open_image_file`\n   - **Reverse Tunnel Service**: `tunnel_start`, `tunnel_stop`, `tunnel_status`\n   - **Window & UI Management**: `open_model_manager`, `get_close_to_tray`, `set_close_to_tray`\n   - **System Autostart**: `enable_autostart`, `disable_autostart`, `is_autostart_enabled`\n   - **Memories Service**: `open_memory`, `take_pending_memory`\n4. **Missing Event Bus Documentation**: Undocumented native desktop events (`memory:pending`, `memory:open`) emitted from Rust to the frontend webview.\n\n### Proposed Solution\n\nUpdate `docs/backend/backend_rust/api.md` to:\n- Migrate frontend code samples to Tauri v2 syntax (",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "17/57 operations have parameters without descriptions",
+     "57/57 operations have no request or response examples",
+     "10/57 operations have no schema for a successful response",
+     "6/57 operations document no error responses",
+     "13 operation groups (tags) have no description"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "first pass",
+   "reason": "Docs for the Tauri commands, a different API from the REST spec measured."
+  },
+  {
+   "repo": "writerslogic/holographic-memory",
+   "number": 10,
+   "title": "Node.js API reference with usage examples",
+   "labels": [
+    "documentation",
+    "good first issue"
+   ],
+   "state": "open",
+   "text": "## Summary\n\nThe full N-API surface (~40 methods) is documented only in `index.d.ts` type signatures. A human-readable API reference with a short example per method would make HMS much more approachable.\n\n## Scope\n\nCreate `docs/API.md` covering every public method on `HolographicMemorySystem`:\n\nFor each method, include:\n- Signature (from `index.d.ts`)\n- One-sentence description\n- A 3-5 line usage example\n- Return type explanation\n\n### Method Groups\n\n| Group | Methods |\n|-------|---------|\n| Core | `memorizeText`, `memorizeTextBuffer`, `memorizeVector`, `memorizeScalar`, `memorizeBatch`, `memorizeFile` |\n| Query | `query`, `queryVector`, `queryScalar`, `queryBatch`, `queryVectorBatch` |\n| Knowledge Graph | `memorizeTriplet`, `queryTriplet`, `findAnalogy`, `memorizeSequence`, `querySequence` |\n| Meaning Memory | `memorizeMeaning`, `structuralQuery`, `multiHopQuery`, `meaningCleanup`, `cleanupVector`, `declareCompositionRule` |\n| Analysis | `analyzeText`, `calculateReadability`, `analyzeComponents`, `factorizeDiffusion`, `synthesizeConcepts` |\n| Cognition | `startCognition`, `stopCognition`, `runCognitionOnce`, `governMemory` |\n| Agency | `addGoal`, `deactivateGoal`, `activeGoals`, `planGoal`, `generateQuestions`, `proposeRule`, `approveProposal`, `rejectProposal` |\n| Graph | `addRelation`, `removeRelation`, `traverse`, `outgoingRelations`, `incomingRelations`, `declareRelationType`, `federatedQuery` |\n| Lifecycle | `trainNsg`, `trainIvf`, `delete`, `compact`, `auditSince`, `bund",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "31/31 operations have no request or response examples",
+     "6 operation groups (tags) have no description"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "first pass",
+   "reason": "A reference for the Node.js library's methods, not the REST spec measured."
+  },
+  {
+   "repo": "ChurchCRM/CRM",
+   "number": 9949,
+   "title": "API docs: OpenAPI paths cannot be resolved against the declared server (43 of 239 private operations 404)",
+   "labels": [
+    "Documentation",
+    "API"
+   ],
+   "state": "open",
+   "text": "## Summary\n\nThe generated OpenAPI specs declare a single server (`{scheme}://{host}/api`), but the `paths` are written in two different conventions depending on which route tree they came from. As a result, a client that resolves a path against the declared server — which is what OpenAPI tooling does by definition — builds a 404 URL for **43 of the 239 private operations (18%)**.\n\nFound while building an Expo/React Native client against the published spec. The specs are genuinely useful and most of the surface is correct; this is about the subset that can't be resolved mechanically.\n\n## Why it happens\n\n`generate.php` scans five route trees into one document:\n\n```\napi/routes/  admin/routes/api/  finance/routes/api/  kiosk/routes/api/  plugins/routes/api/\n```\n\nRoutes under `api/routes/` are mounted at `/api`, so their docblock paths are written *relative* to that mount and match `servers`. The module trees mount under their own prefix (`/admin`, `/finance`, `/kiosk`, `/plugins`) and write paths *absolute from the site root*. One `servers` entry can't describe both.\n\n## 1. Module paths are root-absolute (28 operations)\n\n| Spec path | Real URL | `servers[0].url` + path |\n|---|---|---|\n| `/finance/api/funds` | `/finance/api/funds` | `/api/finance/api/funds` ❌ |\n| `/admin/api/import/csv/families` | `/admin/api/import/csv/families` | `/api/admin/api/import/csv/families` ❌ |\n| `/kiosk/api/devices` | `/kiosk/api/devices` | `/api/kiosk/api/devices` ❌ |\n| `/plugins/api/plugins` | `/plug",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "242/400 operations have parameters without descriptions",
+     "297/400 operations have no request or response examples",
+     "178/400 operations have no schema for a successful response",
+     "44/400 operations document no error responses"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "first pass",
+   "reason": "The generated spec's paths don't match its server; a spec fix, not the gaps measured."
+  },
+  {
+   "repo": "camaraproject/QualityOnDemand",
+   "number": 632,
+   "title": "Update documentation in info.description of both APIs",
+   "labels": [
+    "documentation"
+   ],
+   "state": "closed",
+   "text": "**Problem description**\nseveral documentation points:\n\n1) In the qos-provisioning.yaml file, he term/definition section \"QoS profiles and QoS profile labels\" does not say anything about Qos Profile labels. The term \"label\" is not used anywhere in the yaml(s) - the term QosProfileName is used instead. \n\n2) improve same description in quality-on-demand.yaml \n\n3) the link (if any ?) between provisioning a QoS profile for a device, and requesting a session with a given QoS profile is not clear. \n\n  - Does one need to first provision a QoS profile to a device and then request a session with that **same** profile ? \n  - it looks that one can only provision one QoS profile to a device. What if multiple applications require different QoS profiles assignmenets/sessions to the same device ? \n\n4) both APIs only refer to the QoSProfileName. That should be made more explicit, and reference to latency and jitter shuld be avoided (except in the definition sections for QoS profile)\n \n**Expected action**\n \n1) update the text in qos-provisioning.yaml as follows: \n\n- Drop the reference to QoS profile labels in the section title (line 13)\n- rephrase the first sentenc \"Latency, throughput or priority requirements of the application mapped to relevant QoS profile values.\" to \"A QoS Profile defines the latency, throughput or priority charactersitics as may be required by an application or a session. Each QoS Profie is identified by its QosProfileName.\"\n- rephrase the beginning of the second sentenc",
+   "pick": {
+    "kind": "elsewhere",
+    "gaps": [],
+    "check_manually": [
+     "The README mentions Swagger UI, ReDoc or an OpenAPI URL, so a spec may be generated when the app runs",
+     "Project website: lf-camaraproject.atlassian.net/wiki/x/XCPe"
+    ]
+   },
+   "bounty": false,
+   "label": "A",
+   "labeled_by": "first pass",
+   "reason": "Improve info.description in both API specs; the pick's docs are elsewhere."
+  },
+  {
+   "repo": "camaraproject/QualityOnDemand",
+   "number": 631,
+   "title": "Missing User_Story for QoS Provisioning API",
+   "labels": [
+    "documentation"
+   ],
+   "state": "open",
+   "text": "**Problem description**\nThere is no user story for the QoS provisioning API. \n\n**Expected action**\nAdd the relevznt user story\n\n**Additional context**\nShould be done latest by the public release.",
+   "pick": {
+    "kind": "elsewhere",
+    "gaps": [],
+    "check_manually": [
+     "The README mentions Swagger UI, ReDoc or an OpenAPI URL, so a spec may be generated when the app runs",
+     "Project website: lf-camaraproject.atlassian.net/wiki/x/XCPe"
+    ]
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "first pass",
+   "reason": "A missing user story for one API: product docs, not the reference."
+  },
+  {
+   "repo": "Berk-Unsal/atom",
+   "number": 86,
+   "title": "Reconcile maintained roadmap status and unsupported API release promises",
+   "labels": [
+    "help wanted",
+    "area: docs",
+    "priority: P3",
+    "type: docs"
+   ],
+   "state": "closed",
+   "text": "## Context\n\nThe A.T.O.M v0.12.2 roadmap/contribution audit rechecked this against released source at `0310bd8`. This is a bounded follow-up; existing scientific and operational limits remain in force.\n\n## Problem\n\nplanning/future_plans.md still calls tagged images, browser coverage and an additional pack release-completion work despite current release workflow/E2E/sample-pack evidence. docs/api.md says future versions will add webhooks and other capabilities without an admitted objective or milestone.\n\n## Scope\n\nReconcile maintained roadmap rows with the released source and this evidence-backed issue backlog. Replace unconditional API future promises with supported current behavior or clearly gated candidates. Preserve dated historical research and qualification reports.\n\n## Acceptance criteria\n\n- [ ] Each maintained roadmap row is marked implemented, partial, blocked or deferred with current source/issue evidence; existing sample-pack and release/E2E work is not recreated.\n- [ ] Measurement reference-set text distinguishes synthetic/tooling fixtures from a usable real field-validation dataset.\n- [ ] API documentation makes no uncommitted webhook, terrain, custom-model or release promise; API contract version is kept distinct from application VERSION.\n- [ ] Current docs build/classification/link checks pass and historical artifacts are unchanged.\n\n## Non-goals\n\nNo v0.13.0 milestone or release commitment, qualification reopening, new APIs, new field measurements or implementat",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "8/43 operations have parameters without descriptions",
+     "43/43 operations have no request or response examples",
+     "13/43 operations have no schema for a successful response",
+     "13/43 operations document no error responses"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "C",
+   "labeled_by": "you",
+   "reason": "Reconcile the roadmap with what releases do."
+  },
+  {
+   "repo": "Bike4Mind/bike4mind",
+   "number": 1244,
+   "title": "Epic: Contract-first public API - single-source endpoints + doc consolidation",
+   "labels": [
+    "documentation",
+    "P3",
+    "epic",
+    "roadmap",
+    "public-api"
+   ],
+   "state": "open",
+   "text": "## Problem\n\nOur API documentation and contracts are fragmented and drift-prone:\n\n- The public **OpenAPI spec** (`/api/v1/openapi.json`, Scalar UI at `/api/v1/docs`) is generated from runtime Zod and drift-gated in CI, but covers only **2 operations**.\n- A **~1,400-line hand-written Markdown reference** (`apps/client/app/components/admin/content/apiReferenceContent.ts`, rendered in the admin API Reference tab) documents the whole surface but is **unverified** and silently drifts from the code.\n- Across ~718 route files, the request contract lives **inline in the handler** in ~227 of them; only ~26 import a shared schema. The contract is trapped where docs, SDKs, and types can't reach it.\n- Versioning is incoherent (four version roots: `api/v1`, `ai/v1`, `voice/v2`, `overwatch/v1`) and naming mixes REST nouns with RPC verbs.\n\nThe documentation drift is a symptom; the root cause is that an endpoint's truth (schema + scopes + response + docs) is smeared across 3-5 places per route.\n\n## The pattern\n\nMake each **public** endpoint a single transport-agnostic **contract** object that the handler, validation, auth, OpenAPI spec, and typed client are all derived from. Define once; derive everything.\n\n```\n<name>.contract.ts   (pure data: method, path, operationId, auth, scopes, request/response Zod, docs)\n   |-> OpenAPI:  auto-registered            -> spec + Scalar + SDK codegen\n   |-> Next.js:  nextRouteForContract(...)  -> req.validated, scopes wired\n   |-> Lambda:   defineLambdaRoute",
+   "pick": {
+    "kind": "spec",
+    "gaps": [
+     "1/10 operations have parameters without descriptions",
+     "2/10 operations have no request or response examples",
+     "10/10 operations document no error responses",
+     "The API overview (info.description) is missing or very short",
+     "2 operation groups (tags) have no description"
+    ],
+    "check_manually": []
+   },
+   "bounty": false,
+   "label": "B",
+   "labeled_by": "you",
+   "reason": "A roadmap epic to make one spec the single source: an internal project, not a task for an outsider."
+  }
+ ]
+}

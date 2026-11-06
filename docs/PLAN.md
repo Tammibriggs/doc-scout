@@ -503,7 +503,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅
     hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 226 tests (200 and 9 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅
+  tests/ ✅ 228 tests (202 and 9 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
 ```
 
 ## 17. Risks
@@ -553,7 +553,8 @@ hacktoberfest/
 ## 19. Later (after M5)
 
 **Gemma for the two judgments code still makes from words** (decided 17 Oct, after the deadline):
-- **Is the help request about the API docs?** Moved to M6 (section 21) on 6 Nov: of the 23 listed picks with a help request, only 4 ask for the work DocScout measured.
+- **Is the help request about the API docs?** Moved to M6 (section 21) on 6 Nov: of the 23 listed picks with a help request, only 5 ask for the work DocScout found.
+- **Static JSON datasets** (found 6 Nov): free-llm-api-hub publishes about 30 static JSON files (no server, no parameters, no auth) and passed Gemma's review as a REST API, though most of DocScout's REST checks don't apply to it. Decide whether such projects should be listed; M6 already drops this one, since its only help request (#180, copy buttons on the API page) doesn't count.
 - **Which prose lines are real endpoints?** Today patterns find them (`GET /path`, `curl` lines). Gemma would confirm which of the found lines are the project's own API endpoints, catching what the install-command rule doesn't. Prompt v3 showed Gemma copying measured facts instead of judging, so the question would be narrow (one line at a time, or a list to accept or reject), and measured before it's switched on.
 
 Both add Gemma requests and time to every run.
@@ -633,12 +634,14 @@ The website's list fell from about 70 picks to 9 (section 20), because a pick le
 | The card says | What was true (5–6 Nov) | How it was checked |
 |---|---|---|
 | ⚠ Someone may be on it (15 picks) | **None holds up.** 7 of the 14 flagged PRs are closed, but their claims are still shown, because claims are checked only in a pick's first 7 days. The 7 still open fix none of the measured gaps: they're features and fixes that edit the spec for their own changes. wildduck's adds 11 operations, none documented; devtrack's removes 2. The comment "claims" are offers on issues about something else (docling: a code fix), on issues since deleted (stellar_Earn) or closed (agora), on a deleted repo (Stellar-MarketPay), or not offers at all (holographic-memory) | Each PR's spec measured before and after, with DocScout's own scorer; comments read |
-| Maintainers asked for help (23 picks) | **Only 4 ask for the work DocScout measured** (OpsiMate, Drix10, agora, QualityOnDemand). 10 ask for other API-docs work (one endpoint's description, three outdated statements, Tauri commands instead of the REST spec), and 9 aren't about API docs (a licence badge, a code bug, a new provider, Go doc comments); 6 of these calls are borderline. 8 of the 25 issues are now closed or deleted | Every issue read in full |
-| The gap's numbers | The measured docs file changed for **51 of 106** picks within 2–3 weeks, and 2 files are gone. Measured again, the work needed grew for 30 of 48 specs (new endpoints without docs), stayed the same for 13 and shrank for 4, a lot for 2: OxiCloud 232 → 78 operations needing work, open-wearables 136 → 91. None fell below the size cutoff | The file's version when found and now; changed specs measured again |
+| Maintainers asked for help (23 picks) | **Only 5 ask for the work DocScout found** (OpsiMate, zowe, agora, Drix10, QualityOnDemand). 8 ask for other API-docs work (three outdated statements, Tauri commands instead of the REST spec, a Node.js library reference), and 10 aren't about API docs (a licence badge, code bugs, a new provider, Go doc comments, copy buttons on a docs page). Labeled 6 Nov, the 6 borderline ones by you ([tests/fixtures/m6/help_requests.json](../tests/fixtures/m6/help_requests.json)). 8 of the 25 issues are now closed or deleted | Every issue read in full |
+| The gap's numbers | The measured docs file changed for **51 of 106** picks within 2–3 weeks, and 2 files are gone. Measured again, the work needed grew for 30 of 48 specs (new endpoints without docs), stayed the same for 13 and shrank for 4. None of the 4 gained a request or success example: devtrack and openreader removed operations, and OxiCloud (232 → 78 operations needing work) and open-wearables (136 → 91) added one example to a shared error response that every operation refers to (next row) | The file's version when found and now; changed specs measured again |
+| "N operations have no request or response examples" | **Too low on 5 picks.** The check counts an example anywhere in an operation, error responses included. Of the 1,699 operations counted as having an example, 450 have one only on an error response, nearly all on 5 picks: OxiCloud 217, open-wearables 118, Inventoros 79, openziti 19, projectsend 10. An error example doesn't show what a call takes or returns | Where each example sits, in all 91 spec picks |
 | The project | 1 repo deleted, 1 renamed, 4 with no push for 30+ days (2 of them past 50) | One batched GraphQL check |
 
 What this means:
-- **Keeping picks is sound.** Gaps rarely close within weeks: projects add endpoints faster than they document them.
+- **Keeping picks is sound.** Gaps don't close within weeks: none of the 48 changed specs gained a request or success example, and projects add endpoints faster than they document them.
+- **Measuring has to count the right examples**, or a shared error example looks like hundreds of documented operations, in the gap check and in PR measuring alike (3).
 - **The card must be checked again:** claims and help requests change daily, and the numbers drift.
 - **Gemma can't be asked on every change.** 60 of the 119 live picks had an open PR updated in the last day: about 60 questions a day now and 500 at 1,000 picks, beyond its free tier. Measuring a PR needs no question.
 
@@ -647,7 +650,7 @@ What this means:
 Every listed pick is still open, and every line on its card was checked recently: claims, help requests and whether the project exists, within 6 hours; the gap's numbers, within 6 hours of the docs changing; the health checks, within 7 days.
 
 - **Claims:** at most 1 wrong of the 15 claimed picks of 6 Nov (today none holds up), and every real claim in the test set found.
-- **Help requests:** at least 21 of the 23 agree with your labels, and none of the 9 that aren't about API docs counts.
+- **Help requests:** at least 21 of the 23 agree with your labels, and none of the 10 that aren't about API docs counts.
 - **No listed pick** whose repo is deleted, archived or without a push in 60 days, and no card that shows a closed issue as a help request.
 - **A new PR or offer** on a listed pick shows on its card within 6 hours.
 - **Every open pick is listed** once the backlog is cleared.
@@ -679,6 +682,7 @@ Every listed pick is still open, and every line on its card was checked recently
 - The docs are measured again, by the same code that found the gap, in the same run that spots the change: within about 6 hours of it. If more changes are waiting than the run's cap allows, the rest are measured in the next run. The health checks (committers, outside merges) run every 7 days, in the daily run; the look already covers pushes and archiving.
 - The pick keeps its found date, its Gemma review and its place in the list. The new numbers replace the old ones, and a short history is kept (`details.history`: date, operations needing work, score).
 - When the numbers move by a fifth or more, Gemma rewrites why the docs matter and the first steps, which quote the numbers.
+- ⏳ Examples count only on parameters, request bodies and success responses (to confirm, at the end of this section), so a shared error example can't look like hundreds of documented operations.
 
 **4. Claims are per gap, and PRs are measured.**
 - Each gap gets a stable key, stored with its finding: `examples`, `parameters`, `errors` and so on for specs; `request_example`, `status_codes` and so on for prose.
@@ -698,6 +702,7 @@ Every listed pick is still open, and every line on its card was checked recently
   - **other API-docs work:** shown as a related issue, with none of the above;
   - **not API docs:** not shown.
 - A "docs elsewhere" pick has no measured gap, so there "this work" means work on the project's API reference.
+- Features of a docs site (copy buttons, search, styling) aren't API-docs work, even on the API page (free-llm-api-hub #180).
 - The looser health check still runs before Gemma. If Gemma then says the issue doesn't ask for this work, the repo must pass the normal thresholds, from numbers already fetched.
 - Each issue is asked about once, and again only when its text changes.
 
@@ -744,8 +749,8 @@ Each step can ship on its own.
 
 | Step | What | Exit check |
 |---|---|---|
-| **6a. Test set** | The 23 help requests and 15 claimed picks labeled from their full text (first pass done 6 Nov; you label the 6 borderline ones). **Real claims too:** all 15 claims of 6 Nov are wrong, so a check that never flags anything would pass a test set made only of them. Real claims come from merged PRs that fixed gaps (OxiCloud's and open-wearables' docs improved after they were found), real offers placed next to a gap they match, and a few made-up cases. Small specs, before and after, kept as test fixtures | Labels agreed |
-| **6b. Help requests** | The bounty filter, Gemma's question and its effects, the health-check order. Existing picks' requests asked once | At least 21 of 23 agree; none of the 9 non-API-docs requests counts |
+| **6a. Test set** | The 23 help requests and 15 claimed picks labeled from their full text (first pass done 6 Nov; you label the 6 borderline ones). **Real claims too:** all 15 claims of 6 Nov are wrong, so a check that never flags anything would pass a test set made only of them. Real ones are rare, since none of the 48 changed specs gained a request or success example. So the set uses open-wearables PR #1976 (merged 4 Nov: error responses documented for 32 operations, plus one shared error example that must not count as 119 examples), real offers placed next to a gap they match, and made-up cases. Small specs, before and after, kept as test fixtures. ✅ The help requests: [tests/fixtures/m6/help_requests.json](../tests/fixtures/m6/help_requests.json) | Labels agreed |
+| **6b. Help requests** | The bounty filter, Gemma's question and its effects, the health-check order. Existing picks' requests asked once | At least 21 of 23 agree; none of the 10 non-API-docs requests counts |
 | **6c. Claims per gap** | Gap keys, measuring PRs, per-gap questions for offers and generated specs, the 30-day offer rule, claim lines on cards | At most 1 wrong of the 15; every real claim in the test set found; the 14 PRs measure as on 6 Nov |
 | **6d. Open picks stay listed** | The look every 6 hours (the cron's new schedule and the daily-run rule), gap and health checks, leaving the list, renames, caps, the free 3, card dates and wording. The 120 earlier picks go through their first checks over the first few runs, oldest first, and each is listed again once it passes | A dry run on a copy of Atlas: every pick that leaves has a reason you agree with; the daily run at most 10 minutes longer, the others at most 5 minutes |
 | **6e. Docs and launch** | The README, the public skill (claims per gap, help requests, bounty programs) and this plan; deploy, then watch 3 days of runs | 3 days of clean runs, Gemma within its caps |
@@ -775,5 +780,7 @@ Each step can ship on its own.
 5. The laptop gets 6b and 6c, not 6d.
 6. The order: 6a to 6e, so the list comes back with correct claims.
 7. Looks for changes every 6 hours, not once a day.
+
+⏳ **To confirm:** examples count only where they show a call: on parameters, request bodies and success responses, not on error responses. Measuring this way, the 5 picks above get bigger gaps (OxiCloud: 18 → 235 operations without examples), no pick drops, and the public skill's definition changes to match (6e).
 
 **Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20); website filters.

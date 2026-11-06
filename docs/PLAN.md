@@ -294,6 +294,7 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   | Tags undescribed | 5 |
   | No servers | 5 |
 
+  - M6 changes these checks and weights: examples in two lines, field descriptions, error bodies (section 21, "Measuring changes").
   - `$ref` is resolved only within the file.
   - **Finding the spec** ✅ (16 Oct): files named `openapi*`/`swagger*` first, then any YAML or JSON in an `openapi`/`swagger` folder, then files named like `api.yaml` or `public-api.yaml`, at most 4 fetched. The parser drops files that aren't specs. Matching by name alone missed 4 specs in the comparison (dagu, jupyter_server, traceroot, ChurchCRM). The classifier's "owns a spec" evidence still uses names only, so the measured label numbers stay valid.
   - **Generated specs** (a `DO NOT EDIT` header, or CI that regenerates the file) keep their score, but the suggestion becomes "edit the code annotations".
@@ -636,7 +637,7 @@ The website's list fell from about 70 picks to 9 (section 20), because a pick le
 | ⚠ Someone may be on it (15 picks) | **None holds up.** 7 of the 14 flagged PRs are closed, but their claims are still shown, because claims are checked only in a pick's first 7 days. The 7 still open fix none of the measured gaps: they're features and fixes that edit the spec for their own changes. wildduck's adds 11 operations, none documented; devtrack's removes 2. The comment "claims" are offers on issues about something else (docling: a code fix), on issues since deleted (stellar_Earn) or closed (agora), on a deleted repo (Stellar-MarketPay), or not offers at all (holographic-memory) | Each PR's spec measured before and after, with DocScout's own scorer; comments read |
 | Maintainers asked for help (23 picks) | **Only 5 ask for the work DocScout found** (OpsiMate, zowe, agora, Drix10, QualityOnDemand). 8 ask for other API-docs work (three outdated statements, Tauri commands instead of the REST spec, a Node.js library reference), and 10 aren't about API docs (a licence badge, code bugs, a new provider, Go doc comments, copy buttons on a docs page). Labeled 6 Nov, the 6 borderline ones by you ([tests/fixtures/m6/help_requests.json](../tests/fixtures/m6/help_requests.json)). 8 of the 25 issues are now closed or deleted | Every issue read in full |
 | The gap's numbers | The measured docs file changed for **51 of 106** picks within 2–3 weeks, and 2 files are gone. Measured again, the work needed grew for 30 of 48 specs (new endpoints without docs), stayed the same for 13 and shrank for 4. None of the 4 gained a request or success example: devtrack and openreader removed operations, and OxiCloud (232 → 78 operations needing work) and open-wearables (136 → 91) added one example to a shared error response that every operation refers to (next row) | The file's version when found and now; changed specs measured again |
-| "N operations have no request or response examples" | **Too low on 5 picks.** The check counts an example anywhere in an operation, error responses included. Of the 1,699 operations counted as having an example, 450 have one only on an error response, nearly all on 5 picks: OxiCloud 217, open-wearables 118, Inventoros 79, openziti 19, projectsend 10. An error example doesn't show what a call takes or returns | Where each example sits, in all 91 spec picks |
+| "N operations have no request or response examples" | **Too lenient.** The check counts an example anywhere in an operation. Of the 12,315 operations in 87 spec picks, 582 have examples only on error responses, usually one shared error message (OxiCloud 217, open-wearables 118, Inventoros 79), and 300 only on a parameter, like `limit=10`. Neither shows what a call takes or what it returns. Counted the way a reader needs (below), 10,988 of the 11,717 operations that return something have no success example, and 3,733 of the 4,179 that take a request body have no request example | Where each example sits, in every spec pick |
 | The project | 1 repo deleted, 1 renamed, 4 with no push for 30+ days (2 of them past 50) | One batched GraphQL check |
 
 What this means:
@@ -682,10 +683,10 @@ Every listed pick is still open, and every line on its card was checked recently
 - The docs are measured again, by the same code that found the gap, in the same run that spots the change: within about 6 hours of it. If more changes are waiting than the run's cap allows, the rest are measured in the next run. The health checks (committers, outside merges) run every 7 days, in the daily run; the look already covers pushes and archiving.
 - The pick keeps its found date, its Gemma review and its place in the list. The new numbers replace the old ones, and a short history is kept (`details.history`: date, operations needing work, score).
 - When the numbers move by a fifth or more, Gemma rewrites why the docs matter and the first steps, which quote the numbers.
-- ⏳ Examples count only on parameters, request bodies and success responses (to confirm, at the end of this section), so a shared error example can't look like hundreds of documented operations.
+- The measuring itself changes (confirmed 6 Nov, "Measuring changes" at the end of this section): examples are counted the way a reader needs them, so a shared error example can't look like hundreds of documented operations, and two gaps DocScout missed are counted, fields without descriptions and error bodies.
 
 **4. Claims are per gap, and PRs are measured.**
-- Each gap gets a stable key, stored with its finding: `examples`, `parameters`, `errors` and so on for specs; `request_example`, `status_codes` and so on for prose.
+- Each gap gets a stable key, stored with its finding: `description`, `parameters`, `fields`, `request_example`, `response_example`, `success_schema`, `errors` and so on for specs; `request_example`, `response_example`, `status_codes` and so on for prose.
 - **An open PR that changes the measured docs file:** DocScout measures the file in the PR against the version the PR started from (the merge base, so later changes on the main branch aren't credited to the PR). The PR claims the operations that need work before it and not after it.
   - Operations it adds or removes don't count, and neither does progress inside an operation that still needs work: osk-backend #356 describes one parameter of an operation whose others are still undescribed.
   - Checked 6 Nov on all 14 flagged PRs, including PRs from forks.
@@ -751,7 +752,7 @@ Each step can ship on its own.
 |---|---|---|
 | **6a. Test set** | The 23 help requests and 15 claimed picks labeled from their full text (first pass done 6 Nov; you label the 6 borderline ones). **Real claims too:** all 15 claims of 6 Nov are wrong, so a check that never flags anything would pass a test set made only of them. Real ones are rare, since none of the 48 changed specs gained a request or success example. So the set uses open-wearables PR #1976 (merged 4 Nov: error responses documented for 32 operations, plus one shared error example that must not count as 119 examples), real offers placed next to a gap they match, and made-up cases. Small specs, before and after, kept as test fixtures. ✅ The help requests: [tests/fixtures/m6/help_requests.json](../tests/fixtures/m6/help_requests.json) | Labels agreed |
 | **6b. Help requests** | The bounty filter, Gemma's question and its effects, the health-check order. Existing picks' requests asked once | At least 21 of 23 agree; none of the 10 non-API-docs requests counts |
-| **6c. Claims per gap** | Gap keys, measuring PRs, per-gap questions for offers and generated specs, the 30-day offer rule, claim lines on cards | At most 1 wrong of the 15; every real claim in the test set found; the 14 PRs measure as on 6 Nov |
+| **6c. Claims per gap** | The measuring changes (examples in two lines, field descriptions, error bodies, the new weights; section 9 updated), gap keys, measuring PRs, per-gap questions for offers and generated specs, the 30-day offer rule, claim lines on cards | At most 1 wrong of the 15; every real claim in the test set found; the 14 PRs measured again under the new rules |
 | **6d. Open picks stay listed** | The look every 6 hours (the cron's new schedule and the daily-run rule), gap and health checks, leaving the list, renames, caps, the free 3, card dates and wording. The 120 earlier picks go through their first checks over the first few runs, oldest first, and each is listed again once it passes | A dry run on a copy of Atlas: every pick that leaves has a reason you agree with; the daily run at most 10 minutes longer, the others at most 5 minutes |
 | **6e. Docs and launch** | The README, the public skill (claims per gap, help requests, bounty programs) and this plan; deploy, then watch 3 days of runs | 3 days of clean runs, Gemma within its caps |
 
@@ -780,7 +781,32 @@ Each step can ship on its own.
 5. The laptop gets 6b and 6c, not 6d.
 6. The order: 6a to 6e, so the list comes back with correct claims.
 7. Looks for changes every 6 hours, not once a day.
+8. Examples in two lines, counted the way a reader needs them (below).
+9. Field descriptions counted, and error bodies counted in the error line (below).
 
-⏳ **To confirm:** examples count only where they show a call: on parameters, request bodies and success responses, not on error responses. Measuring this way, the 5 picks above get bigger gaps (OxiCloud: 18 → 235 operations without examples), no pick drops, and the public skill's definition changes to match (6e).
+### Measuring changes (confirmed 6 Nov, built in 6c)
+
+Measured on 6 Nov on 87 spec picks, 12,315 operations.
+
+**Examples, in two lines,** as the prose check already does:
+- **Request example**, for operations that take a request body: "3,733 of 4,179 operations that take a request body have no request example".
+- **Response example**, for operations that return something, which is all but empty answers like 204 No Content: "10,988 of 11,717 operations have no example of a successful response".
+- So a GET that returns a list needs only a response example; a POST that sends JSON needs both; a DELETE that answers 204 needs neither. For a GET, the request is the address and its parameters, which the parameter line covers.
+- Examples on parameters (`limit=10`) or on error responses count for neither line.
+- Most picks' example gaps grow: wppconnect-server, the top free pick on 6 Nov, goes from 9 of 158 operations without examples to 156 of 158 without a success example; OxiCloud from 18 of 235 to 204 of 204.
+
+**Fields without descriptions,** a new line: "2,140 of 3,400 fields have no description (e.g. `User.status`, `Order.total`)".
+- It counts every field a reader sends or gets back: in request bodies and in success and error responses, including nested objects and array items, and each field once, even when many operations share it. Fields of schemas no operation uses don't count.
+- Parameters keep their own line ("operations with parameters without descriptions"), so between the two lines, everything a reader sends or receives is covered.
+- On 6 Nov, 21,338 of the 43,838 top-level fields in the picks' shared schemas had no description (48%). At least half were undescribed in 52 of 77 picks, and all of them in 9. The full count, nested and inline fields included, is measured in 6c.
+- An operation whose request or response fields lack descriptions needs work, so it counts toward the gap's size.
+
+**Error bodies:** an operation documents its errors only when at least one of its error responses describes its body. 2,855 of the 8,495 operations that list error responses don't.
+
+**Not added:** request bodies without a schema, which only 10 of 4,168 are.
+
+**Weights,** still out of 100: description 20 · parameters 10 (was 15) · fields 10 (new) · request example 7 and response example 8 (were "examples", 15) · success schema 10 · errors 10 · overview 10 · security schemes 5 (was 10; usually one or two sentences of work) · tags 5 · servers 5.
+
+The public skill gets the same rules (6e). The comparison rounds keep the numbers measured at the time.
 
 **Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20); website filters.

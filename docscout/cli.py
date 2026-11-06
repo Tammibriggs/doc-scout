@@ -559,15 +559,29 @@ def _cmd_eval_claims(cfg: Config, args: argparse.Namespace) -> int:
     if short:
         print(f"Can't ask the model: {short}.")
         return 1
-    data = json.loads(Path(args.path).read_text(encoding="utf-8"))
+    ok = True
+    if args.part in ("all", "claims"):
+        from docscout.find.health import utcnow
+
+        data = json.loads(Path(args.claims).read_text(encoding="utf-8"))
+        with _github(cfg) as gh:
+            measured = claims_eval.measure_flagged_prs(gh, data)
+        print(claims_eval.format_flagged_prs(measured) + "\n")
+        ok = ok and not any(r.get("fixed") or r.get("fixed_fields") for _, _, r in measured)
     client = review.open_reviewer(cfg)
     try:
-        results = claims_eval.measure_help(client, data, list(cfg["discovery"]["issue_label_denylist"]))
+        if args.part in ("all", "claims"):
+            answers = claims_eval.measure_claims(client, data, utcnow().date().isoformat())
+            print(claims_eval.format_claims(answers) + "\n")
+            ok = ok and claims_eval.claims_passed(answers)
+        if args.part in ("all", "help"):
+            results = claims_eval.measure_help(client, json.loads(Path(args.path).read_text(encoding="utf-8")), list(cfg["discovery"]["issue_label_denylist"]))
+            print(claims_eval.format_help(results))
+            ok = ok and claims_eval.passed(results)
     finally:
         client.unload()
         client.close()
-    print(claims_eval.format_help(results))
-    return 0 if claims_eval.passed(results) else 1
+    return 0 if ok else 1
 
 
 def _eval_llm(cfg: Config, args: argparse.Namespace, rows: list) -> int:
@@ -735,8 +749,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--think", choices=["off", "borderline", "on"], help="thinking for --llm (default: [llm] think)")
     p.set_defaults(func=_cmd_eval)
 
-    p = sub.add_parser("eval-claims", help="measure Gemma's help-request answers on the labeled test set (live)")
+    p = sub.add_parser("eval-claims", help="measure Gemma's help-request and claim answers on the labeled test set (live)")
     p.add_argument("path", nargs="?", default="tests/fixtures/m6/help_requests.json", help="the labeled help requests (default: the M6 test set)")
+    p.add_argument("--claims", default="tests/fixtures/m6/claims.json", help="the labeled claims (default: the M6 test set)")
+    p.add_argument("--part", choices=["all", "help", "claims"], default="all", help="which questions to measure (default: all)")
     p.set_defaults(func=_cmd_eval_claims)
 
     p = sub.add_parser("bench-llm", help="measure LLM speed and memory on this machine")

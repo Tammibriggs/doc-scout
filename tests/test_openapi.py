@@ -12,14 +12,16 @@ def load(name):
 def test_bare_spec_scores_high_with_reasons():
     report = score_spec(load("bare.yaml"), "api/openapi.yaml")
     assert report.version == "OpenAPI 3.0.3" and report.operations == 4
-    assert report.gap == 75  # 20 + 7.5 + 15 + 7.5 + 10 + overview 10 + servers 5; no security schemes or tags to check
+    assert report.gap == 65.5  # 20 + 5 + 8 + 7.5 + 10 + overview 10 + servers 5; no request bodies, fields, security schemes or tags
     texts = [f.text for f in report.findings]
     assert "4/4 operations have no summary or description" in texts
     assert "2/4 operations have parameters without descriptions" in texts
-    assert "4/4 operations have no request or response examples" in texts
-    assert "4/4 operations document no error responses" in texts
-    # DELETE returns 204, so only the 3 others lack a success schema.
+    # DELETE answers 204, so it needs no response example and no success schema.
+    assert "3/3 operations have no example of a successful response" in texts
     assert "3/4 operations have no schema for a successful response" in texts
+    assert "4/4 operations don't describe their error responses" in texts
+    assert not any("request example" in t for t in texts)  # no operation takes a request body
+    assert [f.check for f in report.findings] == ["description", "parameters", "response_example", "success_schema", "errors", "overview", "servers"]
     first = report.findings[0]
     assert first.examples == ["GET /checks", "POST /checks"] and first.more == 2
     assert report.failing_operations == 4
@@ -65,3 +67,74 @@ def test_resolver_stops_at_cycles_and_external_refs():
     assert Resolver(encoded).resolve(encoded["paths"]["/alias/{id}"]) == {"get": {}}
     self_ref = {"definitions": {"Pet": {"properties": {"self": {"$ref": "#/definitions/Pet"}}}}}
     assert not has_example(self_ref["definitions"]["Pet"], Resolver(self_ref))  # terminates
+
+
+RULES = """
+openapi: 3.0.3
+info: {title: T, version: "1", description: An API with enough of an overview to pass that check, for this test.}
+servers: [{url: "https://x.example"}]
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name: {type: string, description: The user's name.}
+        status: {type: string}
+        address:
+          type: object
+          properties:
+            street: {type: string}
+        friends: {type: array, items: {$ref: "#/components/schemas/User"}}
+    Unused:
+      type: object
+      properties:
+        x: {type: string}
+    Problem:
+      type: object
+      properties:
+        title: {type: string, description: A short summary., example: Not found}
+  responses:
+    Error:
+      description: Something went wrong.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Problem"}
+          example: {title: Not found}
+paths:
+  /users:
+    get:
+      summary: List users
+      parameters: [{name: limit, in: query, description: How many., schema: {type: integer}, example: 10}]
+      responses:
+        "200": {description: The users., content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/User"}}}}}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: Create a user
+      requestBody: {content: {application/json: {schema: {$ref: "#/components/schemas/User"}, example: {name: Ada}}}}
+      responses:
+        "201": {description: The new user., content: {application/json: {schema: {$ref: "#/components/schemas/User"}, example: {name: Ada}}}}
+        "400": {description: Invalid.}
+  /users/{id}:
+    delete:
+      summary: Delete a user
+      parameters: [{name: id, in: path, required: true, description: The ID., schema: {type: string}}]
+      responses:
+        "204": {description: Deleted.}
+        "404": {$ref: "#/components/responses/Error"}
+"""
+
+
+def test_examples_count_only_where_they_show_the_call_and_every_field_a_reader_sees_is_counted_once():
+    report = score_spec(RULES)
+    by_check = {f.check: f for f in report.findings}
+    # GET's only examples are on its parameter and its shared error response: neither shows what comes back.
+    assert by_check["response_example"].text == "1/2 operations have no example of a successful response"
+    assert report.failing["response_example"] == ["GET /users"]  # DELETE answers 204; POST shows its 201
+    assert "request_example" not in by_check  # POST, the only one with a request body, has an example
+    # Errors are described when an error response says what its body holds: POST's 400 doesn't.
+    assert report.failing["errors"] == ["POST /users"]
+    # Fields reached from requests and responses, nested and in lists, each once; not the unused schema's.
+    assert report.undescribed_fields == ["User.address", "User.address.street", "User.friends", "User.status"] and report.fields == 6
+    assert by_check["fields"].text == "4/6 fields have no description" and by_check["fields"].examples == ["User.address", "User.address.street"]
+    assert report.failing["fields"] == ["GET /users", "POST /users"]  # DELETE's responses carry only the described Problem
+    assert report.failing_operations == 2 and report.points["fields"] == 6.7

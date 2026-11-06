@@ -1,11 +1,17 @@
 """Score how complete an OpenAPI (3.x) or Swagger (2.0) spec's documentation is.
 
 The gap score (0-100, higher = worse docs) adds up weighted checks. Per-operation checks
-count the share of operations failing them; spec-level checks are all or nothing:
+count the share of operations failing them (of the operations they apply to); the field check
+counts the share of fields; spec-level checks are all or nothing:
 
-    no summary or description 20 · parameters without descriptions 15 · no examples 15
-    no 2xx response schema 10 · no error responses 10 · short API overview 10
-    security schemes undescribed 10 · tags undescribed 5 · no servers 5
+    no summary or description 20 · parameters without descriptions 10 · fields without descriptions 10
+    no request example 7 (operations that take a request body) · no success-response example 8
+    (operations that return something) · no 2xx response schema 10 · error responses not described 10
+    short API overview 10 · security schemes undescribed 5 · tags undescribed 5 · no servers 5
+
+Examples count only where they show the call: on a request body, or on a successful response.
+An example on a parameter or an error response doesn't (M6, 6 Nov: one shared error example made
+217 of OxiCloud's 235 operations look documented).
 
 ``$ref`` is followed only within the same file, with limits on depth and lookups.
 """
@@ -26,15 +32,20 @@ GENERATED_HEADER = re.compile(r"do not edit|code generated|auto-?generated|gener
 GENERATED_DIRS = re.compile(r"(^|/)(generated|gen|build|dist|out|target)/", re.IGNORECASE)
 EXAMPLE_KEYS = ("example", "examples", "x-example", "x-examples")
 
-OPERATION_WEIGHTS = {"description": 20, "parameters": 15, "examples": 15, "success_schema": 10, "errors": 10}
-SPEC_WEIGHTS = {"overview": 10, "security": 10, "tags": 5, "servers": 5}
+OPERATION_WEIGHTS = {"description": 20, "parameters": 10, "request_example": 7, "response_example": 8, "success_schema": 10, "errors": 10}
+FIELDS_WEIGHT = 10
+SPEC_WEIGHTS = {"overview": 10, "security": 5, "tags": 5, "servers": 5}
 OPERATION_TEXT = {
     "description": "have no summary or description",
     "parameters": "have parameters without descriptions",
-    "examples": "have no request or response examples",
+    "request_example": "have no request example",
+    "response_example": "have no example of a successful response",
     "success_schema": "have no schema for a successful response",
-    "errors": "document no error responses",
+    "errors": "don't describe their error responses",
 }
+NOUNS = {"request_example": "operations that take a request body"}  # the rest: "operations"
+EMPTY_SUCCESS = ("204", "205")  # no content by definition
+MAX_FIELD_NODES = 50_000  # schema nodes walked for the field check, whatever the spec's size
 
 
 class Resolver:
@@ -116,6 +127,13 @@ class SpecReport:
     failing_operations: int = 0
     generated: bool = False
     points: dict[str, float] = field(default_factory=dict)  # check -> points added to the gap
+    # For measuring a PR against this version (M6): the operations failing each check, and the
+    # fields without a description, by stable key ("User.status").
+    failing: dict[str, list[str]] = field(default_factory=dict)
+    undescribed_fields: list[str] = field(default_factory=list)
+    fields: int = 0
+    labels: list[str] = field(default_factory=list)  # every operation, "GET /users"
+    field_keys: list[str] = field(default_factory=list)  # every field counted
 
 
 def parse_spec(content: bytes | str) -> dict[str, Any] | None:
@@ -136,6 +154,60 @@ def is_generated(content: bytes | str, path: str = "") -> bool:
     return bool(GENERATED_HEADER.search(head) or GENERATED_DIRS.search(path))
 
 
+class _Fields:
+    """Every field a reader sends or gets back, reached from the operations' request bodies and
+    responses through ``$ref``s, nested objects, list items and allOf/oneOf/anyOf. Each field is
+    keyed by the schema it belongs to ("User.status", or "POST /users request.name" for a schema
+    written inline), so a field shared by many operations is counted once. A field that is
+    itself a ``$ref`` isn't counted; the fields of the schema it refers to are."""
+
+    def __init__(self, resolver: Resolver) -> None:
+        self.resolver = resolver
+        self.described: dict[str, bool] = {}
+        self._by_ref: dict[str, set[str]] = {}
+        self._budget = MAX_FIELD_NODES
+
+    def reach(self, node: Any, owner: str, depth: int = 0) -> set[str]:
+        if not isinstance(node, dict) or depth > 12 or self._budget <= 0:
+            return set()
+        self._budget -= 1
+        ref = node.get("$ref")
+        if isinstance(ref, str):
+            if ref not in self._by_ref:
+                self._by_ref[ref] = set()  # while walking it: a schema that refers to itself stops here
+                self._by_ref[ref] = self.reach(self.resolver.resolve(node), unquote(ref.rsplit("/", 1)[-1]), depth + 1)
+            return self._by_ref[ref]
+        keys: set[str] = set()
+        props = node.get("properties")
+        if isinstance(props, dict):
+            for name, prop in props.items():
+                if not isinstance(prop, dict):
+                    continue
+                key = f"{owner}.{name}"
+                if not isinstance(prop.get("$ref"), str):
+                    described = _has_text(prop.get("description")) or _has_text(prop.get("title"))
+                    self.described[key] = self.described.get(key, False) or described
+                    keys.add(key)
+                keys |= self.reach(prop, key, depth + 1)
+        for sub, suffix in (("items", "[]"), ("additionalProperties", ".*")):
+            keys |= self.reach(node.get(sub), owner + suffix, depth + 1)
+        for combined in ("allOf", "oneOf", "anyOf"):
+            for part in node.get(combined) if isinstance(node.get(combined), list) else []:
+                keys |= self.reach(part, owner, depth + 1)
+        return keys
+
+
+def _media_schemas(node: Any, resolver: Resolver, swagger2: bool) -> list[Any]:
+    """The schemas of a response or request body, resolved one level."""
+    node = resolver.resolve(node)
+    if not isinstance(node, dict):
+        return []
+    if swagger2:
+        return [node["schema"]] if isinstance(node.get("schema"), dict) else []
+    content = node.get("content")
+    return [m["schema"] for m in content.values() if isinstance(m, dict) and isinstance(m.get("schema"), dict)] if isinstance(content, dict) else []
+
+
 def score_spec(content: bytes | str, path: str = "") -> SpecReport | None:
     doc = parse_spec(content)
     if doc is None:
@@ -143,9 +215,13 @@ def score_spec(content: bytes | str, path: str = "") -> SpecReport | None:
     swagger2 = "swagger" in doc and "openapi" not in doc
     version = f"Swagger {doc.get('swagger')}" if swagger2 else f"OpenAPI {doc.get('openapi')}"
     resolver = Resolver(doc)
+    fields = _Fields(resolver)
 
     failing: dict[str, list[str]] = {check: [] for check in OPERATION_WEIGHTS}
+    failing["fields"] = []
+    applies = {"request_example": 0, "response_example": 0}  # operations a check applies to
     labels: list[str] = []
+    op_fields: dict[str, set[str]] = {}
     used_tags: set[str] = set()
     for raw_path, item in doc["paths"].items():
         item = resolver.resolve(item)
@@ -168,59 +244,90 @@ def score_spec(content: bytes | str, path: str = "") -> SpecReport | None:
             if any(not _has_text(p.get("description")) for p in params):
                 failing["parameters"].append(label)
 
-            if not has_example(op, resolver):
-                failing["examples"].append(label)
+            # The request: a request body (OpenAPI 3) or body and form parameters (Swagger 2).
+            body_params = [p for p in params if p.get("in") in ("body", "formData")]
+            body = op.get("requestBody")
+            if body is not None or body_params:
+                applies["request_example"] += 1
+                body_example = (body is not None and has_example(body, resolver)) or any(has_example(p, resolver) for p in body_params)
+                if not body_example:
+                    failing["request_example"].append(label)
 
             responses = resolver.resolve(op.get("responses"))
             responses = responses if isinstance(responses, dict) else {}
             codes = {str(code).upper(): resolver.resolve(resp) for code, resp in responses.items()}
             success = {c: r for c, r in codes.items() if c.startswith("2")}
-            no_content = any(c in ("204", "205") for c in success)
+            errors = {c: r for c, r in codes.items() if c.startswith(("4", "5")) or c == "DEFAULT"}
+            no_content = any(c in EMPTY_SUCCESS for c in success)
             if not success or not (no_content or any(_response_has_schema(r, swagger2) for r in success.values())):
                 failing["success_schema"].append(label)
-            if not any(c.startswith(("4", "5")) or c == "DEFAULT" for c in codes):
+            # A response example is needed unless the call answers with no content.
+            if not (success and all(c in EMPTY_SUCCESS for c in success)) and method not in ("head", "options"):
+                applies["response_example"] += 1
+                if not any(has_example(r, resolver) for r in success.values()):
+                    failing["response_example"].append(label)
+            # Errors are described when at least one error response says what its body holds.
+            if not any(_response_has_schema(r, swagger2) for r in errors.values()):
                 failing["errors"].append(label)
+
+            reached: set[str] = set()
+            for schema in [s for p in body_params for s in _media_schemas(p, resolver, swagger2)] + (_media_schemas(body, resolver, False) if body is not None else []):
+                reached |= fields.reach(schema, f"{label} request")
+            for code, resp in codes.items():
+                for schema in _media_schemas(resp, resolver, swagger2):
+                    reached |= fields.reach(schema, f"{label} {code}")
+            op_fields[label] = reached
 
     total = len(labels)
     if total < MIN_OPERATIONS:
         return None
 
-    report = SpecReport(version=version, operations=total, gap=0.0, generated=is_generated(content, path))
+    undescribed = sorted(key for key, ok in fields.described.items() if not ok)
+    undescribed_set = set(undescribed)
+    failing["fields"] = [label for label in labels if op_fields.get(label, set()) & undescribed_set]
+    report = SpecReport(version=version, operations=total, gap=0.0, generated=is_generated(content, path),
+                        failing={k: list(v) for k, v in failing.items()}, undescribed_fields=undescribed, fields=len(fields.described),
+                        labels=labels, field_keys=sorted(fields.described))  # fmt: skip
     for check, weight in OPERATION_WEIGHTS.items():
-        share = len(failing[check]) / total
-        if share:
-            report.points[check] = round(weight * share, 1)
-            report.findings.append(counted(OPERATION_TEXT[check], failing[check], total))
-    report.failing_operations = len({label for labels_ in failing.values() for label in labels_})
+        base = applies.get(check, total)
+        if failing[check] and base:
+            report.points[check] = round(weight * len(failing[check]) / base, 1)
+            report.findings.append(counted(OPERATION_TEXT[check], failing[check], base, noun=NOUNS.get(check, "operations"), check=check))
+    if undescribed:
+        report.points["fields"] = round(FIELDS_WEIGHT * len(undescribed) / len(fields.described), 1)
+        report.findings.append(counted("have no description", undescribed, len(fields.described), noun="fields", check="fields"))
+    report.failing_operations = len({label for check, labels_ in failing.items() for label in labels_})
 
     info = doc.get("info") if isinstance(doc.get("info"), dict) else {}
     overview = info.get("description") if isinstance(info.get("description"), str) else ""
     if len(overview.strip()) < 50:
         report.points["overview"] = SPEC_WEIGHTS["overview"]
-        report.findings.append(Finding("The API overview (info.description) is missing or very short"))
+        report.findings.append(Finding("The API overview (info.description) is missing or very short", check="overview"))
 
     components = doc.get("components") if isinstance(doc.get("components"), dict) else {}
     schemes = doc.get("securityDefinitions") if swagger2 else components.get("securitySchemes")
     if isinstance(schemes, dict) and schemes:
-        undescribed = []
+        undescribed_schemes = []
         for name, scheme in schemes.items():
             scheme = resolver.resolve(scheme)
             if not (isinstance(scheme, dict) and _has_text(scheme.get("description"))):
-                undescribed.append(str(name))
-        if undescribed:
+                undescribed_schemes.append(str(name))
+        if undescribed_schemes:
             report.points["security"] = SPEC_WEIGHTS["security"]
-            report.findings.append(Finding(f"{len(undescribed)}/{len(schemes)} authentication schemes have no description", undescribed[:2], max(0, len(undescribed) - 2)))
+            report.findings.append(Finding(f"{len(undescribed_schemes)}/{len(schemes)} authentication schemes have no description",
+                                           undescribed_schemes[:2], max(0, len(undescribed_schemes) - 2), "security"))  # fmt: skip
 
     declared = {str(t.get("name")): t for t in doc.get("tags") or [] if isinstance(t, dict)}
     undescribed_tags = sorted(t for t in used_tags if not _has_text((declared.get(t) or {}).get("description")))
     if undescribed_tags:
         report.points["tags"] = SPEC_WEIGHTS["tags"]
-        report.findings.append(Finding(f"{len(undescribed_tags)} operation groups (tags) have no description", undescribed_tags[:2], max(0, len(undescribed_tags) - 2)))
+        report.findings.append(Finding(f"{len(undescribed_tags)} operation groups (tags) have no description",
+                                       undescribed_tags[:2], max(0, len(undescribed_tags) - 2), "tags"))  # fmt: skip
 
     has_servers = bool(doc.get("host")) if swagger2 else bool(doc.get("servers"))
     if not has_servers:
         report.points["servers"] = SPEC_WEIGHTS["servers"]
-        report.findings.append(Finding("No server address is given, so readers can't tell where to send requests"))
+        report.findings.append(Finding("No server address is given, so readers can't tell where to send requests", check="servers"))
 
     report.gap = round(min(100.0, sum(report.points.values())), 1)
     return report

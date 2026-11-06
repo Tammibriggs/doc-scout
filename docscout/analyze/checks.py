@@ -45,6 +45,8 @@ class Checks:
     requirements: list[str] = field(default_factory=list)  # 'CLA required ("…" in CONTRIBUTING.md)'
     local_setup: str = "unclear"  # easy (…) | documented | unclear
     claim_checked: bool = False
+    stale_offers: list[str] = field(default_factory=list)  # offers older than 30 days, with no PR (M6)
+    claimed_out: bool = False  # open PRs and live offers leave less work than the size cutoff (M6)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)

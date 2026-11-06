@@ -19,6 +19,14 @@ from docscout.analyze.scoring import issue_bonus, opportunity_score
 from docscout.find.sources import Candidate
 
 SPEC = (Path(__file__).parent / "fixtures" / "specs" / "bare.yaml").read_bytes()
+DESCRIBED = (Path(__file__).parent / "fixtures" / "specs" / "bare_described.yaml").read_bytes()  # SPEC with a summary on every operation
+PR_HEAD = "c" * 40  # the head commit of the docs PRs below, where the spec has DESCRIBED
+
+
+def docs_pr(number, title):
+    """An open PR that gives every operation of the spec a summary."""
+    return {"number": number, "title": title, "head": {"ref": "docs", "sha": PR_HEAD}, "base": {"sha": "b" * 40},
+            "files": ["api/openapi.yaml"], "changed_files": 1, "user": {"login": "writer", "type": "User"}}  # fmt: skip
 
 
 @pytest.fixture
@@ -170,13 +178,18 @@ class RunGitHub(FakeGitHub):
         return [dict(c, sha="0123456789abcdef0123456789abcdef01234567") for c in commits]
 
     def get_file(self, name, path, ref=None, max_bytes=None):
-        return SPEC if path == "api/openapi.yaml" else None
+        if path != "api/openapi.yaml":
+            return None
+        return DESCRIBED if ref == PR_HEAD else SPEC
 
     def list_owner_repos(self, owner):
         return []
 
     def list_open_pulls(self, name):
-        return [{"number": 7, "title": "docs: describe the checks endpoints", "head": {"ref": "docs-checks"}}] if name == "org/claimed" else []
+        return [docs_pr(7, "docs: describe the checks endpoints")] if name == "org/claimed" else []
+
+    def compare(self, name, base, head):
+        return {"merge_base": "a" * 40, "files": ["api/openapi.yaml"], "complete": True}
 
     def list_issue_comments(self, name, number):
         return []
@@ -254,7 +267,7 @@ def test_done_projects_drop_out_and_reported_ones_stay_listed(cfg, store, now, m
 def test_earlier_picks_are_checked_again_for_claims_once_a_day(cfg, store, now, monkeypatch):
     class Claimed(RunGitHub):  # after org/spec-app was reported, someone opened a docs PR
         def list_open_pulls(self, name):
-            return [{"number": 9, "title": "docs: describe every endpoint", "head": {"ref": "docs"}}] if name == "org/spec-app" else []
+            return [docs_pr(9, "docs: describe every endpoint")] if name == "org/spec-app" else []
 
     def claims(name):
         return next(f for f in store.reported_since(now - timedelta(days=7)) if f.full_name == name).details["checks"]["claimed"]
@@ -266,14 +279,14 @@ def test_earlier_picks_are_checked_again_for_claims_once_a_day(cfg, store, now, 
     later = now + timedelta(days=1)
     second = pipeline.run(Claimed(), cfg, store, later, limit=10, sources=["repo_search"])
     assert second.summary.claims_rechecked == 1
-    assert claims("org/spec-app") == ['Open PR #9 "docs: describe every endpoint": it documents the API endpoints']
+    assert claims("org/spec-app") == ['Open PR #9 "docs: describe every endpoint" adds descriptions to 4 operations']  # measured
     report = second.report_path.read_text()
     assert "## Still open from earlier" in report and "⚠️ Open PR" in report and "earlier picks checked again for claims" in report
     model = AgreeingModel()
     earlier = store.reported_since(now - timedelta(days=7))
     assert pipeline.recheck_claims(Claimed(), store, earlier, later + timedelta(hours=2), model) == 0  # once a day
     assert pipeline.recheck_claims(Claimed(), store, earlier, later + timedelta(days=1), model) == 2
-    assert model.claim_checks == []  # nothing changed on GitHub, so the model wasn't asked again
+    assert model.claim_checks == []  # a PR is measured, not judged: the model is never asked about it
     assert pipeline.recheck_claims(RunGitHub(), store, store.reported_since(now - timedelta(days=7)), later + timedelta(days=2), model) == 2
     assert claims("org/spec-app") == []  # the PR was closed: nothing left to read, so no question needed
 
@@ -285,12 +298,17 @@ def test_claims_stay_unchecked_when_the_model_cannot_answer(cfg, store, now, mon
         def claims(self, ctx):
             raise LLMError("503 after retries, and the fallback model too")
 
-    class WithPR(RunGitHub):
-        def list_open_pulls(self, name):
-            return [{"number": 9, "title": "docs: describe every endpoint", "head": {"ref": "docs"}}]
+    class Offered(RunGitHub):  # someone offered on the help request, which only the model can read
+        def list_issue_comments(self, name, number):
+            return [{"id": 1, "body": "I'll take this", "user": {"login": "writer", "type": "User"}, "created_at": iso(1), "author_association": "NONE"}]
 
-    monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/spec-app"))
-    result = pipeline.run(WithPR(), cfg, store, now, limit=10, sources=["repo_search"], reviewer=Busy)
+    def asked(name, gh, cfg, rng, today, api_types, policy=None, **kwargs):
+        issue = {"number": 3, "title": "Document the checks endpoints", "html_url": "https://github.com/org/spec-app/issues/3",
+                 "labels": ["help wanted"], "outreach": ["help wanted"]}  # fmt: skip
+        yield Candidate("org/spec-app", name, dict(GOOD_REPO, full_name="org/spec-app", description="Self-hosted uptime app with a REST API"), issues=[issue])
+
+    monkeypatch.setattr(pipeline, "source_candidates", asked)
+    result = pipeline.run(Offered(), cfg, store, now, limit=10, sources=["help_requested"], reviewer=Busy)
     checks = result.findings[0].details["checks"]
     assert checks["claim_checked"] is False and "claims_checked" not in result.findings[0].details  # asked again next run
     report = result.report_path.read_text()
@@ -370,7 +388,7 @@ def test_before_you_start_checks_appear_in_the_report(cfg, store, now, monkeypat
     monkeypatch.setattr(pipeline, "source_candidates", fake_sources("org/claimed", "org/spec-app"))
     result = pipeline.run(WithContributing(), cfg, store, now, limit=10, sources=["repo_search"])
     report = result.report_path.read_text()
-    assert '**Before you start:** ⚠️ Open PR \\#7 "docs: describe the checks endpoints": it documents the API endpoints' in report
+    assert '**Before you start:** ⚠️ Open PR \\#7 "docs: describe the checks endpoints" adds descriptions to 4 operations · work left once these are counted: 4 of 4 operations' in report
     assert "✅ not claimed · ⚠️ CLA required" in report
     assert "in CONTRIBUTING.md\\) · local setup: easy \\(docker-compose\\)" in report
 

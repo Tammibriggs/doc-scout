@@ -17,7 +17,7 @@ from docscout.find.github import GitHubError
 from docscout.find.sources import help_requested
 from docscout.hosted.picks import pick
 from docscout.llm import claims, help_requests, review
-from docscout.llm.base import ClaimCheck, HelpAnswer, HelpContext, LLMError, Review, build_help_messages, parse_help
+from docscout.llm.base import Claim, ClaimCheck, HelpAnswer, HelpContext, LLMError, Review, build_help_messages, parse_help
 from docscout.llm.ollama import OllamaClient
 from docscout.run import pipeline
 from docscout.run.db import Store, StoredFinding
@@ -281,5 +281,36 @@ def test_eval_claims_passes_answers_that_match_the_labels_and_fails_a_model_that
     assert not claims_eval.passed(everything)
     assert "Picks labeled C that a run would count: 9" in claims_eval.format_help(everything)  # the 10th C pick is a bounty
 
-    assert cli.main(["eval-claims"]) in (0, 1)  # tests get the stand-in model, never a real one
+    assert cli.main(["eval-claims", "--part", "help"]) in (0, 1)  # tests get the stand-in model, never a real one
     assert "Help requests: 25 issues on 23 picks" in capsys.readouterr().out
+
+
+def test_eval_claims_finds_every_real_claim_and_measures_the_flagged_prs():
+    from pathlib import Path
+
+    from docscout.measure import claims_eval
+
+    data = json.loads((Path(__file__).parent / "fixtures" / "m6" / "claims.json").read_text(encoding="utf-8"))
+    labels = {" ".join(str(c["text"]).split())[:250]: c["label"]["gaps"] for c in data["offers"]}
+    labels.update({c["title"]: c["label"]["gaps"] for c in data["generated_spec_prs"]})
+
+    class Labels(Asked):  # answers each case as labeled
+        def claims(self, ctx):
+            label, text = ctx.items[0]
+            gaps = next((g for key, g in labels.items() if key in text), [])
+            return ClaimCheck(claims=[Claim(item=label, reason="as labeled", gaps=gaps)] if gaps else [])
+
+    right = claims_eval.measure_claims(Labels(), data, "2026-11-06")
+    assert len(right) == 19 and claims_eval.claims_passed(right)  # 21 comments less 5 bounty and bot ones, plus 3 PRs
+    assert "Real claims found: 8 of 8" in claims_eval.format_claims(right)
+    assert not claims_eval.claims_passed(claims_eval.measure_claims(Asked(), data, "2026-11-06"))  # finds nothing
+
+    class Unchanged:  # every flagged PR leaves the measured file as it was
+        def get_json(self, path):
+            return {"number": int(path.rsplit("/", 1)[1]), "state": "open", "head": {"sha": "h" * 40}, "base": {"sha": "b" * 40}}
+
+        def compare(self, name, base, head):
+            return {"merge_base": "m" * 40, "files": ["elsewhere.py"], "complete": True}
+
+    measured = claims_eval.measure_flagged_prs(Unchanged(), data)
+    assert len(measured) == 14 and "PRs that fix a measured gap: 0 of 14" in claims_eval.format_flagged_prs(measured)

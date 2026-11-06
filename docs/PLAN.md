@@ -280,21 +280,24 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
 ```
 
 **Gap score, 0–100 (higher = worse docs):**
-- **A. Spec with gaps.** It uses the worst *owned* spec, meaning not vendored, a test or an example, and with at least 3 operations. Each check below scores the share of operations failing it, multiplied by its weight:
+- **A. Spec with gaps.** It uses the worst *owned* spec, meaning not vendored, a test or an example, and with at least 3 operations. Each check below scores the share failing it (of the operations it applies to, or of the fields), multiplied by its weight. Since 6 Nov (M6 step 6c, section 21):
 
   | Check | Weight |
   |---|---|
   | No summary or description | 20 |
-  | Parameters without descriptions | 15 |
-  | No examples | 15 |
+  | Parameters without descriptions | 10 (15 until 6 Nov) |
+  | Fields without descriptions: every field a reader sends or gets back, each once | 10 (new) |
+  | No request example, of the operations that take a request body | 7 |
+  | No example of a successful response, of the operations that return something | 8 (with the line above: "no examples", 15, until 6 Nov) |
   | No 2xx schema | 10 |
-  | No error responses | 10 |
+  | Error responses not described: none, or none that says what its body holds | 10 |
   | `info.description` under 50 characters | 10 |
-  | Security schemes undescribed | 10 |
+  | Security schemes undescribed | 5 (10 until 6 Nov) |
   | Tags undescribed | 5 |
   | No servers | 5 |
 
-  - M6 changes these checks and weights: examples in two lines, field descriptions, error bodies (section 21, "Measuring changes").
+  - Examples count only where they show the call: on a request body, or on a successful response. One example on a shared error response had made 217 of OxiCloud's 235 operations look documented.
+  - Each finding carries a stable key (`response_example`, `fields`, …) that claims are matched on.
   - `$ref` is resolved only within the file.
   - **Finding the spec** ✅ (16 Oct): files named `openapi*`/`swagger*` first, then any YAML or JSON in an `openapi`/`swagger` folder, then files named like `api.yaml` or `public-api.yaml`, at most 4 fetched. The parser drops files that aren't specs. Matching by name alone missed 4 specs in the comparison (dagu, jupyter_server, traceroot, ChurchCRM). The classifier's "owns a spec" evidence still uses names only, so the measured label numbers stay valid.
   - **Generated specs** (a `DO NOT EDIT` header, or CI that regenerates the file) keep their score, but the suggestion becomes "edit the code annotations".
@@ -345,18 +348,16 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 
 ## 10. Before you contribute (M1; top 10 only, about 3 API calls each)
 
-- **Already claimed? Gemma decides** ✅ (17 Oct; word matching until then).
-  - **What code does:** it gathers the 30 most recently updated open PRs and the comments on the first 2 help-request issues. It sends Gemma up to 15 PRs (title, branch, author, dates, draft, description, changed files) and the last 8 comments, with the gap DocScout found.
-  - **What Gemma does:** it lists the items that overlap the gap, each with a reason shown on the card. Code keeps only answers that name an item it was given.
-  - **Why:** word matching on titles flagged 4 things on Render's picks, and none was work on the gap: an offer to fix a licence badge (statewave), a docs-site deploy rework and a formula fix (bike4mind), an install-guide PR open since Nov 2025 (shkeeper.io), plus a spelling fix (ergo).
-  - **Checked live** on those 6 picks: Gemma 4 31B called all 6 not claimed, matching a reading by hand. On a made-up PR "Add request and response examples to the API reference" for statewave it said claimed, and it ignored a typo fix beside it. 25–190 s per project, including retries; a project with no open PRs or comments isn't asked about.
-  - **When Gemma can't answer:** retries (5, 20, 60 s), then the other Gemma model (`fallback_model`); twice in that check the 31B failed and the 26B answered. If both fail, the pick shows "not checked yet", never a guess, and the next run asks again.
-  - **Not asked again** while a project's open PRs and comments are unchanged since Gemma's last answer.
-- **Checked again every day** ✅ (17 Oct): once a day for `[checks] recheck_claims_days` (7) after a project is reported, so a pick can be claimed after it's shown, including by another DocScout user. A claim that has gone (the PR was closed) is cleared. M6 replaces the 7 days with checks for as long as a pick is listed, and judges claims per gap (section 21).
+- **Already claimed? Per gap** ✅ (6 Nov, M6 step 6c; Gemma decided per project from 17 Oct, word matching before that).
+  - **Open PRs that change the measured docs file are measured** ([analyze/pr_measure.py](../docscout/analyze/pr_measure.py)): the file in the PR against the version it started from (the merge base), with the same scorer. A PR claims what needs work before it and not after: per gap key, the operations it fixes and the fields it describes. Operations it adds or removes don't count. A PR is measured again only when its head commit changes. About 3 GitHub requests for each PR that changes the file; none for one whose file list settles that it doesn't.
+  - **A PR that doesn't change the measured file claims nothing,** unless the spec is generated: then Gemma judges it, one gap at a time, from its title, description and changed files.
+  - **Comments are Gemma's call, one gap at a time,** and only on help requests that ask for this work (section 21, 6b); bots' comments aren't read. An offer counts for 30 days from the person's last comment on the issue; once they have an open PR, the PR is measured instead. An older offer is shown as one to ask about, not as a claim.
+  - **The work left** is what needs work on the main branch, less what open PRs fix and the gaps live offers take. A pick goes below the rest only when the work left is under the size cutoff (5); otherwise it shows "Partly claimed", one line per claim ("Open PR #9 adds descriptions to 4 operations") and the work left.
+  - **Why:** on 6 Nov, none of the 15 claims Gemma had made holds up. 7 of the 14 flagged PRs were closed, and the 7 open ones, measured, fix no gap; the comment "claims" were offers on issues about something else.
+  - **When Gemma can't answer:** retries (5, 20, 60 s), then the other Gemma model (`fallback_model`). If both fail, the pick shows "not checked yet", never a guess, and the next run asks again. Not asked again while a project's open PRs and comments are unchanged.
+- **Checked again every day** ✅ (17 Oct): once a day for `[checks] recheck_claims_days` (7) after a project is reported, so a pick can be claimed after it's shown, including by another DocScout user. A claim that has gone (the PR was closed) is cleared. M6 step 6d replaces the 7 days with checks for as long as a pick is listed (section 21).
   - The laptop report's "Still open from earlier" lines show ⚠️ with what was found.
-  - The website moves claimed picks below the rest, so the free 3 are ones a writer can start.
-  - About 3–5 GitHub requests per project; Gemma is asked only when its PRs or comments changed.
-  - It sees only public signs: an open PR, or an offer in the issue's comments. It doesn't measure the gap again (section 19).
+  - About 3–5 GitHub requests per project; Gemma is asked only when its comments changed.
 - **Requirements, shown only when found.** They never change a repo's score, and each quotes the sentence it matched:
   - a **CLA** to sign;
   - a **DCO sign-off** on every commit;
@@ -374,7 +375,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 1. **Judge** whether the project really has an API worth documenting (the code classifier is 76% precise: apps that only mention "API" get through, and borderline repos are dropped unseen). Gemma's verdict, API style and a quoted piece of evidence adjust confidence within the limits below.
 2. **Guide:** why its docs matter, and up to 3 first steps based on the gaps code found.
 3. ✅ **`docscout draft owner/repo`** (on demand, after you pick a project): a short first message asking the maintainers whether a docs PR is welcome, using the current issue and PR state. DocScout never posts anything itself. It replies on an open "help wanted" or docs issue when there is one, otherwise it drafts a new issue. The claim check runs again first and warns if someone has started, and CLA or AI-policy notes are shown. The draft is printed with control characters removed.
-4. ✅ **Claims** (17 Oct): whether someone is already working on the gap, from the open PRs and issue comments (section 10). On the laptop this uses the local model: one question per new pick and per earlier pick whose PRs or comments changed, with an 8,192-token context (bike4mind's question was about 3,100 tokens, too close to the 4,096 used for reviews).
+4. ✅ **Claims** (17 Oct; per gap since 6 Nov): whether someone is already working on the gap, from the issue comments and, on a generated spec, the PRs that don't change it; other PRs are measured, not judged (section 10). On the laptop this uses the local model: one question per new pick and per earlier pick whose PRs or comments changed, with an 8,192-token context (bike4mind's question was about 3,100 tokens, too close to the 4,096 used for reviews).
 5. ✅ **Help requests** (6 Nov, M6 step 6b): whether each maintainer's request asks for the work DocScout found (section 21). Asked in the review, once the project itself is accepted, and once for projects reported earlier; again only when an issue's text changes. Only a request for this work earns the bonus, the looser activity check and the "Maintainers asked for help" line; claims are read only from its comments.
 
 **Thinking:** Gemma 4 supports it (on by default in the model; DocScout turns it off). ✅ Measured (section 2): no more accurate, 2.6 times slower, so `think = "off"`. The setting stays for faster machines and hosted models.
@@ -497,7 +498,7 @@ hacktoberfest/
     settings/ config.py ✅ profile.py ✅ languages.py ✅ setup_wizard.py ✅ default_config.toml ✅
     find/     discover.py ✅ github.py ✅ health.py ✅ classify.py ✅ evidence.py ✅
               sources/ awesome_selfhosted ✅ repo_search ✅ help_requested ✅ code_search ✅
-    analyze/  tree.py ✅ gaps.py ✅ elsewhere.py ✅ checks.py ✅ scoring.py ✅ safe_yaml.py ✅
+    analyze/  tree.py ✅ gaps.py ✅ elsewhere.py ✅ checks.py ✅ scoring.py ✅ safe_yaml.py ✅ pr_measure.py ✅ (M6)
               apitypes/ base.py ✅ rest.py ✅ openapi.py ✅ rest_prose.py ✅     # graphql.py, grpc.py, … (later)
     llm/      base.py ✅ ollama.py ✅ openai_compat.py ✅ memory.py ✅ review.py ✅ draft.py ✅ claims.py ✅ help_requests.py ✅ (M6)
     run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅
@@ -505,7 +506,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅ claims_eval.py ✅ (M6: `docscout eval-claims`)
     hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 243 tests (217 and 9 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
+  tests/ ✅ 253 tests (227 and 9 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
 ```
 
 ## 17. Risks
@@ -753,7 +754,7 @@ Each step can ship on its own.
 |---|---|---|
 | **6a. Test set** | The 23 help requests and 15 claimed picks labeled from their full text (first pass done 6 Nov; you label the 6 borderline ones). **Real claims too:** all 15 claims of 6 Nov are wrong, so a check that never flags anything would pass a test set made only of them. Real ones are rare, since none of the 48 changed specs gained a request or success example. So the set uses open-wearables PR #1976 (merged 4 Nov: error responses documented for 32 operations, plus one shared error example that must not count as 119 examples), real offers placed next to a gap they match, and made-up cases. Small specs, before and after, kept as test fixtures. ✅ Built 6 Nov: [help_requests.json](../tests/fixtures/m6/help_requests.json) (25 issues) and [claims.json](../tests/fixtures/m6/claims.json) (the 15 flagged picks, 21 comments with names replaced, 3 PRs on a generated spec; 8 real claims to find) | Labels agreed: help requests ✅; claims ⏳ your review |
 | **6b. Help requests** | ✅ Built 6 Nov: the bounty filter, Gemma's question ([llm/help_requests.py](../docscout/llm/help_requests.py)) and its effects (bonus, activity check, listing, claims, drafts, cards), the health-check order, and `docscout eval-claims`. Existing picks' requests are asked about once, up to `[llm] checks_per_run` a run. **When deployed**, of the 23 listed picks with a help request: 3 keep it (OpsiMate, zowe, Drix10), 11 stay listed without the bonus and the line, and 9 leave the list, since their docs may be elsewhere and their only request doesn't count (sciencediscovery and solongate are on the site now) | ✅ Passed 6 Nov with Gemma 4 31B: 21 of 23 picks agree; the 2 misses (bernstein, atom) are C answered B, which don't count either way; none of the 10 C picks counted; every quote found; 53 s a question on the free tier. The first try reached 18 of 23: Gemma counted requests about another API (Tauri commands, a Node.js library) because the question didn't say which spec the gaps were in, so it now names the measured spec and its file. The categories in the prompt were written with these labels in view, so the result is optimistic: new help requests are checked as they come (6e) |
-| **6c. Claims per gap** | The measuring changes (examples in two lines, field descriptions, error bodies, the new weights; section 9 updated), gap keys, measuring PRs, per-gap questions for offers and generated specs, the 30-day offer rule, claim lines on cards | At most 1 wrong of the 15; every real claim in the test set found; the 14 PRs measured again under the new rules |
+| **6c. Claims per gap** | ✅ Built 6 Nov: the measuring changes (section 9), gap keys, measuring PRs ([analyze/pr_measure.py](../docscout/analyze/pr_measure.py)), per-gap questions for comments and for PRs on a generated spec, the 30-day offer rule, and "Partly claimed" with the work left on cards (section 10). On six large specs the new rules match the 6 Nov script (OxiCloud: 204 of 204 operations without a success example) and take up to 8 s for a 1.9 MB spec, mostly parsing. **When deployed,** new picks are measured with the new rules; listed picks keep their numbers until 6d measures them again, but their claims are checked the new way on the next run | ✅ Passed 6 Nov: the 14 flagged PRs, measured under the new rules on GitHub as it is now, fix no measured gap (7 change the measured file, 7 don't). Gemma 4 31B found all 8 real claims in the test set, each with exactly the right gaps, and made 1 wrong one: an offer to fix code on docling #296, an issue that 6b keeps it from reading in a run |
 | **6d. Open picks stay listed** | The look every 6 hours (the cron's new schedule and the daily-run rule), gap and health checks, leaving the list, renames, caps, the free 3, card dates and wording. The 120 earlier picks go through their first checks over the first few runs, oldest first, and each is listed again once it passes | A dry run on a copy of Atlas: every pick that leaves has a reason you agree with; the daily run at most 10 minutes longer, the others at most 5 minutes |
 | **6e. Docs and launch** | The README, the public skill (claims per gap, help requests, bounty programs) and this plan; deploy, then watch 3 days of runs. You label the next new help requests as they arrive, a check of 6b's question on cases it wasn't written with | 3 days of clean runs, Gemma within its caps; at least 9 of the next 10 new help requests answered as you label them |
 

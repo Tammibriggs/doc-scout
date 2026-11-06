@@ -146,7 +146,8 @@ def analyze(gh: GitHub, ev: Evaluated, cfg: Config, types_by_key: dict[str, ApiT
 CLAIMS_RECHECK_HOURS = 20  # one claim check a day per project, however many runs there are
 
 
-def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime | None = None, client: LLMClient | None = None) -> None:
+def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime | None = None, client: LLMClient | None = None,
+                     min_units: int = 5) -> None:  # fmt: skip
     """Requirement checks for reported items, plus the model's claim check when ``client`` is
     given (about 3-5 API calls each)."""
     for finding in findings:
@@ -155,7 +156,7 @@ def before_you_start(gh: GitHub, store: Store, findings: list[StoredFinding], no
         requirement_checks(gh, finding.full_name, checks, d.get("check_paths", {}), d.get("head_sha"))
         d["checks"] = checks.as_dict()
         if client is not None and now is not None:
-            claims_mod.check(gh, client, finding, now)
+            claims_mod.check(gh, client, finding, now, min_units)
         store.update_details(finding.run_id, finding.full_name, d)
 
 
@@ -206,13 +207,13 @@ def recheck_help(gh: GitHub, store: Store, cfg: Config, findings: list[StoredFin
     return checked
 
 
-def recheck_claims(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime, client: LLMClient) -> int:
+def recheck_claims(gh: GitHub, store: Store, findings: list[StoredFinding], now: datetime, client: LLMClient, min_units: int = 5) -> int:
     """Check projects reported earlier again for someone who has started since: a docs PR, or an
     offer to help. A claim that has gone (the PR was closed) is cleared. At most once a day per
     project. Returns how many were checked."""
     checked = 0
     for finding in findings:
-        if _claims_due(finding, now) and claims_mod.check(gh, client, finding, now):
+        if _claims_due(finding, now) and claims_mod.check(gh, client, finding, now, min_units):
             store.update_details(finding.run_id, finding.full_name, finding.details)
             checked += 1
     return checked
@@ -387,9 +388,9 @@ def run(
                 if claims_on:  # their details changed, and some may have left the list
                     earlier = [f for f in store.reported_since(recheck_since) if _claims_due(f, now)]
             if findings and claims_on:
-                before_you_start(gh, store, findings, now, client)
+                before_you_start(gh, store, findings, now, client, int(cfg["report"]["min_effort_units"]))
             if client is not None and claims_on:
-                summary.claims_rechecked = recheck_claims(gh, store, earlier, now, client)
+                summary.claims_rechecked = recheck_claims(gh, store, earlier, now, client, int(cfg["report"]["min_effort_units"]))
         except LLMUnavailable as exc:
             why_not = str(exc)
         except Exception as exc:  # optional extras: never lose the report over them

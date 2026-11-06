@@ -25,12 +25,19 @@ components:
     Check:
       type: object
       properties:
-        id: {type: string}
-        url: {type: string}
+        id: {type: string, description: The check's ID.}
+        url: {type: string, description: The address the check calls.}
       example: {id: "c1", url: "https://example.com"}
+    Error:
+      type: object
+      properties:
+        message: {type: string, description: What went wrong.}
   responses:
     NotFound:
       description: No check with that ID.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
 paths:
   /checks:
     get:
@@ -44,7 +51,11 @@ paths:
               schema:
                 type: array
                 items: {$ref: "#/components/schemas/Check"}
-        "401": {description: Missing or invalid token.}
+        "401":
+          description: Missing or invalid token.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
     post:
       tags: [checks]
       summary: Create a check
@@ -58,7 +69,11 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Check"}
-        "400": {description: Invalid URL.}
+        "400":
+          description: Invalid URL.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /checks/{id}:
     parameters:
       - $ref: "#/components/parameters/CheckId"

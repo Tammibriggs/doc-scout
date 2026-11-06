@@ -32,7 +32,12 @@
      "claims": [],
      "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps. Closed since."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "docs/openapi.json",
+    "generated": false
+   }
   },
   {
    "repo": "0xfurai/peekaping",
@@ -55,7 +60,12 @@
      "claims": [],
      "why": "Doesn't change the measured spec. Closed since."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "apps/web/swagger.json",
+    "generated": false
+   }
   },
   {
    "repo": "docling-project/docling-pipelines",
@@ -73,7 +83,12 @@
      "claims": [],
      "why": "Offers to fix code (routes that don't match their spec), not the docs gaps."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "prose",
+    "location": "docs/api/REST_API_SERVER.md",
+    "generated": false
+   }
   },
   {
    "repo": "EarnQuestOne/stellar_Earn",
@@ -91,7 +106,12 @@
      "claims": [],
      "why": "Bounty-program applications on an issue since deleted."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "prose",
+    "location": "BackEnd/docs/DISPUTES_API.md",
+    "generated": false
+   }
   },
   {
    "repo": "Emmy123222/Stellar-MarketPay-",
@@ -110,7 +130,12 @@
      "claims": [],
      "why": "Bounty-program applications; the repo has since been deleted."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "backend/docs/openapi.yaml",
+    "generated": false
+   }
   },
   {
    "repo": "Agora-Events/agora",
@@ -150,7 +175,12 @@
      "claims": [],
      "why": "Bounty-program applications; the issue was closed on 17 Oct."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "apps/web/public/openapi.yaml",
+    "generated": false
+   }
   },
   {
    "repo": "tchapi/davis",
@@ -171,7 +201,12 @@
      "claims": [],
      "why": "A feature; doesn't change the measured docs file."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "prose",
+    "location": "docs/api/README.md",
+    "generated": false
+   }
   },
   {
    "repo": "sipyourdrink-ltd/bernstein",
@@ -194,7 +229,12 @@
      "claims": [],
      "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "docs/reference/openapi.json",
+    "generated": false
+   }
   },
   {
    "repo": "AOSSIE-Org/PictoPy",
@@ -216,7 +256,12 @@
      "claims": [],
      "why": "Documents the Tauri commands, a different API; doesn't change the measured spec."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "docs/backend/backend_python/openapi.json",
+    "generated": false
+   }
   },
   {
    "repo": "writerslogic/holographic-memory",
@@ -232,7 +277,12 @@
      "claims": [],
      "why": "A maintainer saying a generated reference now exists: not an offer."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "docs/server/openapi.json",
+    "generated": false
+   }
   },
   {
    "repo": "zone-eu/wildduck",
@@ -251,7 +301,12 @@
      "claims": [],
      "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "docs/api/openapidocs.json",
+    "generated": false
+   }
   },
   {
    "repo": "Priyanshu-byte-coder/devtrack",
@@ -273,7 +328,12 @@
      "claims": [],
      "why": "Removing operations doesn't document the others."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "public/openapi.yaml",
+    "generated": false
+   }
   },
   {
    "repo": "opencloudtouch/opencloudtouch",
@@ -296,7 +356,12 @@
      "claims": [],
      "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps. Closed since. Measure again under the error-body rule."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "apps/backend/openapi.yaml",
+    "generated": false
+   }
   },
   {
    "repo": "Open-Source-Kigali/osk-backend",
@@ -326,7 +391,12 @@
      "claims": [],
      "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "docs/openapi.yaml",
+    "generated": false
+   }
   },
   {
    "repo": "projectsend/projectsend",
@@ -349,7 +419,12 @@
      "claims": [],
      "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps. Closed since."
     }
-   ]
+   ],
+   "gap": {
+    "kind": "spec",
+    "location": "docs/api/openapi.json",
+    "generated": false
+   }
   }
  ],
  "offers": [

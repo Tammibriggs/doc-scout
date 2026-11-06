@@ -158,7 +158,7 @@ def test_owned_spec_wins_and_is_fetched_at_the_commit():
     spec = (FIXTURES / "specs" / "bare.yaml").read_bytes()
     gh = FakeGitHub({"api/openapi.yaml": spec})
     gap = RestApi().analyze(ctx(gh, [blob("api/openapi.yaml"), blob("vendor/x/openapi.yaml")], readme("thorough.md")))
-    assert gap.kind == "spec" and gap.score == 75 and gap.location == "api/openapi.yaml"
+    assert gap.kind == "spec" and gap.score == 65.5 and gap.location == "api/openapi.yaml"  # the 6 Nov measuring rules
     assert gap.summary == "OpenAPI 3.0.3, 4 operations, hand-written" and gap.effort_units == 4
     assert gh.fetched == ["api/openapi.yaml"]  # the vendored spec is never fetched
 

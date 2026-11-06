@@ -47,7 +47,7 @@ _OPEN_PULLS_QUERY = """
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(states: [OPEN], first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      nodes { number title headRefName createdAt updatedAt isDraft bodyText author { login __typename } files(first: 10) { nodes { path } } }
+      nodes { number title headRefName headRefOid baseRefOid changedFiles createdAt updatedAt isDraft bodyText author { login __typename } files(first: 10) { nodes { path } } }
     }
   }
 }"""
@@ -390,6 +390,20 @@ class GitHub:
             return [_open_pull_as_rest(node) for node in nodes if node]
         return self.get_json(f"/repos/{full_name}/pulls", params={"state": "open", "sort": "updated", "direction": "desc", "per_page": 30}, retry_not_found=True)
 
+    def compare(self, full_name: str, base: str, head: str) -> dict | None:
+        """Where ``head`` branched from ``base`` and the files it changes since:
+        {"merge_base": sha, "files": [paths], "complete": bool}, or None if GitHub can't compare
+        them (a fork's commits that are gone). Works for PRs from forks: their commits are
+        reachable from the base repository."""
+        try:
+            data = self.get_json(f"/repos/{full_name}/compare/{base}...{head}", params={"per_page": 300})
+        except GitHubError as exc:
+            if exc.status in (404, 422):
+                return None
+            raise
+        files = [f.get("filename") for f in data.get("files") or [] if f.get("filename")]
+        return {"merge_base": (data.get("merge_base_commit") or {}).get("sha"), "files": files, "complete": len(files) < 300}
+
     def get_issue(self, full_name: str, number: int) -> dict | None:
         """One issue with its text, or None if it was deleted or moved (404 or 410)."""
         try:
@@ -473,8 +487,12 @@ def _pull_as_rest(node: dict[str, Any]) -> dict[str, Any]:
 def _open_pull_as_rest(node: dict[str, Any]) -> dict[str, Any]:
     """An open GraphQL pull request in the REST shape, plus ``files`` (changed paths)."""
     files = ((node.get("files") or {}).get("nodes")) or []
+    rest = _pull_as_rest(node)
+    rest["head"]["sha"] = node.get("headRefOid")
     return {
-        **_pull_as_rest(node),
+        **rest,
+        "base": {"sha": node.get("baseRefOid")},
+        "changed_files": node.get("changedFiles"),
         "updated_at": node.get("updatedAt"),
         "draft": bool(node.get("isDraft")),
         "body": node.get("bodyText") or "",

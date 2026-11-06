@@ -27,11 +27,14 @@ def iso(days_ago: float) -> str:
 
 
 def judge_claims_like_gemma(ctx):
-    """Stands in for the model's claim check in tests: a PR whose title starts with "docs" works
-    on the gap, and so does a comment saying "I'll take this"."""
+    """Stands in for the model's claim check in tests: a comment saying "I'll take this" offers to
+    do every gap, and so does a PR (on a generated spec) whose title starts with "docs"."""
+    import re
+
     from docscout.llm.base import Claim, ClaimCheck
 
-    claims = [Claim(item=label, reason="it documents the API endpoints") for label, text in ctx.items
+    keys = [m.group(1) for g in ctx.gap for m in [re.match(r"\[(\w+)\]", g)] if m]
+    claims = [Claim(item=label, reason="it documents the API endpoints", gaps=keys) for label, text in ctx.items
               if text.startswith("Title: docs") or "I'll take this" in text]  # fmt: skip
     return ClaimCheck(claims=claims)
 
@@ -102,4 +105,16 @@ def no_real_model(monkeypatch):
 
     monkeypatch.setattr(OllamaClient, "_chat", mocked_only(OllamaClient._chat))
     monkeypatch.setattr(OpenAICompatClient, "_post", mocked_only(OpenAICompatClient._post))
+
+    # The same for GitHub: a test that builds a real client (the CLI does) must never reach it.
+    from docscout.find.github import GitHub
+
+    real_request = GitHub.request
+
+    def github_mocked_only(self, *args, **kwargs):
+        if not isinstance(self._client._transport, httpx.MockTransport):
+            raise AssertionError("a test tried to call the real GitHub API")
+        return real_request(self, *args, **kwargs)
+
+    monkeypatch.setattr(GitHub, "request", github_mocked_only)
     return model

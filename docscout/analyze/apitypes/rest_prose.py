@@ -42,6 +42,8 @@ _AUTH = re.compile(r"\b(auth\w*|tokens?|api[ _-]?keys?|bearer|credentials?|sign[
 _WORD = re.compile(r"[A-Za-z]{2,}")
 
 WEIGHTS = {"description": 25, "request example": 20, "response example": 25, "status or error codes": 15, "auth": 15}
+KEYS = {"description": "description", "request example": "request_example", "response example": "response_example",
+        "status or error codes": "status_codes", "auth": "auth"}  # the gap keys claims are matched on (M6)  # fmt: skip
 MISSING_TEXT = {
     "description": "have no description",
     "request example": "have no request example",
@@ -136,7 +138,7 @@ class ProseResult:
         for key in WEIGHTS:
             failing = [e.label for e in self.endpoints if key in e.missing]
             if failing:
-                result.append(counted(MISSING_TEXT[key], failing, total, noun="endpoints"))
+                result.append(counted(MISSING_TEXT[key], failing, total, noun="endpoints", check=KEYS[key]))
         return result
 
 

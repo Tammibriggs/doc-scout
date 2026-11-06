@@ -74,7 +74,12 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
         "why": clean(review.get("why") or "", 600) or None,
         "first_steps": [clean(s, 300) for s in (review.get("first_steps") or [])[:3]],
         "claimed": [clean(c, 300) for c in checks.get("claimed") or []],
-        "claim_checked": bool(checks.get("claim_checked")),  # by Gemma; unchecked picks show no claim label
+        "claimed_out": claimed_out(finding),
+        "stale_offers": [clean(c, 300) for c in checks.get("stale_offers") or []],
+        "work_left": (d.get("claims") or {}).get("work_left"),
+        "work": (d.get("claims") or {}).get("work"),
+        "work_noun": (d.get("claims") or {}).get("noun") or "operations",
+        "claim_checked": bool(checks.get("claim_checked")),  # unchecked picks show no claim label
         "requirements": [clean(r, 220) for r in checks.get("requirements") or []],
         "local_setup": clean(checks.get("local_setup") or "", 60) or None,
         # Only a help request that asks for this work is shown as one (help_requests); other
@@ -86,6 +91,14 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
 
 def _issue(issue: dict[str, Any]) -> dict[str, Any]:
     return {"title": clean(f"#{issue.get('number')} {issue.get('title', '')}", 140), "url": _trusted(str(issue.get("html_url", "")))}
+
+
+def claimed_out(finding: StoredFinding) -> bool:
+    """True when open PRs and live offers leave less work than the size cutoff (M6, claims per
+    gap). A claim checked before 6 Nov had no measure of the work left: any claim counted."""
+    d = finding.details
+    checks = d.get("checks") or {}
+    return bool(checks.get("claimed_out")) if "claims" in d else bool(checks.get("claimed"))
 
 
 def _too_small(finding: StoredFinding, min_units: int) -> bool:
@@ -100,5 +113,5 @@ def weekly_picks(store: Store, now: datetime, min_units: int = 0) -> list[dict[s
     found = [f for f in store.reported_since(now - WEEK) if not _too_small(f, min_units)]
     # Projects someone may already be on go after the rest (best first within each), so the
     # free picks are ones a writer can start. The daily run checks every pick again for claims.
-    found.sort(key=lambda f: bool((f.details.get("checks") or {}).get("claimed")))
+    found.sort(key=claimed_out)
     return [pick(f, rank, now) for rank, f in enumerate(found, 1)]

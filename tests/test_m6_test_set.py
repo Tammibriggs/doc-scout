@@ -31,3 +31,31 @@ def test_the_counts_the_plan_quotes():
     assert len(best) == 23 and counts == {"A": 5, "B": 8, "C": 10}
     bounty = {i["repo"] for i in load("help_requests.json")["issues"] if i["bounty"]}
     assert bounty == {"EarnQuestOne/stellar_Earn", "Emmy123222/Stellar-MarketPay-", "Agora-Events/agora"}
+
+
+GAP_KEYS = {"description", "parameters", "fields", "request_example", "response_example", "success_schema", "errors",
+            "overview", "security", "tags", "servers", "status_codes", "auth"}  # fmt: skip
+
+
+def test_none_of_the_claims_flagged_on_6_nov_holds_up():
+    flagged = load("claims.json")["flagged"]
+    assert len(flagged) == 15 and len({f["repo"] for f in flagged}) == 15
+    items = [item for f in flagged for item in f["items"]]
+    assert sum(1 for i in items if i["kind"] == "pr") == 14
+    assert all(item["claims"] == [] and item["why"] for item in items)
+
+
+def test_the_claims_set_has_real_claims_to_find_and_no_names():
+    data = load("claims.json")
+    offers, generated = data["offers"], data["generated_spec_prs"]
+    for case in offers:
+        assert isinstance(case["label"]["offer"], bool) and set(case["label"]["gaps"]) <= GAP_KEYS and case["why"]
+        assert case["label"]["offer"] or not case["label"]["gaps"]  # only an offer can cover a gap
+        assert case["author"].startswith("user-") or case["author"].endswith("[bot]")
+        assert set(case["context"]["gaps"]) <= GAP_KEYS
+    for case in generated:
+        assert set(case["label"]["gaps"]) <= GAP_KEYS and case["files"]
+    # A check that never flags anything mustn't pass: 8 cases cover a gap (bounty ones aside).
+    found = [c for c in offers if c["label"]["gaps"] and not c["bounty"]] + [c for c in generated if c["label"]["gaps"]]
+    assert len(found) == 8
+    assert sum(1 for c in offers if c["source"] == "real") == 14

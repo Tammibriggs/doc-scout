@@ -1,0 +1,946 @@
+{
+ "about": "M6 test set (6a): claims. 'flagged' is what Gemma flagged as claims on the 15 claimed picks of 6 Nov 2026, and what was true: none of them claims a gap. PRs were measured with DocScout's own scorer on the PR's version of the spec (6 Nov rules; measure them again under M6's measuring changes). 'offers' are comments, real (names replaced) and made up, each with the issue it's on and the pick's gap keys; the label says whether it's an offer and which gaps it covers. Bounty-program comments are dropped by code before Gemma. 'generated_spec_prs' are made-up PRs on a generated spec, which Gemma judges because the spec file doesn't change.",
+ "flagged": [
+  {
+   "repo": "the-momentum/open-wearables",
+   "gaps_6_nov": [
+    "85/137 operations have parameters without descriptions",
+    "119/137 operations have no request or response examples",
+    "6/137 operations have no schema for a successful response",
+    "32/137 operations document no error responses",
+    "The API overview (info.description) is missing or very short",
+    "1/1 authentication schemes have no description"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 1963,
+     "title": "feat(backend): store Garmin bone mass and body water percentage",
+     "state": "closed",
+     "touches_measured_file": true,
+     "measured": "88 -> 88 operations needing work",
+     "claims": [],
+     "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps. Closed since."
+    },
+    {
+     "kind": "pr",
+     "number": 1934,
+     "title": "feat(api): aggregates: /timeseries 1day, 1week, 1month",
+     "state": "closed",
+     "touches_measured_file": true,
+     "measured": "136 -> 136",
+     "claims": [],
+     "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps. Closed since."
+    }
+   ]
+  },
+  {
+   "repo": "0xfurai/peekaping",
+   "gaps_6_nov": [
+    "48/59 operations have no request or response examples",
+    "2/59 operations document no error responses",
+    "The API overview (info.description) is missing or very short",
+    "1/1 authentication schemes have no description",
+    "9 operation groups (tags) have no description",
+    "No server address is given, so readers can't tell where to send requests"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 500,
+     "title": "#258 feat(server): cap the instances a probe can register",
+     "state": "closed",
+     "touches_measured_file": false,
+     "measured": null,
+     "claims": [],
+     "why": "Doesn't change the measured spec. Closed since."
+    }
+   ]
+  },
+  {
+   "repo": "docling-project/docling-pipelines",
+   "gaps_6_nov": [
+    "3/50 endpoints have no description",
+    "42/50 endpoints have no request example",
+    "46/50 endpoints have no response example",
+    "49/50 endpoints list no status or error codes"
+   ],
+   "items": [
+    {
+     "kind": "comments",
+     "issue": 296,
+     "count": 3,
+     "claims": [],
+     "why": "Offers to fix code (routes that don't match their spec), not the docs gaps."
+    }
+   ]
+  },
+  {
+   "repo": "EarnQuestOne/stellar_Earn",
+   "gaps_6_nov": [
+    "5/5 endpoints have no request example",
+    "5/5 endpoints have no response example",
+    "5/5 endpoints list no status or error codes",
+    "4/5 endpoints don't say how to authenticate"
+   ],
+   "items": [
+    {
+     "kind": "comments",
+     "issue": 2767,
+     "count": 5,
+     "claims": [],
+     "why": "Bounty-program applications on an issue since deleted."
+    }
+   ]
+  },
+  {
+   "repo": "Emmy123222/Stellar-MarketPay-",
+   "gaps_6_nov": [
+    "83/162 operations have parameters without descriptions",
+    "155/162 operations have no request or response examples",
+    "137/162 operations have no schema for a successful response",
+    "109/162 operations document no error responses",
+    "1 operation groups (tags) have no description"
+   ],
+   "items": [
+    {
+     "kind": "comments",
+     "issue": 1857,
+     "count": 4,
+     "claims": [],
+     "why": "Bounty-program applications; the repo has since been deleted."
+    }
+   ]
+  },
+  {
+   "repo": "Agora-Events/agora",
+   "gaps_6_nov": [
+    "1/9 operations have parameters without descriptions",
+    "9/9 operations have no request or response examples",
+    "9/9 operations have no schema for a successful response",
+    "9/9 operations document no error responses",
+    "1/1 authentication schemes have no description",
+    "3 operation groups (tags) have no description"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 1712,
+     "title": "docs(api): move implemented events and auth endpoints out of future list (#1698)",
+     "state": "closed",
+     "touches_measured_file": false,
+     "measured": null,
+     "claims": [],
+     "why": "Edits another doc, not the measured spec. Closed since."
+    },
+    {
+     "kind": "pr",
+     "number": 1711,
+     "title": "docs(openapi): describe supported event filters in GET /api/v1/events (#1699)",
+     "state": "closed",
+     "touches_measured_file": false,
+     "measured": null,
+     "claims": [],
+     "why": "Edits another spec file, not the measured one. Closed since."
+    },
+    {
+     "kind": "comments",
+     "issue": 1572,
+     "count": 4,
+     "claims": [],
+     "why": "Bounty-program applications; the issue was closed on 17 Oct."
+    }
+   ]
+  },
+  {
+   "repo": "tchapi/davis",
+   "gaps_6_nov": [
+    "3/11 endpoints have no description",
+    "11/11 endpoints have no request example",
+    "11/11 endpoints have no response example",
+    "11/11 endpoints list no status or error codes"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 294,
+     "title": "Added API routes to create and delete users",
+     "state": "open",
+     "touches_measured_file": false,
+     "measured": null,
+     "claims": [],
+     "why": "A feature; doesn't change the measured docs file."
+    }
+   ]
+  },
+  {
+   "repo": "sipyourdrink-ltd/bernstein",
+   "gaps_6_nov": [
+    "238/515 operations have parameters without descriptions",
+    "515/515 operations have no request or response examples",
+    "256/515 operations have no schema for a successful response",
+    "199/515 operations document no error responses",
+    "16 operation groups (tags) have no description",
+    "No server address is given, so readers can't tell where to send requests"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 6691,
+     "title": "fix: expose approval_spec, sensitivity, claimed_by_session in TaskResponse",
+     "state": "open",
+     "touches_measured_file": true,
+     "measured": "513 -> 513",
+     "claims": [],
+     "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps."
+    }
+   ]
+  },
+  {
+   "repo": "AOSSIE-Org/PictoPy",
+   "gaps_6_nov": [
+    "17/57 operations have parameters without descriptions",
+    "57/57 operations have no request or response examples",
+    "10/57 operations have no schema for a successful response",
+    "6/57 operations document no error responses",
+    "13 operation groups (tags) have no description"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 1680,
+     "title": "docs: update Rust API docs for Tauri v2 and document all IPC commands",
+     "state": "open",
+     "touches_measured_file": false,
+     "measured": null,
+     "claims": [],
+     "why": "Documents the Tauri commands, a different API; doesn't change the measured spec."
+    }
+   ]
+  },
+  {
+   "repo": "writerslogic/holographic-memory",
+   "gaps_6_nov": [
+    "31/31 operations have no request or response examples",
+    "6 operation groups (tags) have no description"
+   ],
+   "items": [
+    {
+     "kind": "comments",
+     "issue": 10,
+     "count": 1,
+     "claims": [],
+     "why": "A maintainer saying a generated reference now exists: not an offer."
+    }
+   ]
+  },
+  {
+   "repo": "zone-eu/wildduck",
+   "gaps_6_nov": [
+    "123/134 operations have no request or response examples",
+    "133/134 operations document no error responses"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 1210,
+     "title": "feat(imap): IMAP ACL (RFC 4314) with shared and team mailboxes",
+     "state": "open",
+     "touches_measured_file": true,
+     "measured": "134 -> 145: adds 11 operations, none documented",
+     "claims": [],
+     "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps."
+    }
+   ]
+  },
+  {
+   "repo": "Priyanshu-byte-coder/devtrack",
+   "gaps_6_nov": [
+    "24/142 operations have parameters without descriptions",
+    "142/142 operations have no request or response examples",
+    "116/142 operations have no schema for a successful response",
+    "83/142 operations document no error responses",
+    "42 operation groups (tags) have no description"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 2667,
+     "title": "Refactor/api payload",
+     "state": "open",
+     "touches_measured_file": true,
+     "measured": "135 -> 133: removes 2 operations",
+     "claims": [],
+     "why": "Removing operations doesn't document the others."
+    }
+   ]
+  },
+  {
+   "repo": "opencloudtouch/opencloudtouch",
+   "gaps_6_nov": [
+    "50/114 operations have parameters without descriptions",
+    "114/114 operations have no request or response examples",
+    "63/114 operations have no schema for a successful response",
+    "26/114 operations document no error responses",
+    "21 operation groups (tags) have no description",
+    "No server address is given, so readers can't tell where to send requests"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 560,
+     "title": "feat(api): add machine-readable code to API error responses and typed ApiError",
+     "state": "closed",
+     "touches_measured_file": true,
+     "measured": "115 -> 115",
+     "claims": [],
+     "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps. Closed since. Measure again under the error-body rule."
+    }
+   ]
+  },
+  {
+   "repo": "Open-Source-Kigali/osk-backend",
+   "gaps_6_nov": [
+    "19/36 operations have parameters without descriptions",
+    "1/1 authentication schemes have no description",
+    "9 operation groups (tags) have no description"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 356,
+     "title": "docs: document featured query param in openapi.yaml",
+     "state": "open",
+     "touches_measured_file": true,
+     "measured": "19 -> 19",
+     "claims": [],
+     "why": "Describes one parameter of an operation whose other parameters are still undescribed."
+    },
+    {
+     "kind": "pr",
+     "number": 357,
+     "title": "fix: apply public rate limit to stats endpoint",
+     "state": "open",
+     "touches_measured_file": true,
+     "measured": "19 -> 19",
+     "claims": [],
+     "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps."
+    }
+   ]
+  },
+  {
+   "repo": "projectsend/projectsend",
+   "gaps_6_nov": [
+    "2/52 operations have no summary or description",
+    "9/52 operations have parameters without descriptions",
+    "42/52 operations have no request or response examples",
+    "1/52 operations have no schema for a successful response",
+    "1/1 authentication schemes have no description",
+    "17 operation groups (tags) have no description"
+   ],
+   "items": [
+    {
+     "kind": "pr",
+     "number": 1793,
+     "title": "Fix interrupted upload parts and large-file finalization",
+     "state": "closed",
+     "touches_measured_file": true,
+     "measured": "41 -> 41",
+     "claims": [],
+     "why": "A feature or fix that edits the spec for its own change; measured, it fixes none of the gaps. Closed since."
+    }
+   ]
+  }
+ ],
+ "offers": [
+  {
+   "source": "real",
+   "issue": "docling-project/docling-pipelines#296",
+   "author": "user-1",
+   "association": "CONTRIBUTOR",
+   "date": "2026-10-19",
+   "text": "Hi @someone and Docling maintainers,\n\nI'm interested in contributing to this issue.\n\nI've reviewed the reported document-library API mismatches, including the name filtering, document-set validation, HTTP status codes, and document size response field.\n\nI'd be happy to investigate the affected routes and services, reproduce the reported behavior, and prepare focused fixes with regression tests aligned with the OpenSpec requirements.\n\nSince the original reporter also expressed interest in working on this issue, could you please confirm whether anyone has already started implementing a fix?\n\nI'm also happy to take on a specific subset of the issues if that would help avoid overlapping work.\n\nTh",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": []
+   },
+   "why": "Offers and planning for code fixes; covers none of the docs gaps.",
+   "context": {
+    "issue_title": "bug(api): document-libraries routes deviate from their OpenSpec",
+    "issue_asks": "not API docs (label C)",
+    "gaps": [
+     "description",
+     "request_example",
+     "response_example",
+     "status_codes"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "docling-project/docling-pipelines#296",
+   "author": "user-2",
+   "association": "CONTRIBUTOR",
+   "date": "2026-10-19",
+   "text": "Hi @user-1, thanks! I haven't started the fixes yet. Splitting sounds good:\n- I'd keep the three status code items (unknown set 404, set not in library 400, rename conflict 409). They touch `get_document_library_service()` and `DuckDBAssetRepository.update()`, which overlap with #291 and with the tests in #290 and #297.\n- You could take the `name` filter in `list_libraries` and the `size` vs `size_bytes` field in `list_document_sets`. Both are self-contained.\n\nThese are behaviour changes, so each one needs an `openspec/changes/<name>/` proposal per `AGENTS.md`. Once #297 is merged, `tests/unit/api/routes/test_document_libraries_routes.py` is a good base for the regression tests.\n\n@someone, d",
+   "bounty": false,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "Splitting the code fixes; not an offer for docs.",
+   "context": {
+    "issue_title": "bug(api): document-libraries routes deviate from their OpenSpec",
+    "issue_asks": "not API docs (label C)",
+    "gaps": [
+     "description",
+     "request_example",
+     "response_example",
+     "status_codes"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "docling-project/docling-pipelines#296",
+   "author": "user-1",
+   "association": "CONTRIBUTOR",
+   "date": "2026-10-19",
+   "text": "Hi @user-2 and @someone,\n\nThank you for proposing the work split.\n\nI've completed the two self-contained fixes on my dedicated branch:\n\n- Apply case-insensitive partial `name` filtering before pagination in `list_libraries`.\n- Correct the `size_bytes` to `size` response mapping in `list_document_sets`.\n\nI've also added focused service and FastAPI route regression tests, along with the OpenSpec change documentation.\n\nThe focused test suite passed (69 tests), and the changes have been pushed to my fork:\n\nhttps://github.com/user-1/docling-pipelines/tree/fix/296-document-library-name-filter-and-size\n\nI've kept the three status-code fixes reserved for @user-2 completely untouched.\n\nBefore o",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": []
+   },
+   "why": "Offers and planning for code fixes; covers none of the docs gaps.",
+   "context": {
+    "issue_title": "bug(api): document-libraries routes deviate from their OpenSpec",
+    "issue_asks": "not API docs (label C)",
+    "gaps": [
+     "description",
+     "request_example",
+     "response_example",
+     "status_codes"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "docling-project/docling-pipelines#296",
+   "author": "user-2",
+   "association": "CONTRIBUTOR",
+   "date": "2026-10-21",
+   "text": "Hi @user-1, thanks, that was quick! The split is fine from my side.\n\nOne thing to watch out for: once `src/docpipe/api/routes/document_libraries.py` is touched, the ruff pre-commit hook flags every f-string `logger` call in that file (G004, AGENTS.md rule 7). #297 already converts all of them. So either:\n- wait until #297 is merged and rebase, then ruff only sees your lines, or\n- open your PR now and convert those logger calls as well; if yours lands first, I'll rebase #297 on top of it.\n\nEither way works for me.",
+   "bounty": false,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "Splitting the code fixes; not an offer for docs.",
+   "context": {
+    "issue_title": "bug(api): document-libraries routes deviate from their OpenSpec",
+    "issue_asks": "not API docs (label C)",
+    "gaps": [
+     "description",
+     "request_example",
+     "response_example",
+     "status_codes"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "docling-project/docling-pipelines#296",
+   "author": "user-1",
+   "association": "CONTRIBUTOR",
+   "date": "2026-10-21",
+   "text": "Hi @user-2 and @someone,\n\nThank you for confirming the work split and for the guidance regarding PR #297.\n\nTo avoid overlapping changes and unnecessary rework, I'll wait until PR #297 is merged before opening my pull request for Issue #296.\n\nMy branch already contains the two agreed fixes:\n- Case-insensitive partial name filtering before pagination.\n- Correct document size mapping (`size_bytes` → `size`).\n\nThe corresponding OpenSpec documentation and regression tests are also prepared.\n\nOnce #297 is merged, I'll rebase onto the latest main branch, address any remaining lint issues, rerun the relevant checks, and submit a focused PR.\n\nI'll keep the three status-code fixes reserved for @user-2",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": []
+   },
+   "why": "Offers and planning for code fixes; covers none of the docs gaps.",
+   "context": {
+    "issue_title": "bug(api): document-libraries routes deviate from their OpenSpec",
+    "issue_asks": "not API docs (label C)",
+    "gaps": [
+     "description",
+     "request_example",
+     "response_example",
+     "status_codes"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "Agora-Events/agora#1572",
+   "author": "user-1",
+   "association": "CONTRIBUTOR",
+   "date": "2026-09-30",
+   "text": "Hello @someone,\n\nI am interested in working on this issue.\nPlan:\n1. Structure the service layer for `[DOCS] Document the backend API error response format in docs/api.md` with secure data access and transaction boundaries.\n2. Cover route handlers with automated endpoint integration tests.\n\nReady to deliver a clean, tested PR within 12–24 hours. Please assign!",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "errors"
+    ]
+   },
+   "why": "Offers to document the error format, though its plan reads like a template.",
+   "context": {
+    "issue_title": "[DOCS] Document the backend API error response format in docs/api.md",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example",
+     "request_example",
+     "success_schema",
+     "parameters",
+     "security",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "Agora-Events/agora#1572",
+   "author": "user-2",
+   "association": "NONE",
+   "date": "2026-09-30",
+   "text": "Hi, I'd like to work on this issue. I'll first trace the backend error response implementation to confirm the actual JSON schema, then update docs/api.md accordingly.",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "errors"
+    ]
+   },
+   "why": "A clear offer: trace the error format, then document it.",
+   "context": {
+    "issue_title": "[DOCS] Document the backend API error response format in docs/api.md",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example",
+     "request_example",
+     "success_schema",
+     "parameters",
+     "security",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "Agora-Events/agora#1572",
+   "author": "user-3",
+   "association": "NONE",
+   "date": "2026-10-17",
+   "text": "@user-3 has applied to work on this issue as part of the **Stellar Wave Program**'s 10th wave.\n\n\n\n> Hi maintainer can I pls work on this?\n\n\nℹ️ **Repo Maintainers**: To accept this application, [review their application](https://www.drips.network/wave/maintainers/issues/f07fd4f7-15a0-45f7-a16e-f32793d093b7) or assign @user-3 to this issue.",
+   "bounty": true,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "errors"
+    ]
+   },
+   "why": "A bounty-program application: dropped by code before Gemma sees it.",
+   "context": {
+    "issue_title": "[DOCS] Document the backend API error response format in docs/api.md",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example",
+     "request_example",
+     "success_schema",
+     "parameters",
+     "security",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "Agora-Events/agora#1572",
+   "author": "user-4",
+   "association": "NONE",
+   "date": "2026-10-17",
+   "text": "@user-4 has applied to work on this issue as part of the **Stellar Wave Program**'s 10th wave.\n\n\n\n> Hey Maintainer,\n> I would love to work on this issue kindly assign. \n\n\nℹ️ **Repo Maintainers**: To accept this application, [review their application](https://www.drips.network/wave/maintainers/issues/f07fd4f7-15a0-45f7-a16e-f32793d093b7) or assign @user-4 to this issue.",
+   "bounty": true,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "errors"
+    ]
+   },
+   "why": "A bounty-program application: dropped by code before Gemma sees it.",
+   "context": {
+    "issue_title": "[DOCS] Document the backend API error response format in docs/api.md",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example",
+     "request_example",
+     "success_schema",
+     "parameters",
+     "security",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "Agora-Events/agora#1572",
+   "author": "user-5",
+   "association": "CONTRIBUTOR",
+   "date": "2026-10-17",
+   "text": "@user-5 has applied to work on this issue as part of the **Stellar Wave Program**'s 10th wave.\n\n\n\n> I can update `apps/web/components/layout/Header.tsx` to keep the main navigation header visible while scrolling on mobile web.\n> \n> I’ll apply sticky positioning with `top-0` and `z-50`, ensuring the header stays accessible without covering page content.\n> \n> I’ll verify the behavior on mobile layouts and check that desktop navigation remains unaffected.\n\n\nℹ️ **Repo Maintainers**: To accept this application, [review their application](https://www.drips.network/wave/maintainers/issues/f07fd4f7-15a0-45f7-a16e-f32793d093b7) or assign @user-5 to this issue.",
+   "bounty": true,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "errors"
+    ]
+   },
+   "why": "A bounty-program application: dropped by code before Gemma sees it.",
+   "context": {
+    "issue_title": "[DOCS] Document the backend API error response format in docs/api.md",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example",
+     "request_example",
+     "success_schema",
+     "parameters",
+     "security",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "Agora-Events/agora#1572",
+   "author": "drips-wave[bot]",
+   "association": "NONE",
+   "date": "2026-10-17",
+   "text": "Congratulations, @user-5! 🎉 Your application was accepted by the repo's maintainers, and the issue is **due on October 22, 2026**.\n\n**🧑‍💻 @user-5**: Please resolve the issue such that the repo's maintainers have enough time to review your contribution before the due date. You'll earn Points for completing the issue on-time, which will make you eligible for a share of the **Stellar Wave Program**'s reward pool.\n\n> [!WARNING]\n> When opening a PR, please [link it to this issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) to ensure it gets tracked accurately. Points are awarded when **this issue is marked as completed** by the",
+   "bounty": true,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "The bounty program's bot: dropped by code.",
+   "context": {
+    "issue_title": "[DOCS] Document the backend API error response format in docs/api.md",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example",
+     "request_example",
+     "success_schema",
+     "parameters",
+     "security",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "Agora-Events/agora#1572",
+   "author": "drips-wave[bot]",
+   "association": "NONE",
+   "date": "2026-10-17",
+   "text": "This issue has been completed by @user-5 as part of the [**Stellar Wave Program's 10th Wave**](https://www.drips.network/wave/stellar) 🥳\n\n😎 **@user-5**: You **earned 200 Points** for completing this issue! Once the Wave's rewards are finalized, you'll be eligible for a percentage of the Wave's reward pool based on the percentage of total points you've earned. Learn more [here](https://docs.drips.network/wave/contributors/solving-issues-and-earning-rewards). You can also [**Leave a review**](https://www.drips.network/wave/stellar/issues/f07fd4f7-15a0-45f7-a16e-f32793d093b7/review) to share your experience working on this issue.\n\n🧑‍💻 **Repo maintainers**: How'd the contributor do? [**Leave a r",
+   "bounty": true,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "The bounty program's bot: dropped by code.",
+   "context": {
+    "issue_title": "[DOCS] Document the backend API error response format in docs/api.md",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example",
+     "request_example",
+     "success_schema",
+     "parameters",
+     "security",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "writerslogic/holographic-memory#10",
+   "author": "user-1",
+   "association": "COLLABORATOR",
+   "date": "2026-10-21",
+   "text": "Partly done. A reference generated from `index.d.ts` (typedoc, via `scripts/docs_api.py`) is part of the docs site (#125), so every method has a signature and description that cannot drift.\n\nNot done: a hand-written `docs/API.md` grouped as proposed, with a 3 to 5 line usage example and return-type note per method. The generated pages carry no per-method examples. Leaving open; a good first issue if split by method group.",
+   "bounty": false,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "A maintainer reporting what exists; not an offer.",
+   "context": {
+    "issue_title": "Node.js API reference with usage examples",
+    "issue_asks": "other API-docs work (label B)",
+    "gaps": [
+     "response_example",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "real",
+   "issue": "writerslogic/holographic-memory#10",
+   "author": "user-1",
+   "association": "COLLABORATOR",
+   "date": "2026-10-29",
+   "text": "The [Node API reference](https://docs.holographic-memory.com/dev/api/node/) is now generated from the canonical declarations during the strict docs build, and CI detects declaration drift. Maintained quickstarts and integration guides provide runnable document/memory examples. Keeping open: generated signatures do not supply the requested short usage example for every public HolographicMemorySystem method.",
+   "bounty": false,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "A maintainer reporting what exists; not an offer.",
+   "context": {
+    "issue_title": "Node.js API reference with usage examples",
+    "issue_asks": "other API-docs work (label B)",
+    "gaps": [
+     "response_example",
+     "tags"
+    ]
+   }
+  },
+  {
+   "source": "made up",
+   "author": "user-1",
+   "association": "NONE",
+   "date": "2026-11-01",
+   "text": "Hi! I'd like to pick this up. I'll add request and response examples for the /users and /orders endpoints this week.",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "request_example",
+     "response_example"
+    ]
+   },
+   "why": "A clear offer, for both kinds of example.",
+   "context": {
+    "issue_title": "Add request and response examples to the API reference",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "request_example",
+     "response_example",
+     "fields"
+    ]
+   }
+  },
+  {
+   "source": "made up",
+   "author": "user-1",
+   "association": "NONE",
+   "date": "2026-11-01",
+   "text": "I'm happy to take the response examples; someone else may want the request bodies.",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "response_example"
+    ]
+   },
+   "why": "An offer for one gap only.",
+   "context": {
+    "issue_title": "Add request and response examples to the API reference",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "request_example",
+     "response_example",
+     "fields"
+    ]
+   }
+  },
+  {
+   "source": "made up",
+   "author": "user-1",
+   "association": "NONE",
+   "date": "2026-11-01",
+   "text": "Is anyone working on this? The docs for /orders are confusing.",
+   "bounty": false,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "A question, not an offer.",
+   "context": {
+    "issue_title": "Add request and response examples to the API reference",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "request_example",
+     "response_example",
+     "fields"
+    ]
+   }
+  },
+  {
+   "source": "made up",
+   "author": "user-1",
+   "association": "NONE",
+   "date": "2026-11-01",
+   "text": "+1, I need this too.",
+   "bounty": false,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "Support, not an offer.",
+   "context": {
+    "issue_title": "Add request and response examples to the API reference",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "request_example",
+     "response_example",
+     "fields"
+    ]
+   }
+  },
+  {
+   "source": "made up",
+   "author": "user-1",
+   "association": "NONE",
+   "date": "2026-11-01",
+   "text": "I started on this but got busy. Feel free to take it over.",
+   "bounty": false,
+   "label": {
+    "offer": false,
+    "gaps": []
+   },
+   "why": "An offer withdrawn.",
+   "context": {
+    "issue_title": "Add request and response examples to the API reference",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "request_example",
+     "response_example",
+     "fields"
+    ]
+   }
+  },
+  {
+   "source": "made up",
+   "author": "user-1",
+   "association": "NONE",
+   "date": "2026-11-01",
+   "text": "Can I work on this? I'm new to open source.",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "errors"
+    ]
+   },
+   "why": "An offer; it covers what the issue asks for.",
+   "context": {
+    "issue_title": "Document the error responses",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example"
+    ]
+   }
+  },
+  {
+   "source": "made up",
+   "author": "user-1",
+   "association": "MEMBER",
+   "date": "2026-11-01",
+   "text": "Assigned to @user-2, thanks!",
+   "bounty": false,
+   "label": {
+    "offer": true,
+    "gaps": [
+     "errors"
+    ]
+   },
+   "why": "A maintainer assigning the issue: someone is on it.",
+   "context": {
+    "issue_title": "Document the error responses",
+    "issue_asks": "this work (label A)",
+    "gaps": [
+     "errors",
+     "response_example"
+    ]
+   }
+  }
+ ],
+ "generated_spec_prs": [
+  {
+   "source": "made up",
+   "title": "docs: add docstrings and response examples to the user routes",
+   "files": [
+    "app/routers/users.py"
+   ],
+   "context": {
+    "spec": "generated from FastAPI route annotations",
+    "gaps": [
+     "description",
+     "response_example",
+     "fields"
+    ]
+   },
+   "label": {
+    "gaps": [
+     "description",
+     "response_example"
+    ]
+   },
+   "why": "The spec is generated from these annotations, so this is the docs work."
+  },
+  {
+   "source": "made up",
+   "title": "fix: handle a null avatar in the user serializer",
+   "files": [
+    "app/serializers/user.py",
+    "tests/test_users.py"
+   ],
+   "context": {
+    "spec": "generated from FastAPI route annotations",
+    "gaps": [
+     "description",
+     "response_example",
+     "fields"
+    ]
+   },
+   "label": {
+    "gaps": []
+   },
+   "why": "A bug fix in code the spec is built from; it documents nothing."
+  },
+  {
+   "source": "made up",
+   "title": "docs(api): describe the fields of the Order model",
+   "files": [
+    "app/models/order.py"
+   ],
+   "context": {
+    "spec": "generated from FastAPI route annotations",
+    "gaps": [
+     "description",
+     "response_example",
+     "fields"
+    ]
+   },
+   "label": {
+    "gaps": [
+     "fields"
+    ]
+   },
+   "why": "Field descriptions in the model the spec is generated from."
+  }
+ ]
+}

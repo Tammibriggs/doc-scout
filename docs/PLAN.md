@@ -23,6 +23,7 @@ DocScout finds open-source projects that **(a)** serve an API, **(b)** have docu
 | **Deadline** | | | **Mon 19 Oct** |
 | **M4. Read external docs** | | **After the deadline** | |
 | **M5. macOS and Windows support** | launchd and Task Scheduler setup, notifications and file lock on both, CI on 3 operating systems, `pipx` packaging, a fresh-install test on real machines | **After the deadline** | |
+| **M6. Open picks stay listed, and stay true** | Planned 6 Nov (section 21), after the website's list fell to 9: open picks listed with no age limit; a look for changes at every listed pick every 6 hours (one request per 60 picks); the gap measured again when its docs change, health every 7 days; claims per gap, with open PRs measured instead of judged; Gemma checks that each help request asks for the measured work; bounty programs filtered | | After the deadline: steps 6a–6e |
 
 **If the schedule slips:** the "if time allows" items go first, then M2 shrinks to first steps only. M1's must-ship items stay, because without them the tool can't tell you what to fix.
 
@@ -350,7 +351,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
   - **Checked live** on those 6 picks: Gemma 4 31B called all 6 not claimed, matching a reading by hand. On a made-up PR "Add request and response examples to the API reference" for statewave it said claimed, and it ignored a typo fix beside it. 25–190 s per project, including retries; a project with no open PRs or comments isn't asked about.
   - **When Gemma can't answer:** retries (5, 20, 60 s), then the other Gemma model (`fallback_model`); twice in that check the 31B failed and the 26B answered. If both fail, the pick shows "not checked yet", never a guess, and the next run asks again.
   - **Not asked again** while a project's open PRs and comments are unchanged since Gemma's last answer.
-- **Checked again every day** ✅ (17 Oct): once a day for `[checks] recheck_claims_days` (7) after a project is reported, so a pick can be claimed after it's shown, including by another DocScout user. A claim that has gone (the PR was closed) is cleared.
+- **Checked again every day** ✅ (17 Oct): once a day for `[checks] recheck_claims_days` (7) after a project is reported, so a pick can be claimed after it's shown, including by another DocScout user. A claim that has gone (the PR was closed) is cleared. M6 replaces the 7 days with checks for as long as a pick is listed, and judges claims per gap (section 21).
   - The laptop report's "Still open from earlier" lines show ⚠️ with what was found.
   - The website moves claimed picks below the rest, so the free 3 are ones a writer can start.
   - About 3–5 GitHub requests per project; Gemma is asked only when its PRs or comments changed.
@@ -552,7 +553,7 @@ hacktoberfest/
 ## 19. Later (after M5)
 
 **Gemma for the two judgments code still makes from words** (decided 17 Oct, after the deadline):
-- **Is the help request about the API docs?** Today a docs label or docs words in the title are enough. statewave's "Maintainers asked for help" came from #481, an issue about a licence badge, not its API docs. Gemma would read the issue and say whether it asks for work on the API documentation; only then would it count as a help request and earn the bonus.
+- **Is the help request about the API docs?** Moved to M6 (section 21) on 6 Nov: of the 23 listed picks with a help request, only 4 ask for the work DocScout measured.
 - **Which prose lines are real endpoints?** Today patterns find them (`GET /path`, `curl` lines). Gemma would confirm which of the found lines are the project's own API endpoints, catching what the install-command rule doesn't. Prompt v3 showed Gemma copying measured facts instead of judging, so the question would be narrow (one line at a time, or a list to accept or reject), and measured before it's switched on.
 
 Both add Gemma requests and time to every run.
@@ -614,11 +615,165 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 
 In the first run, 16 of the 60 passed the health checks. Render started with an empty memory. The rehearsal had published picks from a database on this laptop without saving that database to Atlas, so Render's first run replaced the 42 rehearsal picks with its own 3.
 
-**The candidate pool ran dry by 24 Oct** (found 5 Nov). The runs of 17–23 Oct checked the full 200 repos and published 5–15 picks each, and the 7-day list grew to about 70. By 24 Oct DocScout had checked about 3,000 repos: every awesome-selfhosted app in the star range (1,115) and every page of the 24 repo-search slices, each gone through 2–4 times. A checked repo isn't checked again for 90 days (`recheck_after_days`), so since 25 Oct a run finds only the repos new to its sources: 9–152 (about 50 on average) instead of 200, and 0–3 new picks. The older picks left the 7-day list, which fell to 9 on 5 Nov. Nothing was deleted: the picks are still in Atlas. ⏳ Decide: more sources, a longer list, or both.
+**The candidate pool ran dry by 24 Oct** (found 5 Nov). The runs of 17–23 Oct checked the full 200 repos and published 5–15 picks each, and the 7-day list grew to about 70. By 24 Oct DocScout had checked about 3,000 repos: every awesome-selfhosted app in the star range (1,115) and every page of the 24 repo-search slices, each gone through 2–4 times. A checked repo isn't checked again for 90 days (`recheck_after_days`), so since 25 Oct a run finds only the repos new to its sources: 9–152 (about 50 on average) instead of 200, and 0–3 new picks. The older picks left the 7-day list, which fell to 9 on 5 Nov. Nothing was deleted: the picks are still in Atlas. Decided 6 Nov: open picks stay listed and are kept true (M6, section 21); more sources come after it.
 
 **⏳ Still to do:**
 - ✅ Gemma 4 31B on the 58 labels: 85% precision, 90% recall (section 2);
 - ✅ deployed: the public GitHub repo, the Render Blueprint, Atlas access for Render;
 - a real end-to-end test payment on the live site, in test mode;
 - before real payments (after the deadline): subscribers are recognized only by a signed cookie in their browser, so they lose access on another device or after clearing cookies; renewal doesn't extend the 31-day pass, and cancelling doesn't end it early. A "restore access" step through Stripe's customer portal, and passes that follow the Stripe subscription's status, fix all three;
-- after the deadline: check published projects again after 90 days, like the others, so one that still has the gap and isn't claimed can come back.
+- after the deadline: check published projects again, so one that still has the gap and isn't claimed stays or comes back: now M6 (section 21).
+
+## 21. M6: open picks stay listed, and stay true (planned 6 Nov)
+
+The website's list fell from about 70 picks to 9 (section 20), because a pick leaves after 7 days and a listed project is never checked again. Listing every open pick fixes the count, but only if every card stays true. Checking all 120 listed picks on 5–6 Nov found four ways a card goes wrong.
+
+### What the checks found
+
+| The card says | What was true (5–6 Nov) | How it was checked |
+|---|---|---|
+| ⚠ Someone may be on it (15 picks) | **None holds up.** 7 of the 14 flagged PRs are closed, but their claims are still shown, because claims are checked only in a pick's first 7 days. The 7 still open fix none of the measured gaps: they're features and fixes that edit the spec for their own changes. wildduck's adds 11 operations, none documented; devtrack's removes 2. The comment "claims" are offers on issues about something else (docling: a code fix), on issues since deleted (stellar_Earn) or closed (agora), on a deleted repo (Stellar-MarketPay), or not offers at all (holographic-memory) | Each PR's spec measured before and after, with DocScout's own scorer; comments read |
+| Maintainers asked for help (23 picks) | **Only 4 ask for the work DocScout measured** (OpsiMate, Drix10, agora, QualityOnDemand). 10 ask for other API-docs work (one endpoint's description, three outdated statements, Tauri commands instead of the REST spec), and 9 aren't about API docs (a licence badge, a code bug, a new provider, Go doc comments); 6 of these calls are borderline. 8 of the 25 issues are now closed or deleted | Every issue read in full |
+| The gap's numbers | The measured docs file changed for **51 of 106** picks within 2–3 weeks, and 2 files are gone. Measured again, the work needed grew for 30 of 48 specs (new endpoints without docs), stayed the same for 13 and shrank for 4, a lot for 2: OxiCloud 232 → 78 operations needing work, open-wearables 136 → 91. None fell below the size cutoff | The file's version when found and now; changed specs measured again |
+| The project | 1 repo deleted, 1 renamed, 4 with no push for 30+ days (2 of them past 50) | One batched GraphQL check |
+
+What this means:
+- **Keeping picks is sound.** Gaps rarely close within weeks: projects add endpoints faster than they document them.
+- **The card must be checked again:** claims and help requests change daily, and the numbers drift.
+- **Gemma can't be asked on every change.** 60 of the 119 live picks had an open PR updated in the last day: about 60 questions a day now and 500 at 1,000 picks, beyond its free tier. Measuring a PR needs no question.
+
+### Goal and exit check
+
+Every listed pick is still open, and every line on its card was checked recently: claims, help requests and whether the project exists, within 6 hours; the gap's numbers, within 6 hours of the docs changing; the health checks, within 7 days.
+
+- **Claims:** at most 1 wrong of the 15 claimed picks of 6 Nov (today none holds up), and every real claim in the test set found.
+- **Help requests:** at least 21 of the 23 agree with your labels, and none of the 9 that aren't about API docs counts.
+- **No listed pick** whose repo is deleted, archived or without a push in 60 days, and no card that shows a closed issue as a help request.
+- **A new PR or offer** on a listed pick shows on its card within 6 hours.
+- **Every open pick is listed** once the backlog is cleared.
+- **The daily run takes at most 10 minutes longer** at today's 120 picks, and each of the other runs at most 5 minutes.
+
+### How it works
+
+**1. A pick stays listed while it's open.**
+- No age limit on the website (`[picks] keep_open`). The laptop keeps its daily reports and "Still open from earlier" lines.
+- A pick leaves the list when:
+  - the work left falls below the size cutoff (5): it goes back into the normal pool, to be checked again after 90 days like any repo, with the reason "docs fixed";
+  - the project fails the health checks: back into the pool, reason "went quiet";
+  - the repo is deleted or made private: "ignored", reason "repo gone".
+- A renamed repo keeps its pick under the new name. If the new name is already in the memory, the two records merge, so the project isn't listed twice.
+- Each card shows when it was found and when it was last checked: "Found 20 Oct · checked 2 hours ago".
+
+**2. A look at what changed, every 6 hours: one request per 60 picks.**
+- One GraphQL request asks, for each pick: its current name, whether it's archived, its last push, the version of the measured docs file, its open PRs (how many, and the latest update), and each help-request issue's state, update time and comment count.
+  - Checked 6 Nov: 120 picks in 2 requests and 19 seconds, 1 point each of the 5,000 an hour. Renames are followed, and a deleted repo or issue fails only its own part of the answer.
+- The answers are kept with the pick (`details.watch`) and compared with the last look:
+  - docs file changed: measure it again in this run;
+  - PRs or comments changed: check claims in this run;
+  - a help-request issue closed or deleted: off the card, and the score's bonus recomputed;
+  - repo renamed, archived or gone: as in 1;
+  - nothing changed: no further requests.
+- Prose docs span several files, so prose picks (23 of 120) are measured again every 7 days instead.
+
+**3. The gap check.**
+- The docs are measured again, by the same code that found the gap, in the same run that spots the change: within about 6 hours of it. If more changes are waiting than the run's cap allows, the rest are measured in the next run. The health checks (committers, outside merges) run every 7 days, in the daily run; the look already covers pushes and archiving.
+- The pick keeps its found date, its Gemma review and its place in the list. The new numbers replace the old ones, and a short history is kept (`details.history`: date, operations needing work, score).
+- When the numbers move by a fifth or more, Gemma rewrites why the docs matter and the first steps, which quote the numbers.
+
+**4. Claims are per gap, and PRs are measured.**
+- Each gap gets a stable key, stored with its finding: `examples`, `parameters`, `errors` and so on for specs; `request_example`, `status_codes` and so on for prose.
+- **An open PR that changes the measured docs file:** DocScout measures the file in the PR against the version the PR started from (the merge base, so later changes on the main branch aren't credited to the PR). The PR claims the operations that need work before it and not after it.
+  - Operations it adds or removes don't count, and neither does progress inside an operation that still needs work: osk-backend #356 describes one parameter of an operation whose others are still undescribed.
+  - Checked 6 Nov on all 14 flagged PRs, including PRs from forks.
+- **A PR that doesn't change the measured file** can't claim its gaps, when the spec is hand-written.
+- **Generated specs** (11 of the 91 spec picks): the real work happens in code annotations, so Gemma judges the PR, one gap at a time.
+- **Offers in comments:** Gemma judges them, one gap at a time, and only on help requests that ask for this work (5). An offer counts for 30 days from the person's last comment on the issue (today: 3 months), so a new comment from them restarts the 30 days. Once their PR appears, the PR is measured instead. After 30 days of silence the offer stops counting, but the card still mentions it, so a writer can ask whether they're still on it.
+- A PR is measured again only when its head commit changes.
+- **The work left** is the work on the main branch, minus what open PRs fix, minus the gaps that live offers cover. A pick goes below the rest only when the work left is under the size cutoff. Otherwise it keeps its place, with one line per claim: "PR #2667 removes 2 operations; the other 133 still need work."
+
+**5. Help requests must ask for this work.**
+- **Bounty programs are filtered by code first:** labels and bots such as Stellar Wave and `drips-wave[bot]` go into a setting, like today's bounty labels. Their issues aren't help requests, and their applicants aren't claims.
+- **Gemma reads each issue** (title, labels, the start of the text) next to the gaps, and answers one of three ways, with a quote that code checks is in the issue:
+  - **asks for this work:** the score bonus, "Maintainers asked for help" and the looser health check; it can make a "docs elsewhere" pick listable, and its comments are read for claims;
+  - **other API-docs work:** shown as a related issue, with none of the above;
+  - **not API docs:** not shown.
+- A "docs elsewhere" pick has no measured gap, so there "this work" means work on the project's API reference.
+- The looser health check still runs before Gemma. If Gemma then says the issue doesn't ask for this work, the repo must pass the normal thresholds, from numbers already fetched.
+- Each issue is asked about once, and again only when its text changes.
+
+**6. The website.**
+- **Free:** the best 3 found in the last 7 days, topped up with older picks when the week has fewer. **Subscribers:** every open pick, best first or newest first.
+- Every card says "Comment on the issue, or open one, before you start". That's how the next writer, and DocScout, see someone is on it.
+- "Picks from the last 7 days" becomes "every open pick, checked every 6 hours", on the page and in the paywall text.
+
+**7. Runs: when, what, and their limits.**
+- **The cron job runs every 6 hours** (04:15, 10:15, 16:15 and 22:15 UTC) instead of once a day. It's one schedule in render.yaml, so there's no second cron job and no second $1 monthly minimum.
+- **The daily run** is the first run of the day (UTC) that finds the day's work not done, normally the 04:15 one. If it fails, the next run tries again, instead of waiting a day as now. It:
+  1. looks at every listed pick;
+  2. acts on what changed, within caps: up to 40 gap checks, 40 claim checks, and 30 Gemma questions for claims, help requests and rewrites (`[llm] checks_per_run`);
+  3. runs the 7-day health checks that are due;
+  4. finds new repos with the GitHub budget left, then Gemma reviews them, as today.
+- **The other three runs** only look, act on what changed with smaller caps (20 gap checks, 20 claim checks, 10 Gemma questions), and publish the picks again. Most claims need no Gemma question, since PRs are measured.
+- **A run still going** when the next one starts: the new run sees it in the memory and stops at once.
+- **Within a cap**, the picks free visitors see go first, then the newest, then the longest unchecked. The rest wait for the next run, and each card says when it was last checked.
+
+Projected from the 6 Nov checks, per day:
+
+| Listed picks | Looks | Claim checks | Gap and health checks | Gemma questions | Added time |
+|---|---|---|---|---|---|
+| 120 (today) | 4 × 2 requests | about 60 picks, in about 6 requests | about 3 gap checks and 17 health checks | about 5 | 5–10 min in the daily run, about 2 min in each of the others |
+| 1,000 | 4 × 17 requests | about 500 picks, in about 50 requests | about 25 and 140 | up to 60 (the caps) | 45–60 min in the daily run, most of it Gemma's 30 questions; 5–15 min in each of the others |
+
+**8. Laptop and website.**
+
+| Setting | Laptop | Website |
+|---|---|---|
+| `[picks] keep_open` | off | on |
+| `[checks] measure_prs` | on | on |
+| `[checks] help_requests_by_gemma` | on (about 50 s a question on `e2b`) | on |
+| `[llm] checks_per_run` | 5 | 30 in the daily run, 10 in the others |
+| `[picks] look_every_hours` | off (the laptop doesn't keep picks) | 6 |
+
+Each is a switch, so a problem on Render is fixed in deploy/render.toml without undoing code.
+
+**9. Stored data.** Everything new lives in a finding's details (`watch`, `history`, per-gap `claims`, Gemma's `help` answers) or its gaps (the keys), so the SQLite file needs no migration. A rename moves the repo record to the new name in both stores, and the contract tests run each new behavior against both.
+
+### Build order
+
+Each step can ship on its own.
+
+| Step | What | Exit check |
+|---|---|---|
+| **6a. Test set** | The 23 help requests and 15 claimed picks labeled from their full text (first pass done 6 Nov; you label the 6 borderline ones). **Real claims too:** all 15 claims of 6 Nov are wrong, so a check that never flags anything would pass a test set made only of them. Real claims come from merged PRs that fixed gaps (OxiCloud's and open-wearables' docs improved after they were found), real offers placed next to a gap they match, and a few made-up cases. Small specs, before and after, kept as test fixtures | Labels agreed |
+| **6b. Help requests** | The bounty filter, Gemma's question and its effects, the health-check order. Existing picks' requests asked once | At least 21 of 23 agree; none of the 9 non-API-docs requests counts |
+| **6c. Claims per gap** | Gap keys, measuring PRs, per-gap questions for offers and generated specs, the 30-day offer rule, claim lines on cards | At most 1 wrong of the 15; every real claim in the test set found; the 14 PRs measure as on 6 Nov |
+| **6d. Open picks stay listed** | The look every 6 hours (the cron's new schedule and the daily-run rule), gap and health checks, leaving the list, renames, caps, the free 3, card dates and wording. The 120 earlier picks go through their first checks over the first few runs, oldest first, and each is listed again once it passes | A dry run on a copy of Atlas: every pick that leaves has a reason you agree with; the daily run at most 10 minutes longer, the others at most 5 minutes |
+| **6e. Docs and launch** | The README, the public skill (claims per gap, help requests, bounty programs) and this plan; deploy, then watch 3 days of runs | 3 days of clean runs, Gemma within its caps |
+
+- **Why this order:** each step goes live when it's done. 6c reads comments only on help requests that pass 6b. 6d brings the list back, and comes after 6b and 6c, so the picks that return carry correct claims and help requests (confirmed 6 Nov).
+- **Tests:** unit tests for each part (recorded GraphQL answers, the PR fixtures, the merge rule, caps and priorities, the cards) and contract tests for both stores. `docscout eval-claims` measures Gemma's two new questions on the test set: live, never in the test suite, like `eval --llm`.
+
+### Risks
+
+| Risk | What limits it |
+|---|---|
+| Gemma's new questions are no better (prompt v3) | The test set first; narrow questions; quotes checked by code; each a switch |
+| A PR restructures the spec (split files, moved `$ref`s), so measuring misreads it | Only operations in both versions count; if the PR's spec doesn't parse, Gemma judges it |
+| A spec over 2 MB | The same cap as today; such a PR is judged by Gemma |
+| Gemma busy or down | Caps, the 26B fallback, and "not checked yet", never a guess (as today) |
+| A run cut off midway | Each check saves as it goes; the look's answers are saved only after they've been acted on |
+| Two runs at once | A run still going makes the next one stop at once |
+| More writers see the same pick | "Comment before you start"; claims checked every 6 hours |
+| The list grows long | The look for changes and caps; pages of 10; filters (language, size of job) later |
+
+### Decisions (confirmed 6 Nov)
+
+1. The free 3: the best from the last 7 days, topped up with older picks when the week has fewer.
+2. Offers without a PR count for 30 days from the person's last comment on the issue.
+3. A pick goes below the rest only when its unclaimed work is under 5 operations or endpoints.
+4. Gap checks in the run that spots the change; health checks every 7 days.
+5. The laptop gets 6b and 6c, not 6d.
+6. The order: 6a to 6e, so the list comes back with correct claims.
+7. Looks for changes every 6 hours, not once a day.
+
+**Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20); website filters.

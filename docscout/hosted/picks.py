@@ -75,6 +75,9 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
         "first_steps": [clean(s, 300) for s in (review.get("first_steps") or [])[:3]],
         "claimed": [clean(c, 300) for c in checks.get("claimed") or []],
         "claimed_out": claimed_out(finding),
+        # A chip only when a claim takes work off: a feature PR that describes one field leaves
+        # every operation to do (osk-backend, 6 Nov), so it's a line under Before you start only.
+        "partly": bool(checks.get("claimed")) and ("claims" not in d or (d["claims"].get("work_left") is not None and d["claims"]["work_left"] < (d["claims"].get("work") or 0))),
         "stale_offers": [clean(c, 300) for c in checks.get("stale_offers") or []],
         "work_left": (d.get("claims") or {}).get("work_left"),
         "work": (d.get("claims") or {}).get("work"),

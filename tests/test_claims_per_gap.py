@@ -196,3 +196,13 @@ def test_large_specs_parse_fast_and_still_refuse_aliases():
         raise AssertionError("an alias was accepted")
     except UnsafeYAML as exc:
         assert "aliases are not allowed (line 2)" in str(exc)
+
+
+def test_a_claim_that_takes_no_operation_off_gets_no_chip(now):
+    gh = GitHub(pulls=[pr(3)])
+    f = finding(issues=[])
+    assert claims.check(gh, Model(), f, now, min_units=1)
+    card = pick(StoredFinding("org/app", 50, f.details, 1, reported=now.isoformat()), 1, now)
+    assert card["claimed"] and not card["partly"]  # descriptions for all 4, but each still has other gaps: 4 of 4 left
+    f.details["claims"]["work_left"] = 1
+    assert pick(StoredFinding("org/app", 50, f.details, 1, reported=now.isoformat()), 1, now)["partly"]

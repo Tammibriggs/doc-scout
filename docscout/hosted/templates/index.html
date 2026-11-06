@@ -210,7 +210,7 @@
           {% if p.effort %}<li class="chip">{{ p.effort }}</li>{% endif %}
           {% if p.published %}<li class="chip green">Docs published</li>{% endif %}
           {% if p.issues %}<li class="chip blue">Maintainers asked for help</li>{% endif %}
-          {% if p.claimed_out %}<li class="chip amber" title="Open PRs or offers cover nearly all of the work: see Before you start">Someone is on it</li>{% elif p.claimed %}<li class="chip amber" title="Open PRs or offers cover part of the work: see Before you start">Partly claimed</li>{% elif p.claim_checked %}<li class="chip green" title="DocScout checks the open PRs and comments every day">Not claimed</li>{% endif %}
+          {% if p.claimed_out %}<li class="chip amber" title="Open PRs or offers cover nearly all of the work: see Before you start">Someone is on it</li>{% elif p.partly %}<li class="chip amber" title="Open PRs or offers cover part of the work: see Before you start">Partly claimed</li>{% elif p.claim_checked %}<li class="chip green" title="DocScout checks the open PRs and comments every day">Not claimed</li>{% endif %}
           {% if p.outside_prs %}<li class="chip">{{ p.outside_prs }} outside PR{{ "" if p.outside_prs == 1 else "s" }} merged lately</li>{% endif %}
           {% if p.found %}<li class="chip">Found {{ p.found }}{% if p.checked_ago %} · checked {{ p.checked_ago }}{% endif %}</li>{% endif %}
         </ul>

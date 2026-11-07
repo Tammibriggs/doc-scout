@@ -56,9 +56,15 @@ If the user hasn't said, use these defaults and say you did:
    Add one keyword: `api`, `openapi`, `swagger` or `endpoint`.
    - Commas mean "any of". `OR` between labels returns nothing.
    - Ignore bounty labels and dependency dashboards. Also ignore tiny repos where the owner tracks their own to-dos; most help requests are like that.
+   - Ignore bounty programs, whose issues collect applications for points: labels or bots such as Stellar Wave, `drips-wave[bot]`, OnlyDust, Gitcoin or Algora. Their issues aren't help requests, and their applicants aren't claims.
    - A request counts when an outsider opened it, or when it carries an outreach label (help wanted, good first issue).
    - Most results come from student, hackathon, bounty or spam repos, and issue search can't filter by stars. Look up each result's repo (stars, archived, fork) before reading the issue.
-   - **Read the issue.** It counts only when it asks for work on the API documentation. A docs label isn't enough: feature requests, bugs and other docs topics (installation, a licence badge, typos) don't count.
+   - **Read the issue, next to the gap you measured.** A docs label isn't enough. Sort each request into one of three:
+     - **It asks for this work:** the gap you measured, or, when the docs live elsewhere, work on the project's API reference. Only this kind counts as "maintainers asked for help", and only its comments are read for claims.
+     - **Other API-docs work:** an outdated statement, another API of the project (Tauri commands, a library's reference) when your gap is in the REST spec. Mention it as a related issue, but it doesn't count.
+     - **Not API docs:** feature requests, bugs, installation guides, a licence badge, typos, Go doc comments, and features of the docs site (copy buttons, search, styling), even on the API page. Leave it out.
+
+     In testing, only 5 of 23 listed help requests asked for the work that had been measured.
 
 Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of thousands of junk results.
 
@@ -72,7 +78,7 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
   - An outsider's author association isn't OWNER, MEMBER or COLLABORATOR, **and** they haven't merged any pull request in the repo. GitHub shows maintainers whose org membership is private as CONTRIBUTOR; in testing, one project's "63 outside PRs" were all but one by the people who merge its PRs.
   - Ignore bots and dependency bumps (Dependabot, Renovate).
   - If you only fetched the latest 100 merged PRs, say the count is "at least".
-- Exception: when a maintainer labeled a docs issue "help wanted" or "good first issue", 1 committer and no outside merges are enough.
+- Exception: when a maintainer labeled a docs issue "help wanted" or "good first issue", and the issue asks for the API docs work you measured, 1 committer and no outside merges are enough.
 
 ## Finding the gap (measure, don't guess)
 
@@ -84,14 +90,16 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
   Open each candidate to confirm it's a spec. Skip vendored copies, tests, examples, and specs with fewer than 3 operations. A spec generated at build time may not be committed at all: look for its URL on the docs site's Redoc or Swagger UI page. Then count the operations with:
   - no summary or description;
   - parameters without descriptions;
-  - no examples;
+  - no request example, of the operations that take a request body;
+  - no example of a successful response, of the operations that return something;
   - no 2xx schema;
-  - no 4xx or 5xx responses.
+  - no error responses, or none that describes its body.
 
-  Also check for an `info.description` under 50 characters, security schemes without descriptions, and no servers. Report counts, such as "21/38 operations have no description", with example operations.
+  Count the fields too: every field a reader sends or gets back (in request bodies, and in success and error responses, including nested objects and array items) that has no description. Count each field once, even when many operations share it, and leave out schemas no operation uses. Also check for an `info.description` under 50 characters, security schemes without descriptions, and no servers. Report counts, such as "21/38 operations have no description" or "2,140 of 3,400 fields have no description", with examples.
 
   How to count:
-  - **An example** is one anywhere in the operation: on a parameter, a request or response media type, a schema, or a schema's properties, following `$ref`s. Redoc and Swagger UI show property examples as example bodies, so a writer will see them. Say which kinds you found.
+  - **Examples count only where they show the call:** on a request body, or on a successful response. That includes the media type's `example` or `examples`, and examples on the body's schema or its properties, following `$ref`s, since Redoc and Swagger UI show property examples as example bodies. An example on a parameter (`limit=10`) or on an error response counts for neither. In testing, one example on a shared error response had made 217 of an app's 235 operations look documented.
+  - So a GET that returns a list needs only a response example, a POST that sends JSON needs both, and a DELETE that answers 204 needs neither.
   - **A 204 response** needs no schema; don't count it as "no 2xx schema".
   - **`$ref`s inside a spec may be percent-encoded** (`#/paths/~1users~1%7Bid%7D`): decode them, or you'll undercount operations.
   - **Errors described once for the whole API** (an "Errors" section) cover every endpoint. Say so instead of counting each endpoint as missing error codes.
@@ -120,17 +128,19 @@ Put one keyword in each query; `(openapi OR swagger) in:title` returns tens of t
 
 ## Before recommending
 
-- **Already claimed?** Read the open pull requests (title, description and changed files) and the comments on the project's docs issues. A project is claimed only when someone is working on, or has offered to do, this gap or a large part of it. These are **not** claims:
-  - typo, spelling and broken-link fixes, or correcting one value;
-  - dependency updates and pull requests opened by bots;
-  - work on other docs: installation guides, badges, licensing, how the docs site is built or deployed;
-  - features, bug fixes and refactors;
-  - offers on an issue about something other than this gap;
-  - pull requests and offers with no activity for more than 3 months.
-
-  A maintainer's own work counts too: an open rewrite of the same docs is a claim. A maintainer's release or feature PR that edits the spec isn't, but say so under "Before you start", since the writer will need to rebase.
-
-  When something is a claim, name the PR or comment and say how it overlaps. Rank claimed projects below the rest.
+- **Already claimed?** Check one gap at a time (descriptions, request examples, fields, errors…), since a PR or an offer usually covers only part of the work.
+  - **An open pull request that changes the docs file you measured: measure it.** Count the file in the PR's version against the version it started from (the merge base, from `gh api repos/OWNER/REPO/compare/BASE...HEAD`), so changes made on the main branch since then aren't credited to the PR. The PR claims the operations that need work before it and don't after it. Operations it adds or removes don't count, and neither does progress inside an operation that still needs work. In testing, all 14 PRs an earlier version of this check flagged were features and fixes that edit the spec for their own changes; measured, none fixed a gap.
+  - **A pull request that doesn't change the measured file** claims nothing, unless the spec is generated: then judge it from its title, description and changed files, since the fix belongs in the code annotations.
+  - **Comments:** read them only on help requests that ask for this work. An offer ("I'd like to work on this") counts for 30 days from the person's last comment on the issue. After that, don't count it, but mention it so the writer can ask whether they're still on it. Once the person opens a PR, measure the PR instead.
+  - **These are not claims:**
+    - typo, spelling and broken-link fixes, or correcting one value;
+    - dependency updates, pull requests opened by bots, and applicants to bounty programs;
+    - work on other docs: installation guides, badges, licensing, how the docs site is built or deployed;
+    - features, bug fixes and refactors;
+    - offers on an issue about something other than this gap;
+    - pull requests with no activity for 90 days.
+  - A maintainer's own work counts too: an open rewrite of the same docs is a claim. A maintainer's release or feature PR that edits the spec isn't, but say so under "Before you start", since the writer will need to rebase.
+  - **The work left** is what needs work now, less what open PRs fix and the gaps live offers cover. Name each claim and what it covers ("PR #9 adds descriptions to 4 operations"). Rank a project below the rest only when fewer than 5 operations or endpoints are left; otherwise call it partly claimed and give the work left.
 - **Requirements:** a CLA to sign, a DCO sign-off on commits, or an AI-contribution policy. Quote the sentence you found.
 - **Local setup:** easy (Docker, compose or a devcontainer), documented, or unclear. Read CONTRIBUTING's setup commands before saying "unclear".
 - **Where pull requests go:** if CONTRIBUTING asks for a branch other than the default one (`dev`, `develop`), say so, and flag it when the guide and the default branch disagree.
@@ -144,9 +154,10 @@ Start with one line saying how you counted outside PRs. Then a ranked list, best
 - **The gap:** the biggest gap first, then the other measured facts, each linked to the file (a permalink with a commit SHA) or the issue;
 - **Docs published:** where the docs can be read without installing the project, or "only in the running app";
 - **Likely to merge:** outside PRs merged in the last 180 days and committers in the last 90 days;
-- **Before you start:** whether it's claimed and by what, any CLA, DCO or AI policy, and the local setup;
+- **Maintainers asked for help:** the issues that ask for this work, linked; other API-docs issues as related;
+- **Before you start:** each claim and what it covers, with the work left, any offer older than 30 days to ask about, any CLA, DCO or AI policy, and the local setup;
 - **First steps:** up to 3 concrete steps toward a first small PR.
 
-End with the near-misses in one line each (failed the merge check, claimed, too small), so the writer can see what was ruled out and why.
+End with the near-misses in one line each (failed the merge check, claimed, too small), so the writer can see what was ruled out and why. Remind the writer to comment on the issue, or open one, before starting, so the next person can see they're on it.
 
 Every number and fact must come from something you fetched in this session. If you couldn't check something, say so. Fewer solid picks are better than ten weak ones.

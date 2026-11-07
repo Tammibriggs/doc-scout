@@ -6,9 +6,26 @@ DocScout finds projects that serve a REST API, are actively maintained, have doc
 
 Use it on the [website](https://docscout-web.onrender.com/), run it yourself [once](#run-it-once) or [every day by itself on Linux](#run-it-every-day-by-itself-linux), or give [the skill](#use-it-from-your-own-ai-agent) to your own AI agent.
 
-**How it works:** code searches GitHub, checks each project's health and measures its docs gaps. Then **an open-weight model, Gemma 4, reviews every project that passes**. It decides whether the project really has an API worth documenting, checks whether someone is already working on the gap, explains why the docs matter, and suggests where to start. Only projects it has reviewed are reported. Gemma runs on your computer with Ollama, or through a hosted API, as on the website (Gemma 4 31B). DocScout starts with REST APIs and is built so other API types (GraphQL, gRPC, AsyncAPI, ...) can be added as modules; everything it checks is language- and framework-agnostic.
+**How it works:** code searches GitHub, checks each project's health and measures its docs gaps. Then **an open-weight model, Gemma 4, reviews every project that passes**. It decides whether the project really has an API worth documenting, checks that each maintainer's help request asks for the work DocScout found, reads the issue comments for anyone who has offered to do that work, explains why the docs matter, and suggests where to start. Open pull requests that change the docs are measured by code, so a PR claims only the gaps it actually fixes. Only projects Gemma has reviewed are reported. Gemma runs on your computer with Ollama, or through a hosted API, as on the website (Gemma 4 31B). DocScout starts with REST APIs and is built so other API types (GraphQL, gRPC, AsyncAPI, ...) can be added as modules; everything it checks is language- and framework-agnostic.
 
 > **Status:** works on Linux, including daily runs without starting it yourself. macOS and Windows come later.
+
+## The website
+
+[docscout-web.onrender.com](https://docscout-web.onrender.com/) runs DocScout for you, with Gemma 4 31B on Google's API, so there's nothing to install.
+
+- **Every open pick stays listed,** and is checked every 6 hours for new pull requests, offers in comments, closed help requests and changes to its docs. A pick's docs are measured again when its docs file changes, and at least once a week.
+- **A pick leaves the list** when:
+  - its docs are fixed, with fewer than 5 operations or endpoints still needing work;
+  - the project goes quiet: archived, no push in 60 days, or it fails the other health checks;
+  - its docs may live elsewhere and no maintainer has asked for help with them;
+  - the repo is deleted.
+
+  A renamed repo keeps its pick under the new name.
+- **Each card** says when the pick was found and last checked, what needs doing, and whether anyone is already on part of it ("Partly claimed", with the work that's left).
+- **Free:** the best 3 found this week. **Subscribers ($2 a month):** every open pick, best first or newest first.
+
+Before you start on a pick, comment on the issue, or open one, so the next writer, and DocScout, can see you're on it.
 
 ## Install
 
@@ -129,11 +146,20 @@ Reports go to `~/Documents/DocScout/reports/` (set `[report] dir` to change it):
 **Each item shows:**
 - **Gemma's review:** what the project is (for example "an app or service with its own REST API"), the quote it based that on, and how it changed the code's confidence (for example 0.50 → 0.80). It can raise confidence to at most 0.8, so a README written to fool it can't push a project to the top;
 - **why its docs matter** and **up to 3 first steps**, from Gemma;
-- **the gap:** for an OpenAPI spec, which operations lack descriptions, examples, success schemas or error responses, with a permanent link to the file; for prose docs, which endpoints lack a description, request and response examples, status codes or auth. Specs are found by name (`openapi.yaml`, `swagger.json`), by folder (`docs/openapi/…`), and as files named like `api.yaml`;
+- **the gap,** with a permanent link to the file:
+  - for an OpenAPI spec: the operations with no description, with parameters that have no description, with no request example (of those that take a request body), with no example of a successful response (of those that return something), with no success schema, or whose error responses don't describe their body; and the fields a reader sends or gets back that have no description. Examples count only where they show the call, on a request body or a successful response: one example on a shared error response doesn't make every operation documented;
+  - for prose docs: the endpoints with no description, request or response example, status codes or auth.
+
+  Specs are found by name (`openapi.yaml`, `swagger.json`), by folder (`docs/openapi/…`), and as files named like `api.yaml`;
 - **"Docs published":** where the docs can be read as pages without installing the project: a docs site built from the repo (MkDocs, Sphinx, Docusaurus, Mintlify…), a docs website, a separate docs repo, or Markdown API docs on GitHub. These projects rank higher (`[scoring] published_docs_bonus`), because you can see the gap in a browser and the fix is Markdown;
 - **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
-- **"Maintainers asked for help"** with links, when the project has open docs issues labeled "help wanted" or "good first issue";
-- **"Before you start":** an open docs PR or someone already offering to do the work, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. Whether someone is already on it is Gemma's call: it reads the open pull requests and the comments on the project's docs issues next to the gap DocScout found, and says which overlap it and why. For 7 days after a project is reported, each run checks it again once a day (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;
+- **"Maintainers asked for help"** with links, when maintainers have an open issue asking for the work DocScout found. Gemma reads each request next to the gap and quotes the line its answer rests on, and code checks the quote is really in the issue. A request for other API-docs work is listed as related, and one that isn't about API docs isn't shown. Only a request for this work raises the score;
+- **"Before you start":** whether someone is already on the gap, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. Claims are checked one gap at a time:
+  - **An open pull request that changes the measured docs file is measured:** the file in the PR against the version it started from. It claims only the operations it fixes, so a feature PR that edits the spec for its own changes claims nothing. On a generated spec, where the fix belongs in code annotations, Gemma judges the PR instead.
+  - **Comments are Gemma's call,** on help requests that ask for this work. An offer counts for 30 days from the person's last comment; an older one is shown as an offer to ask about.
+  - **A project goes below the rest** only when fewer than 5 operations or endpoints are left unclaimed. Otherwise it shows "Partly claimed", one line per claim, and the work left.
+
+  For 7 days after a project is reported, each run checks it again once a day (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;
 - **"Check manually"** when the docs may live elsewhere (a docs website, a separate docs repo, or Swagger UI served by the running app). DocScout can't read those yet, so it reports these only when maintainers asked for help.
 
 **Small gaps are skipped:** a project is reported only when at least 5 operations or endpoints need work (`[report] min_effort_units`). One undocumented endpoint is a quick fix, not a project to contribute to. A skipped project is checked again after 90 days, in case its API grows.
@@ -222,6 +248,15 @@ The first run fetches each repo's details and caches them in your data folder; l
 
 It prints precision and recall with and without Gemma, what Gemma changed, the time per review, and the memory Gemma used, with a suggested `min_free_memory_gb`. Reviews are cached, so the second command only reviews the borderline repos again. Ctrl+C stops it, and the same command continues.
 
+**To measure Gemma's help-request and claim answers** on the labeled test set in [tests/fixtures/m6/](tests/fixtures/m6/) (live; about 53 s a question on Google's free tier):
+
+```bash
+.venv/bin/docscout eval-claims                 # both
+.venv/bin/docscout eval-claims --part help     # only whether each help request asks for the work found
+```
+
+It lists each case with your label and Gemma's answer, marks the ones that disagree, and prints the time per question.
+
 ### Labeling guide
 
 Give each row about a minute. Open the `url`, read the description and the top of the README, then fill in `label`:
@@ -255,10 +290,10 @@ Give each row about a minute. Open the `url`, read the description and the top o
 |---|---|
 | `awesome_selfhosted` | The curated [awesome-selfhosted](https://github.com/awesome-selfhosted/awesome-selfhosted-data) list of real self-hosted apps |
 | `repo_search` | GitHub repo search, using each enabled API type's `repo_queries` |
-| `help_requested` | Open, unassigned issues where maintainers ask for API docs help. An issue only counts if it's about docs (a docs label, or a title such as "Document the webhooks") and carries a "help wanted" or "good first issue" label or was opened by someone outside the project. Bots, dependency dashboards and bounty labels are ignored |
+| `help_requested` | Open, unassigned issues where maintainers ask for API docs help. An issue only counts if it's about docs (a docs label, or a title such as "Document the webhooks") and carries a "help wanted" or "good first issue" label or was opened by someone outside the project. Bots, dependency dashboards, bounty labels and bounty programs (such as Stellar Wave, whose issues collect applications for points) are ignored. Gemma then reads each issue: only one that asks for the work DocScout found earns the score bonus and the looser activity check below |
 | `code_search` (optional, needs a token) | Repos containing an API definition file, using each API type's `definition_filenames` |
 
-Every repo, whatever its source, goes through the same code-only health gate: not archived or a fork, has a license, at least 20 stars, recent pushes, and real activity. When a maintainer has labeled a docs issue "help wanted" or "good first issue", the activity part is looser (`[health.help_requested]`): the explicit ask stands in for a history of merged outside PRs.
+Every repo, whatever its source, goes through the same code-only health gate: not archived or a fork, has a license, at least 20 stars, recent pushes, and real activity. When a maintainer has labeled a docs issue "help wanted" or "good first issue", the activity part is looser (`[health.help_requested]`): the explicit ask stands in for a history of merged outside PRs. If Gemma then finds the issue doesn't ask for the work DocScout found, the project must pass the normal thresholds.
 
 ## API types
 
@@ -289,6 +324,8 @@ Most people only need `docscout init` and `docscout set`, which write the `[prof
 
 To switch to a hosted model, set `provider = "openai_compatible"` together with `base_url`, `model` and the `DOCSCOUT_LLM_API_KEY` secret. Any OpenAI-compatible API works, for example OpenRouter, Groq, Together or OpenAI. Set `fallback_model` to a second model from the same provider, and DocScout asks it whenever the first can't answer after its retries; the hosted version uses Gemma 4 31B with Gemma 4 26B behind it.
 
+The website's settings are in [deploy/render.toml](deploy/render.toml). `[picks] keep_open = true` keeps open picks listed, and the caps in `[picks]` and `[llm]` limit how many re-checks, claim checks and Gemma questions each run makes. Its job runs every 6 hours: the first run of each day (UTC) is a full `docscout run`, and the others run `docscout look`, which looks at every listed pick and acts on what changed. `DOCSCOUT_ATLAS_DATABASE` points the job, the commands it starts and the website at another Atlas database, for a dry run on a copy.
+
 ## How the code is organized
 
 The `docscout` package is grouped by the stages a project goes through, in order:
@@ -297,10 +334,10 @@ The `docscout` package is grouped by the stages a project goes through, in order
 |---|---|
 | [`settings/`](docscout/settings/) | Your profile (`init`, `set`), the config loader and the defaults |
 | [`find/`](docscout/find/) | Where candidates come from ([`sources/`](docscout/find/sources/)), the GitHub client, the health checks and the classifier |
-| [`analyze/`](docscout/analyze/) | Measuring the docs gaps (specs, prose, docs published elsewhere), the claim and requirement checks, and the score. Each API type lives in [`apitypes/`](docscout/analyze/apitypes/) |
-| [`llm/`](docscout/llm/) | Gemma: the local (Ollama) and hosted clients, the review of each project, and the draft message to maintainers |
-| [`run/`](docscout/run/) | One run from start to report, daily runs and their schedule, the database, the lock and notifications |
-| [`measure/`](docscout/measure/) | Accuracy checks against the labeled repos (`docscout eval`) and the model benchmark (`bench-llm`) |
+| [`analyze/`](docscout/analyze/) | Measuring the docs gaps (specs, prose, docs published elsewhere), what an open pull request would fix, the claim and requirement checks, and the score. Each API type lives in [`apitypes/`](docscout/analyze/apitypes/) |
+| [`llm/`](docscout/llm/) | Gemma: the local (Ollama) and hosted clients, the review of each project, the help-request and claim questions, and the draft message to maintainers |
+| [`run/`](docscout/run/) | One run from start to report, daily runs and their schedule, the database, the lock and notifications; for the website, the look for changes every 6 hours and keeping open picks true |
+| [`measure/`](docscout/measure/) | Accuracy checks against the labeled repos (`docscout eval`), Gemma's help-request and claim answers (`docscout eval-claims`), and the model benchmark (`bench-llm`) |
 | [`hosted/`](docscout/hosted/) | The hosted version: the website, the daily job on Render, MongoDB Atlas and Stripe |
 
 [`cli.py`](docscout/cli.py) holds every command. [`docs/PLAN.md`](docs/PLAN.md) records the decisions and measurements, and [`docs/comparison/`](docs/comparison/) compares DocScout with an AI agent given a skill.

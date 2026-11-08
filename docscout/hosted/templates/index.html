@@ -65,8 +65,15 @@
   .section-head .note { color: var(--muted); font-size: .93rem; }
   .tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .sort { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); font-size: .9rem; font-weight: 600; }
-  .sort a, .sort strong { padding: 6px 12px; text-decoration: none; }
+  .sort a, .sort strong { padding: 6px 12px; text-decoration: none; white-space: nowrap; }
   .sort strong { background: var(--brand); color: var(--brand-text); }
+  .filters { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: -4px 0 18px; }
+  .filters .label { color: var(--muted); font-size: .9rem; white-space: nowrap; }
+  @media (max-width: 420px) { .sort a, .sort strong { padding: 6px 9px; } }
+  .group { display: inline-flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; }
+  .toggle { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 6px 12px; font-size: .9rem; font-weight: 600; text-decoration: none; }
+  .toggle.on { background: var(--blue-soft); color: var(--blue); border-color: var(--blue-soft); }
+  .filters .note { color: var(--muted); font-size: .9rem; }
 
   /* Pick cards */
   .picks { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
@@ -180,15 +187,30 @@
       {% elif subscribed and total > 1 %}
       <div class="tools">
         <nav class="sort" aria-label="Order">
-          {% if sort == "latest" %}<a href="/#picks">Best first</a><strong aria-current="true">Newest first</strong>
-          {% else %}<strong aria-current="true">Best first</strong><a href="/?sort=latest#picks">Newest first</a>{% endif %}
+          {% if sort == "latest" %}<a href="{{ link(sort='best') }}">Best first</a><strong aria-current="true">Newest first</strong>
+          {% else %}<strong aria-current="true">Best first</strong><a href="{{ link(sort='latest') }}">Newest first</a>{% endif %}
         </nav>
         {% if pages > 1 %}<span class="note">Page {{ page_number }} of {{ pages }}</span>{% endif %}
       </div>
       {% endif %}
     </div>
 
-    {% if not picks %}
+    {% if subscribed and total > 1 %}
+    <nav class="filters" aria-label="Filters">
+      <span class="group"><span class="label" id="size-label">Job size</span>
+        <span class="sort" role="group" aria-labelledby="size-label">
+          {% for value, name in sizes %}{% if size == value %}<strong aria-current="true">{{ name }}</strong>{% else %}<a href="{{ link(size=value) }}">{{ name }}</a>{% endif %}{% endfor %}
+        </span>
+      </span>
+      {% if help_only %}<a class="toggle on" href="{{ link(help_only=False) }}" aria-current="true">✓ Maintainers asked for help</a>
+      {% else %}<a class="toggle" href="{{ link(help_only=True) }}">Maintainers asked for help</a>{% endif %}
+      {% if filtered %}<span class="note">{{ matching }} of {{ total }} match · <a href="{{ link(size=None, help_only=False) }}">Clear filters</a></span>{% endif %}
+    </nav>
+    {% endif %}
+
+    {% if not picks and filtered %}
+    <p class="empty">No open picks match these filters right now. <a href="{{ link(size=None, help_only=False) }}">Show every pick</a></p>
+    {% elif not picks %}
     <p class="empty">The first picks are on their way. DocScout checks projects every day, so come back tomorrow.</p>
     {% endif %}
 
@@ -254,13 +276,12 @@
     </ol>
 
     {% if pages > 1 %}
-    {% set sort_q = "&sort=latest" if sort == "latest" else "" %}
     <nav class="pager" aria-label="Pages">
-      {% if page_number > 1 %}<a class="step" href="/?page={{ page_number - 1 }}{{ sort_q }}#picks" rel="prev">← Previous</a>{% else %}<span class="step off">← Previous</span>{% endif %}
+      {% if page_number > 1 %}<a class="step" href="{{ link(page=page_number - 1) }}" rel="prev">← Previous</a>{% else %}<span class="step off">← Previous</span>{% endif %}
       <span class="numbers">
-        {% for n in range(1, pages + 1) %}{% if n == page_number %}<span class="num here" aria-current="page">{{ n }}</span>{% else %}<a class="num" href="/?page={{ n }}{{ sort_q }}#picks">{{ n }}</a>{% endif %}{% endfor %}
+        {% for n in range(1, pages + 1) %}{% if n == page_number %}<span class="num here" aria-current="page">{{ n }}</span>{% else %}<a class="num" href="{{ link(page=n) }}">{{ n }}</a>{% endif %}{% endfor %}
       </span>
-      {% if page_number < pages %}<a class="step" href="/?page={{ page_number + 1 }}{{ sort_q }}#picks" rel="next">Next →</a>{% else %}<span class="step off">Next →</span>{% endif %}
+      {% if page_number < pages %}<a class="step" href="{{ link(page=page_number + 1) }}" rel="next">Next →</a>{% else %}<span class="step off">Next →</span>{% endif %}
     </nav>
     {% endif %}
 
@@ -272,6 +293,7 @@
         <ul>
           <li>Every open pick, checked every 6 hours for anyone already on it</li>
           <li>Newest first, to see what was just found</li>
+          <li>Filters for the size of the job and for projects whose maintainers asked for help</li>
           <li>Gemma's first steps for each project</li>
           <li>Nothing to install, and cancel anytime</li>
         </ul>

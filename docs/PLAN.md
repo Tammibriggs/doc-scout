@@ -351,7 +351,7 @@ score = gap × (0.5 + 0.5·health) × type_confidence + issue_bonus (help wanted
 - **Already claimed? Per gap** ✅ (6 Nov, M6 step 6c; Gemma decided per project from 17 Oct, word matching before that).
   - **Open PRs that change the measured docs file are measured** ([analyze/pr_measure.py](../docscout/analyze/pr_measure.py)): the file in the PR against the version it started from (the merge base), with the same scorer. A PR claims what needs work before it and not after: per gap key, the operations it fixes and the fields it describes. Operations it adds or removes don't count. A PR is measured again only when its head commit changes. About 3 GitHub requests for each PR that changes the file; none for one whose file list settles that it doesn't.
   - **A PR that doesn't change the measured file claims nothing,** unless the spec is generated: then Gemma judges it, one gap at a time, from its title, description and changed files.
-  - **Comments are Gemma's call, one gap at a time,** and only on help requests that ask for this work (section 21, 6b); bots' comments aren't read. An offer counts for 30 days from the person's last comment on the issue; once they have an open PR, the PR is measured instead. An older offer is shown as one to ask about, not as a claim.
+  - **Comments are Gemma's call, one gap at a time,** and only on help requests that ask for this work (section 21, 6b); bots' comments aren't read. An offer counts for 30 days from the person's last comment on the issue; once they open a PR for the issue (one whose title or text names or links it), the PR is measured instead. Until 8 Nov any open PR of theirs ended the offer: at docling-pipelines, two PRs for other issues had ended an offer on #296. An older offer is shown as one to ask about, not as a claim.
   - **The work left** is what needs work on the main branch, less what open PRs fix and the gaps live offers take. A pick goes below the rest only when the work left is under the size cutoff (5); otherwise it shows "Partly claimed", one line per claim ("Open PR #9 adds descriptions to 4 operations") and the work left.
   - **Why:** on 6 Nov, none of the 15 claims Gemma had made holds up. 7 of the 14 flagged PRs were closed, and the 7 open ones, measured, fix no gap; the comment "claims" were offers on issues about something else.
   - **When Gemma can't answer:** retries (5, 20, 60 s), then the other Gemma model (`fallback_model`). If both fail, the pick shows "not checked yet", never a guess, and the next run asks again. Not asked again while a project's open PRs and comments are unchanged.
@@ -506,7 +506,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅ claims_eval.py ✅ (M6: `docscout eval-claims`)
     hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 270 tests (241 and 12 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
+  tests/ ✅ 275 tests (244 and 12 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
 ```
 
 ## 17. Risks
@@ -584,6 +584,7 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - every open pick, checked every 6 hours, best score first (since M6 was deployed on 6 Nov, section 21). Until then, the picks from the last 7 days: each stayed for 7 daily runs and wasn't checked again, which is how the list fell to 9 once the pool ran dry;
   - the top 3 free (5 until 17 Oct; since M6, the best 3 found in the last 7 days, topped up with older picks), the rest after a Stripe Checkout subscription;
   - subscribers can switch to newest first (17 Oct): the day it was found, then best score. Every card says when it was found, and a "New" label marks the last 24 hours;
+  - subscribers can filter the list (8 Nov): by the size of the job (small, medium or big, the card's effort label) and to picks whose maintainers asked for help. Links, not a form, so no JavaScript; sorting and pages keep the filters. Visitors get no filters, since a filter would show them picks beyond the free 3. On the 93 open picks of 8 Nov: 14 small jobs, and 2 big jobs with a help request;
   - the paywall is enforced on the server, so the page holds only what the visitor may see;
   - subscribers page through the list, 10 picks a page (server-side pages: infinite scrolling would need JavaScript);
   - picks someone may already be on go below the rest (17 Oct), because every pick is checked for claims again each day (section 10). Since M6, only when the unclaimed work is under 5 operations or endpoints; otherwise the card says "Partly claimed" with the work left;
@@ -695,7 +696,7 @@ Every listed pick is still open, and every line on its card was checked recently
   - Checked 6 Nov on all 14 flagged PRs, including PRs from forks.
 - **A PR that doesn't change the measured file** can't claim its gaps, when the spec is hand-written.
 - **Generated specs** (11 of the 91 spec picks): the real work happens in code annotations, so Gemma judges the PR, one gap at a time.
-- **Offers in comments:** Gemma judges them, one gap at a time, and only on help requests that ask for this work (5). An offer counts for 30 days from the person's last comment on the issue (today: 3 months), so a new comment from them restarts the 30 days. Once their PR appears, the PR is measured instead. After 30 days of silence the offer stops counting, but the card still mentions it, so a writer can ask whether they're still on it.
+- **Offers in comments:** Gemma judges them, one gap at a time, and only on help requests that ask for this work (5). An offer counts for 30 days from the person's last comment on the issue (today: 3 months), so a new comment from them restarts the 30 days. Once their PR for the issue appears, the PR is measured instead. After 30 days of silence the offer stops counting, but the card still mentions it, so a writer can ask whether they're still on it.
 - A PR is measured again only when its head commit changes.
 - **The work left** is the work on the main branch, minus what open PRs fix, minus the gaps that live offers cover. A pick goes below the rest only when the work left is under the size cutoff. Otherwise it keeps its place, with one line per claim: "PR #2667 removes 2 operations; the other 133 still need work."
 
@@ -773,7 +774,7 @@ Each step can ship on its own.
 | A run cut off midway | Each check saves as it goes; the look's answers are saved only after they've been acted on |
 | Two runs at once | A run still going makes the next one stop at once |
 | More writers see the same pick | "Comment before you start"; claims checked every 6 hours |
-| The list grows long | The look for changes and caps; pages of 10; filters (language, size of job) later |
+| The list grows long | The look for changes and caps; pages of 10; filters for the size of the job and help requests (8 Nov); a language filter later |
 
 ### Decisions (confirmed 6 Nov)
 
@@ -812,4 +813,4 @@ Measured on 6 Nov on 87 spec picks, 12,315 operations.
 
 The public skill gets the same rules (6e). The comparison rounds keep the numbers measured at the time.
 
-**Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20); website filters.
+**Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20); a language filter on the website (the size and help-request filters were added on 8 Nov).

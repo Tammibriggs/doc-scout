@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -151,15 +152,24 @@ def judge(client: LLMClient, details: dict[str, Any], full_name: str, items: lis
     return list(claims.values())
 
 
+def _for_issue(pr: dict[str, Any], issue: Any) -> bool:
+    """True if the PR says it's for the issue: "#296" or a link to it in its title or text."""
+    if issue is None:
+        return False
+    text = f"{pr.get('title') or ''}\n{pr.get('body') or ''}"
+    return re.search(rf"(?<![\w/])#{int(issue)}\b|/issues/{int(issue)}\b", text) is not None
+
+
 def _offer_state(comment: dict[str, Any], comments: list[dict[str, Any]], pulls: list[dict[str, Any]], now: datetime) -> tuple[str, str]:
     """("live", "stale" or "pr", the person's last comment on the issue). An offer counts for 30
-    days after the person's last comment there; once they have an open PR, the PR is measured
-    instead ("pr")."""
+    days after the person's last comment there; once they open a PR for the issue, the PR is
+    measured instead ("pr"). Their PRs for other issues don't end the offer (docling-pipelines,
+    8 Nov: two unrelated PRs had ended an offer on #296)."""
     login, issue = _login(comment), (comment.get("issue") or {}).get("number")
     times = [parse_time(c.get("created_at")) for c in comments if _login(c) == login and (c.get("issue") or {}).get("number") == issue]
     last = max((t for t in times if t), default=parse_time(comment.get("created_at")))
     when = last.isoformat(timespec="seconds") if last else ""
-    if any(_login(p) == login for p in pulls):
+    if any(_login(p) == login and _for_issue(p, issue) for p in pulls):
         return "pr", when
     return ("live" if last and now - last <= timedelta(days=OFFER_DAYS) else "stale"), when
 

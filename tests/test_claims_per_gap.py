@@ -19,8 +19,8 @@ BARE, DESCRIBED = (SPECS / "bare.yaml").read_bytes(), (SPECS / "bare_described.y
 HEAD, PATH = "c" * 40, "api/openapi.yaml"
 
 
-def pr(number, *, files=(PATH,), changed=None, login="writer", head=HEAD, title="docs: describe the endpoints"):
-    return {"number": number, "title": title, "head": {"ref": "docs", "sha": head}, "base": {"sha": "b" * 40}, "files": list(files),
+def pr(number, *, files=(PATH,), changed=None, login="writer", head=HEAD, title="docs: describe the endpoints", body=""):
+    return {"number": number, "title": title, "body": body, "head": {"ref": "docs", "sha": head}, "base": {"sha": "b" * 40}, "files": list(files),
             "changed_files": len(files) if changed is None else changed, "user": {"login": login, "type": "User"},
             "created_at": iso(3), "updated_at": iso(1)}  # fmt: skip
 
@@ -135,15 +135,35 @@ def test_a_measured_pr_leaves_the_pick_partly_claimed(now):
 def test_offers_count_for_30_days_after_the_persons_last_comment(now):
     offers = [comment(1, "I'll take this one", "ana", 40), comment(2, "I can take this too", "bo", 40), comment(3, "Still on it, PR soon", "bo", 10),
               comment(4, "Can I help?", "cy", 2), {**comment(5, "Assigned!", "bot", 1), "user": {"login": "drips-wave[bot]", "type": "Bot"}}]  # fmt: skip
-    gh = GitHub(pulls=[pr(7, files=["src/x.py"], login="cy")], comments=offers)
+    gh = GitHub(pulls=[pr(7, files=["src/x.py"], login="cy", body="Fixes #12")], comments=offers)
     model = Model({"take this": ["response_example"], "Can I help": ["errors"], "Assigned": ["errors"]})
     f = finding()
     assert claims.check(gh, model, f, now)
     c = f.details["checks"]
     assert c["claimed"] == ["bo on #12 (" + iso(40)[:10] + ") offered to work on response examples: r"]  # bo commented 10 days ago
     assert c["stale_offers"] == ["ana offered on #12 (" + iso(40)[:10] + ") to work on response examples, with no PR or comment since: ask whether they're still on it"]
-    assert [o["author"] for o in f.details["claims"]["offers"] if not o["live"]] == ["ana", "cy"]  # cy has an open PR: it's measured instead
+    assert [o["author"] for o in f.details["claims"]["offers"] if not o["live"]] == ["ana", "cy"]  # cy has an open PR for #12: it's measured instead
     assert "drips-wave[bot]" not in "\n".join(text for _, text in model.contexts[0].items)  # bots' comments aren't read
+
+
+def test_only_a_pr_for_the_issue_ends_an_offer(now):
+    # docling-pipelines, 8 Nov: an offer on #296 had ended because its author had two open PRs for other issues.
+    gh = GitHub(pulls=[pr(8, files=["src/jobs.py"], login="sunny", title="fix(job-stats): prevent read side effects (#365)")],
+                comments=[comment(1, "I'd like to work on this", "sunny", 3)])  # fmt: skip
+    f = finding()
+    assert claims.check(gh, Model({"work on this": ["errors"]}), f, now)
+    assert [(o["author"], o["state"]) for o in f.details["claims"]["offers"]] == [("sunny", "live")]
+    gh.pulls.append(pr(9, files=["src/libraries.py"], login="sunny", title="fix: library routes", body="Closes #12"))
+    assert claims.check(gh, Model({"work on this": ["errors"]}), f, now)
+    assert [(o["author"], o["state"]) for o in f.details["claims"]["offers"]] == [("sunny", "pr")]
+
+
+def test_a_pr_is_for_an_issue_when_it_names_or_links_it():
+    assert claims._for_issue({"title": "fix: routes (#12)"}, 12)
+    assert claims._for_issue({"title": "fix", "body": "See https://github.com/org/app/issues/12"}, 12)
+    assert not claims._for_issue({"title": "fix: routes (#123)"}, 12)
+    assert not claims._for_issue({"title": "fix", "body": "Like other/repo#12"}, 12)  # another repo's issue
+    assert not claims._for_issue({"title": "fix #12"}, None)
 
 
 def test_offers_covering_the_work_move_the_pick_down(tmp_path, now):

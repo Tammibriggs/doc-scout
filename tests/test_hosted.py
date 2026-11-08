@@ -225,6 +225,47 @@ def test_subscribers_can_see_the_newest_first_and_visitors_keep_the_best():
     assert "?sort=latest" not in visitor  # sorting is for subscribers
 
 
+def subscriber(picks):
+    c = client(FakeAtlas(picks))
+    c.cookies.set(COOKIE, sign_pass("cs_test_paid0000000001", 2_000_000_000, SECRET))
+    return c
+
+
+def names(page):
+    return re.findall(r">(org/app\d+)</a>", page)
+
+
+def test_subscribers_can_filter_by_the_size_of_the_job_and_help_requests():
+    picks = sample_picks(14)  # ranks 1-5 small, 6-9 big, 10-14 medium
+    for p in picks[:5]:
+        p["effort"] = "Small job"
+    for p in picks[5:9]:
+        p["effort"] = "Big job"
+    picks[1]["issues"] = picks[6]["issues"] = [{"title": "#3 Document the API", "url": None}]
+    c = subscriber(picks)
+    small = c.get("/?size=small").text
+    assert names(small) == [f"org/app{i}" for i in range(1, 6)] and "5 of 14 match" in small
+    both = c.get("/?size=big&help=1").text
+    assert names(both) == ["org/app7"] and "1 of 14 match" in both
+    assert 'href="/?size=big#picks"' in both  # turning the help filter off keeps the size
+    assert 'href="/?sort=latest&amp;size=big&amp;help=1#picks"' in both  # so does sorting
+    assert 'href="/#picks">Clear filters' in both
+    empty = c.get("/?size=medium&help=1").text
+    assert names(empty) == [] and "No open picks match these filters" in empty
+    ignored = c.get("/?size=huge&help=yes").text  # values the page doesn't offer change nothing
+    assert len(names(ignored)) == 10 and " match" not in ignored
+    visitor = client(FakeAtlas(picks)).get("/?size=big&help=1").text
+    assert names(visitor) == [f"org/app{i}" for i in range(1, FREE_PICKS + 1)] and 'class="filters"' not in visitor  # filters are for subscribers
+
+
+def test_pages_keep_the_filters():
+    picks = sample_picks(25)
+    for p in picks[:3]:
+        p["effort"] = "Small job"  # the other 22 are medium
+    first = subscriber(picks).get("/?size=medium").text
+    assert "Page 1 of 3" in first and names(first)[0] == "org/app4" and 'href="/?page=2&amp;size=medium#picks"' in first
+
+
 def test_unpaid_or_forged_returns_unlock_nothing():
     atlas = FakeAtlas(sample_picks(7))
     c = client(atlas)

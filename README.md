@@ -23,7 +23,7 @@ Use it on the [website](https://docscout-web.onrender.com/), run it yourself [on
 
   A renamed repo keeps its pick under the new name.
 - **Each card** says when the pick was found and last checked, what needs doing, and whether anyone is already on part of it ("Partly claimed", with the work that's left).
-- **Free:** the best 3 found this week. **Subscribers ($2 a month):** every open pick, best first or newest first.
+- **Free:** the best 3 found this week. **Subscribers ($2 a month):** every open pick, best first or newest first, with filters for the size of the job and for projects whose maintainers asked for help.
 
 Before you start on a pick, comment on the issue, or open one, so the next writer, and DocScout, can see you're on it.
 
@@ -156,7 +156,7 @@ Reports go to `~/Documents/DocScout/reports/` (set `[report] dir` to change it):
 - **"Maintainers asked for help"** with links, when maintainers have an open issue asking for the work DocScout found. Gemma reads each request next to the gap and quotes the line its answer rests on, and code checks the quote is really in the issue. A request for other API-docs work is listed as related, and one that isn't about API docs isn't shown. Only a request for this work raises the score;
 - **"Before you start":** whether someone is already on the gap, a CLA, DCO sign-off, or an AI-contribution policy (quoted), and how easy it is to run locally. Claims are checked one gap at a time:
   - **An open pull request that changes the measured docs file is measured:** the file in the PR against the version it started from. It claims only the operations it fixes, so a feature PR that edits the spec for its own changes claims nothing. On a generated spec, where the fix belongs in code annotations, Gemma judges the PR instead.
-  - **Comments are Gemma's call,** on help requests that ask for this work. An offer counts for 30 days from the person's last comment; an older one is shown as an offer to ask about.
+  - **Comments are Gemma's call,** on help requests that ask for this work. An offer counts for 30 days from the person's last comment; an older one is shown as an offer to ask about. Once the person opens a PR for the issue (one that names or links it), the PR is measured instead.
   - **A project goes below the rest** only when fewer than 5 operations or endpoints are left unclaimed. Otherwise it shows "Partly claimed", one line per claim, and the work left.
 
   For 7 days after a project is reported, each run checks it again once a day (`[checks] recheck_claims_days`), and "Still open from earlier" shows ⚠️ when someone may be on it;

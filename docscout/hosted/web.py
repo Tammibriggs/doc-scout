@@ -1,4 +1,4 @@
-"""The website: the picks from the last 7 days, the top few free and the rest for subscribers.
+"""The website: every open pick, the best 3 found this week free and the rest for subscribers.
 
 Run it with ``uvicorn --factory docscout.hosted.web:from_env``. It reads, from the environment:
 ``MONGODB_URI``, ``STRIPE_SECRET_KEY``, ``SESSION_SECRET`` (signs the subscriber cookie) and
@@ -20,6 +20,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -29,11 +30,15 @@ from starlette.templating import Jinja2Templates
 
 from docscout.hosted import atlas_database, required_secret
 from docscout.hosted.billing import PRICE_CENTS, BillingError
-from docscout.hosted.picks import FREE_PICKS
+from docscout.hosted.picks import EFFORT, FREE_PICKS
 from docscout.run.sanitize import is_github_url
 
 COOKIE = "docscout_pass"
 PER_PAGE = 10  # picks per page for subscribers
+# Subscribers' filters (8 Nov): the job's size, and only picks whose maintainers asked for help.
+# Visitors get none, since a filter would show them picks beyond the free 3.
+SIZES = {"small": "S", "medium": "M", "big": "L"}
+SIZE_CHOICES = [(None, "Any size"), ("small", "Small"), ("medium", "Medium"), ("big", "Big")]
 PASS_SECONDS = 31 * 24 * 3600  # a month's subscription, plus a day
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -64,6 +69,15 @@ def ago(iso: str | None, now: float) -> str | None:
         return f"{hours} hour{'s' if hours != 1 else ''} ago"
     return f"{hours // 24} days ago"
 
+def picks_link(*, page: int = 1, sort: str = "best", size: str | None = None, help_only: bool = False) -> str:
+    """The list's address with these choices: only the ones that differ from the defaults."""
+    params = [("page", str(page))] if page > 1 else []
+    params += [("sort", "latest")] if sort == "latest" else []
+    params += [("size", size)] if size in SIZES else []
+    params += [("help", "1")] if help_only else []
+    return ("/?" + urlencode(params) if params else "/") + "#picks"
+
+
 def sign_pass(subscription_id: str, expires: int, secret: str) -> str:
     payload = f"{subscription_id}.{expires}"
     mac = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
@@ -93,12 +107,19 @@ def create_app(
 
     async def index(request: Request) -> Response:
         picks, updated = atlas.current_picks()
+        total = len(picks)
         subscribed = valid_pass(request.cookies.get(COOKIE), secret, clock())
-        pages, number, sort = 1, 1, "best"
-        if subscribed:  # pages of PER_PAGE; visitors see only the free picks, so they need no pages or sorting
+        pages, number, sort, size, help_only = 1, 1, "best", None, False
+        if subscribed:  # pages of PER_PAGE; visitors see only the free picks, so they need no pages, sorting or filters
             if request.query_params.get("sort") == "latest":  # newest first, then best first within a day
                 sort = "latest"
                 picks = sorted(picks, key=lambda p: (str(p.get("reported") or ""), p.get("score") or 0), reverse=True)
+            if request.query_params.get("size") in SIZES:
+                size = request.query_params["size"]
+                picks = [p for p in picks if p.get("effort") == EFFORT[SIZES[size]]]
+            if request.query_params.get("help") == "1":
+                help_only = True
+                picks = [p for p in picks if p.get("issues")]  # the "Maintainers asked for help" chip
             pages = max(1, math.ceil(len(picks) / PER_PAGE))
             requested = request.query_params.get("page", "1")
             number = min(pages, max(1, int(requested))) if requested.isdigit() else 1
@@ -106,14 +127,24 @@ def create_app(
         else:  # the free picks (M6: the best found this week); a list published before has no flags
             shown = [p for p in picks if p.get("free")][:FREE_PICKS] or picks[:FREE_PICKS]
         shown = [{**p, "checked_ago": ago(p.get("checked"), clock())} for p in shown]
+
+        def link(**changes: Any) -> str:  # the current choices, with some changed; a change starts again at page 1
+            return picks_link(**{"sort": sort, "size": size, "help_only": help_only, **changes})
+
         return page(
             request,
             picks=shown,
-            hidden=0 if subscribed else len(picks) - len(shown),
+            hidden=0 if subscribed else total - len(shown),
             page_number=number,
             pages=pages,
             sort=sort,
-            total=len(picks),
+            size=size,
+            help_only=help_only,
+            filtered=bool(size or help_only),
+            matching=len(picks),
+            sizes=SIZE_CHOICES,
+            link=link,
+            total=total,
             subscribed=subscribed,
             updated=updated,
             price=f"${PRICE_CENTS / 100:.0f}",

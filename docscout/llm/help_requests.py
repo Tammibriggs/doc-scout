@@ -7,8 +7,8 @@ DocScout found; the others were about licence badges, code bugs, other APIs or c
 
 So Gemma reads each issue next to the gaps and answers one of three ways
 (:data:`docscout.llm.base.HelpVerdict`); only "this_work" counts. Code keeps it in bounds:
-bounty-program issues never reach it, a "this_work" answer counts only if its quote is really
-in the issue, and an issue is asked about again only when its text changes.
+bounty-program issues and bug reports never reach it, a "this_work" answer counts only if its
+quote is really in the issue, and an issue is asked about again only when its text changes.
 """
 
 from __future__ import annotations
@@ -28,7 +28,12 @@ log = logging.getLogger(__name__)
 TEXT_CHARS = 1500  # of each issue's text, as Gemma reads it
 _COMMENT = re.compile(r"(?s)<!--.*?-->")
 _QUOTES = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "`": ""})
-NOT_ASKED = ("bounty", "closed", "deleted")  # verdicts code gives without asking
+NOT_ASKED = ("bounty", "bug_report", "closed", "deleted")  # verdicts code gives without asking
+# A bug report's title, in the conventional forms "bug(api): ...", "fix: ..." or "[Bug] ...". Not one
+# whose scope is the docs ("fix(docs): ..."). Gemma read docling-pipelines #296 ("bug(api): routes
+# deviate from their OpenSpec") as docs work in every live run, and rewording the question didn't
+# hold (8 Nov). On the M6 test set this matches only issues labeled as code bugs.
+_BUG_TITLE = re.compile(r"^\s*(?:\[\s*(?:bug|fix)\s*\]|(?:bug|fix)(?:\(([^)]*)\))?!?\s*:)", re.IGNORECASE)
 
 
 def issue_text(body: Any) -> str:
@@ -60,6 +65,12 @@ def is_bounty(issue: dict[str, Any], label_denylist: list[str]) -> bool:
     return any(bad.lower() in label for label in labels for bad in label_denylist)
 
 
+def is_bug_report(issue: dict[str, Any]) -> bool:
+    """True if the issue's title marks it as a bug report: a code fix, not docs work."""
+    match = _BUG_TITLE.match(str(issue.get("title") or ""))
+    return bool(match) and "doc" not in (match.group(1) or "").lower()
+
+
 def signature(issue: dict[str, Any]) -> str:
     """Changes when the issue's title or text changes, so it's asked about again."""
     key = f"{issue.get('title', '')}\n{issue.get('text', '')}"
@@ -79,6 +90,8 @@ def quote_found(quote: str, issue: dict[str, Any]) -> bool:
 def counts(issue: dict[str, Any]) -> bool:
     """True if the issue counts as maintainers asking for this work. An issue Gemma hasn't been
     asked about yet counts, as before M6 (the setting is off, or a later run asks)."""
+    if is_bug_report(issue):  # whatever Gemma answered before the rule
+        return False
     answer = issue.get("help")
     if answer is None:
         return True
@@ -87,7 +100,7 @@ def counts(issue: dict[str, Any]) -> bool:
 
 def related(issue: dict[str, Any]) -> bool:
     """API-docs work, but not the gaps DocScout found: shown as a related issue."""
-    return (issue.get("help") or {}).get("verdict") == "other_api_docs"
+    return not is_bug_report(issue) and (issue.get("help") or {}).get("verdict") == "other_api_docs"
 
 
 def _context(details: dict[str, Any], full_name: str, issue: dict[str, Any]) -> HelpContext:
@@ -123,20 +136,22 @@ def ask(client: LLMClient, details: dict[str, Any], full_name: str, issue: dict[
 
 def due(issue: dict[str, Any], label_denylist: list[str]) -> bool:
     """True if Gemma needs to be asked: never asked, or the text changed since."""
-    if is_bounty(issue, label_denylist) or issue.get("state") in ("closed", "deleted"):
+    if is_bounty(issue, label_denylist) or is_bug_report(issue) or issue.get("state") in ("closed", "deleted"):
         return False
     answer = issue.get("help")
     return answer is None or answer.get("verdict") in NOT_ASKED or answer.get("signature") != signature(issue)
 
 
 def check(client: LLMClient, details: dict[str, Any], full_name: str, label_denylist: list[str]) -> int:
-    """Ask about each of the finding's help requests that's due, and mark bounty, closed and
-    deleted ones without asking. Updates ``details`` in place; returns how many were asked.
+    """Ask about each of the finding's help requests that's due, and mark bounty, bug-report,
+    closed and deleted ones without asking. Updates ``details`` in place; returns how many were asked.
     Raises LLMError, so a finding is never half checked."""
     asked = 0
     for issue in details.get("issues") or []:
         if is_bounty(issue, label_denylist):
             issue["help"] = {"verdict": "bounty"}
+        elif is_bug_report(issue):
+            issue["help"] = {"verdict": "bug_report"}
         elif issue.get("state") in ("closed", "deleted"):
             issue["help"] = {"verdict": issue["state"]}
         elif due(issue, label_denylist):

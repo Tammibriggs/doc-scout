@@ -14,6 +14,7 @@ from test_report_pipeline import RunGitHub, fake_sources
 from test_review import TYPES
 
 from docscout.hosted.picks import open_picks
+from docscout.llm.base import HelpAnswer
 from docscout.run import keep_open, pipeline, watch
 from docscout.run.db import Store, StoredFinding
 from docscout.settings.config import Config, load_defaults
@@ -173,6 +174,37 @@ def test_a_closed_help_request_takes_off_a_pick_listed_only_for_it(cfg, store, n
     store.set_status("org/elsewhere", "reported", now)
     out = step(Looking({"org/elsewhere": node("org/elsewhere", issues={12: ("CLOSED", iso(0), 4)})}), store, cfg, now + timedelta(hours=1))
     assert out.left == [("org/elsewhere", "its docs may be elsewhere, and no help request asks for API docs work")]
+
+
+def test_a_help_request_stored_without_its_text_is_read_before_gemma_is_asked(cfg, store, now):
+    # writerslogic/warm #10, 8 Nov: judged from its title alone ("Node.js API reference with usage
+    # examples"), it counted as a request for the REST spec's examples; its text is about a library.
+    title_only = {"number": 10, "title": "Node.js API reference with usage examples", "labels": ["documentation"], "outreach": ["good first issue"],
+                  "html_url": "https://github.com/org/app/issues/10", "help": {"verdict": "this_work", "verified": True, "signature": "from-the-title"}}  # fmt: skip
+    save(store, now, "org/app", details_with([title_only]))
+    f = store.latest_finding("org/app")
+    store.set_review(f.finding_id, "accepted", f.score, f.details)
+    store.set_status("org/app", "reported", now)
+
+    class Reading:
+        name, texts = "openai_compatible:gemma-4-31b-it", []
+
+        def help_request(self, ctx):
+            self.texts.append(ctx.text)
+            return HelpAnswer(verdict="other_api_docs", quote="Node.js API reference", reason="a library's functions")
+
+        def unload(self):
+            pass
+
+        def close(self):
+            pass
+
+    model = Reading()
+    cfg.values["llm"]["provider"] = "openai_compatible"  # as on Render: no local-memory check
+    step(Looking({"org/app": node("org/app", issues={10: ("OPEN", iso(3), 0)})}), store, cfg, now + timedelta(hours=1), model=model)
+    assert model.texts == ["The endpoints need descriptions and examples."]  # the issue's text, fetched first
+    stored = store.latest_finding("org/app").details["issues"][0]
+    assert stored["text"] and stored["help"]["verdict"] == "other_api_docs"
 
 
 def test_caps_leave_the_rest_for_the_next_run_free_picks_first(cfg, store, now, monkeypatch):

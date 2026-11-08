@@ -62,7 +62,7 @@ If the user hasn't said, use these defaults and say you did:
    - **Read the issue, next to the gap you measured.** A docs label isn't enough. Sort each request into one of three:
      - **It asks for this work:** the gap you measured, or, when the docs live elsewhere, work on the project's API reference. Only this kind counts as "maintainers asked for help", and only its comments are read for claims.
      - **Other API-docs work:** an outdated statement, another API of the project (Tauri commands, a library's reference) when your gap is in the REST spec. Mention it as a related issue, but it doesn't count.
-     - **Not API docs:** feature requests, bugs, installation guides, a licence badge, typos, Go doc comments, and features of the docs site (copy buttons, search, styling), even on the API page. Leave it out.
+     - **Not API docs:** feature requests, bugs, installation guides, a licence badge, typos, Go doc comments, and features of the docs site (copy buttons, search, styling), even on the API page. Leave it out. A title such as `bug(api): …` or `[Bug] …` marks a bug report, even when it compares the API with its spec: it asks for the code to change, not the docs.
 
      In testing, only 5 of 23 listed help requests asked for the work that had been measured.
 

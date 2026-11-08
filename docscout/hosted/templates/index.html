@@ -63,17 +63,28 @@
   .section-head { margin: 40px 0 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .section-head h2 { margin: 0; font-size: 1.4rem; }
   .section-head .note { color: var(--muted); font-size: .93rem; }
-  .tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .tools { display: flex; align-items: center; gap: 10px; margin-left: auto; }
   .sort { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); font-size: .9rem; font-weight: 600; }
   .sort a, .sort strong { padding: 6px 12px; text-decoration: none; white-space: nowrap; }
   .sort strong { background: var(--brand); color: var(--brand-text); }
-  .filters { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: -4px 0 18px; }
-  .filters .label { color: var(--muted); font-size: .9rem; white-space: nowrap; }
-  @media (max-width: 420px) { .sort a, .sort strong { padding: 6px 9px; } }
-  .group { display: inline-flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; }
-  .toggle { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 6px 12px; font-size: .9rem; font-weight: 600; text-decoration: none; }
+  /* Filters: an icon that opens a panel (<details>, so no JavaScript), and the active ones as chips */
+  details.filter { position: relative; margin: 0; padding: 0; border: 0; }
+  .filter summary { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px;
+                    background: var(--surface); color: var(--muted); font-size: .9rem; }
+  .filter summary::before { content: none; }
+  .filter summary svg { width: 18px; height: 18px; }
+  .filter[open] summary, .filter.on summary { color: var(--brand); border-color: var(--brand); }
+  .filter .count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand); color: var(--brand-text);
+                   font-size: .75rem; font-weight: 700; display: grid; place-items: center; }
+  .panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 10; width: max-content; max-width: calc(100vw - 40px);
+           background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(20, 22, 30, .16); padding: 6px 16px 16px; }
+  .panel .label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 10px 0 6px; }
+  .toggle { display: inline-block; border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; font-size: .9rem; font-weight: 600; text-decoration: none; }
   .toggle.on { background: var(--blue-soft); color: var(--blue); border-color: var(--blue-soft); }
-  .filters .note { color: var(--muted); font-size: .9rem; }
+  .active { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: -4px 0 18px; color: var(--muted); font-size: .9rem; }
+  .remove { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--blue-soft); color: var(--blue);
+            font-weight: 600; text-decoration: none; }
+  @media (max-width: 420px) { .sort a, .sort strong { padding: 6px 9px; } .panel { padding: 4px 12px 14px; } .panel .sort a, .panel .sort strong { padding: 6px 8px; } }
 
   /* Pick cards */
   .picks { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
@@ -190,22 +201,32 @@
           {% if sort == "latest" %}<a href="{{ link(sort='best') }}">Best first</a><strong aria-current="true">Newest first</strong>
           {% else %}<strong aria-current="true">Best first</strong><a href="{{ link(sort='latest') }}">Newest first</a>{% endif %}
         </nav>
-        {% if pages > 1 %}<span class="note">Page {{ page_number }} of {{ pages }}</span>{% endif %}
+        <details class="filter filters{% if filtered %} on{% endif %}">
+          <summary aria-label="Filter the picks{% if filtered %}: {{ active_count }} on{% endif %}" title="Filter the picks">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/></svg>
+            {% if filtered %}<span class="count" aria-hidden="true">{{ active_count }}</span>{% endif %}
+          </summary>
+          <div class="panel">
+            <p class="label" id="size-label">Job size</p>
+            <span class="sort" role="group" aria-labelledby="size-label">
+              {% for value, name in sizes %}{% if size == value %}<strong aria-current="true">{{ name }}</strong>{% else %}<a href="{{ link(size=value) }}">{{ name }}</a>{% endif %}{% endfor %}
+            </span>
+            <p class="label">Help requests</p>
+            {% if help_only %}<a class="toggle on" href="{{ link(help_only=False) }}" aria-current="true">✓ Maintainers asked for help</a>
+            {% else %}<a class="toggle" href="{{ link(help_only=True) }}">Maintainers asked for help</a>{% endif %}
+          </div>
+        </details>
       </div>
       {% endif %}
     </div>
 
-    {% if subscribed and total > 1 %}
-    <nav class="filters" aria-label="Filters">
-      <span class="group"><span class="label" id="size-label">Job size</span>
-        <span class="sort" role="group" aria-labelledby="size-label">
-          {% for value, name in sizes %}{% if size == value %}<strong aria-current="true">{{ name }}</strong>{% else %}<a href="{{ link(size=value) }}">{{ name }}</a>{% endif %}{% endfor %}
-        </span>
-      </span>
-      {% if help_only %}<a class="toggle on" href="{{ link(help_only=False) }}" aria-current="true">✓ Maintainers asked for help</a>
-      {% else %}<a class="toggle" href="{{ link(help_only=True) }}">Maintainers asked for help</a>{% endif %}
-      {% if filtered %}<span class="note">{{ matching }} of {{ total }} match · <a href="{{ link(size=None, help_only=False) }}">Clear filters</a></span>{% endif %}
-    </nav>
+    {% if subscribed and (filtered or pages > 1) %}
+    <div class="active">
+      {% if size %}<a class="remove" href="{{ link(size=None) }}" aria-label="Remove the filter: {{ size_name | lower }} jobs">{{ size_name }} job <span aria-hidden="true">✕</span></a>{% endif %}
+      {% if help_only %}<a class="remove" href="{{ link(help_only=False) }}" aria-label="Remove the filter: maintainers asked for help">Maintainers asked for help <span aria-hidden="true">✕</span></a>{% endif %}
+      {% if filtered %}<span>{{ matching }} of {{ total }} match</span><a href="{{ link(size=None, help_only=False) }}">Clear filters</a>{% endif %}
+      {% if pages > 1 %}<span>Page {{ page_number }} of {{ pages }}</span>{% endif %}
+    </div>
     {% endif %}
 
     {% if not picks and filtered %}

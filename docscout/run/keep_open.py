@@ -241,6 +241,14 @@ def step(
                     help_changed = True
                 elif old and ((old.get("issues") or {}).get(number) or [None, None])[1] != now_state[1]:
                     help_requests.fetch_text(gh, finding.full_name, issue)  # its text may have changed
+            # Gemma reads each request's text, so fetch it where it's missing: picks reported before
+            # 6 Nov were stored without it, and until 8 Nov every request on the website was judged
+            # from its title alone (writerslogic/warm #10, "Node.js API reference with usage
+            # examples", counted as a request for the REST spec's examples). A fetched text changes
+            # the request's signature, so it's asked about again.
+            for issue in d.get("issues") or []:
+                if "text" not in issue and issue.get("state") not in ("closed", "deleted") and not help_requests.is_bounty(issue, denylist):
+                    help_requests.fetch_text(gh, finding.full_name, issue)
             if caps.gemma > 0 and any(help_requests.due(i, denylist) for i in d.get("issues") or []) and model() is not None:
                 try:
                     asked = help_requests.check(opened[0], d, finding.full_name, denylist)

@@ -147,6 +147,31 @@ def test_what_a_request_that_doesnt_count_takes_away():
     assert help_requests.effects(details_with([], stats={"outsider_merged_180d": 0, "human_committers_90d": 1}), HEALTH) == ([], None)
 
 
+def test_bug_reports_are_not_help_requests_whatever_the_model_said():
+    # docling-pipelines #296: Gemma answered "this work" in every live run; it asks for a code fix.
+    for title in ("bug(api): document-libraries routes deviate from their OpenSpec", "[Bug] The preview endpoint clamps ?maxRows=",
+                  "fix: list_libraries ignores the name filter", "Bug: 500 on PUT /items", "fix(api)!: wrong status codes"):  # fmt: skip
+        assert help_requests.is_bug_report({"title": title}), title
+    for title in ("fix(docs): describe the error responses", "Document the bug report endpoint", "Debug logging for the API", "Docs: add an API reference page"):
+        assert not help_requests.is_bug_report({"title": title}), title
+    bug = {**issue(296, "bug(api): routes deviate from their OpenSpec"), "help": {"verdict": "this_work", "verified": True}}  # answered before the rule
+    assert not help_requests.counts(bug) and not help_requests.related(bug)
+    elsewhere = details_with([bug], kind="elsewhere", check_manually=["Project website: app.example"], findings=())
+    assert "docs may be elsewhere" in help_requests.effects(elsewhere, HEALTH)[1]  # so docling-pipelines leaves the list
+    d = details_with([issue(5, "bug: wrong status codes"), issue(6, "Add request examples")])
+    model = Asked()
+    assert help_requests.check(model, d, "org/app", DENY) == 1 and model.asked == ["Add request examples"]  # no question for the bug report
+    assert d["issues"][0]["help"] == {"verdict": "bug_report"}
+
+
+def test_on_the_labeled_test_set_the_bug_report_rule_catches_only_code_bugs():
+    from pathlib import Path
+
+    data = json.loads((Path(__file__).parent / "fixtures" / "m6" / "help_requests.json").read_text(encoding="utf-8"))
+    caught = {f"{i['repo']}#{i['number']}": i["label"] for i in data["issues"] if help_requests.is_bug_report(i)}
+    assert caught == {"docling-project/docling-pipelines#296": "C", "openJiuwen-ai/sciencediscovery#841": "C"}
+
+
 def test_the_issue_text_is_read_without_template_comments():
     class Issues:
         def get_issue(self, name, number):

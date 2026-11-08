@@ -250,6 +250,9 @@ def test_subscribers_can_filter_by_the_size_of_the_job_and_help_requests():
     assert 'href="/?size=big#picks"' in both  # turning the help filter off keeps the size
     assert 'href="/?sort=latest&amp;size=big&amp;help=1#picks"' in both  # so does sorting
     assert 'href="/#picks">Clear filters' in both
+    assert 'href="/?help=1#picks" aria-label="Remove the filter: big jobs">Big job' in both  # each active filter is a chip that removes it
+    assert '<span class="count" aria-hidden="true">2</span>' in both  # the filter icon shows how many are on
+    assert 'class="count"' not in c.get("/").text
     empty = c.get("/?size=medium&help=1").text
     assert names(empty) == [] and "No open picks match these filters" in empty
     ignored = c.get("/?size=huge&help=yes").text  # values the page doesn't offer change nothing

@@ -141,6 +141,8 @@ def create_app(
             size=size,
             help_only=help_only,
             filtered=bool(size or help_only),
+            active_count=int(bool(size)) + int(help_only),
+            size_name=dict(SIZE_CHOICES).get(size),
             matching=len(picks),
             sizes=SIZE_CHOICES,
             link=link,

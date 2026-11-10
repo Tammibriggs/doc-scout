@@ -8,7 +8,8 @@
 2. The other runs only look at the listed picks and act on what changed (``docscout look``, M6).
    A run that finds another still going stops at once.
 3. Every run publishes the open picks to Atlas for the website, even after a failed or cut-off
-   run, since DocScout saves its progress as it goes.
+   run, since DocScout saves its progress as it goes. A publish writes each pick's small part
+   (rank, labels, when it was checked) and only the content that changed (:mod:`docscout.hosted.atlas`).
 
 Until 18 Oct the job copied DocScout's memory, a SQLite file, in and out of Atlas GridFS around
 each run. The first run with an empty set of collections moves that file into them.

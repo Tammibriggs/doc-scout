@@ -6,8 +6,10 @@ Run it with ``uvicorn --factory docscout.hosted.web:from_env``. It reads, from t
 
 The page uses no JavaScript, so its Content-Security-Policy allows no scripts at all.
 The paywall is enforced here, on the server: a visitor's page only ever contains the picks
-they may see. Templates escape every value (Jinja2 autoescape), and links are only the
-GitHub URLs prepared in :mod:`docscout.hosted.picks`.
+they may see. Atlas keeps each pick in two parts, joined when read (:mod:`docscout.hosted.atlas`),
+and a page asks only for what it shows: the free picks, a page of 10, or the fields the search reads.
+Templates escape every value (Jinja2 autoescape), and links are only the GitHub URLs prepared in
+:mod:`docscout.hosted.picks`.
 """
 
 from __future__ import annotations
@@ -109,35 +111,46 @@ def create_app(
         return resp
 
     async def index(request: Request) -> Response:
-        picks, updated = atlas.current_picks()
-        total = len(picks)
+        # Atlas keeps each pick in two parts (hosted.atlas): the page asks only for what it shows
+        listing = atlas.listing()
+        total = listing.count
         subscribed = valid_pass(request.cookies.get(COOKIE), secret, clock())
         pages, number, sort, size, help_only = 1, 1, "best", None, False
         q = clean(request.query_params.get("q", "")[:MAX_QUERY], MAX_QUERY) or None  # cut, not shortened with "…"
         free = total
+        searched: list[dict[str, Any]] = []  # what a suggested search looks through: the searched fields only
+        found: list[str] = []  # the names a search matched, in order
         if subscribed:  # pages of PER_PAGE; visitors see only the free picks, so they need no pages, sorting or filters
+            where: dict[str, Any] = {}
             if request.query_params.get("sort") == "latest":  # newest first, then best first within a day
                 sort = "latest"
-                picks = sorted(picks, key=lambda p: (str(p.get("reported") or ""), p.get("score") or 0), reverse=True)
             if request.query_params.get("size") in SIZES:
                 size = request.query_params["size"]
-                picks = [p for p in picks if p.get("effort") == EFFORT[SIZES[size]]]
+                where["effort"] = EFFORT[SIZES[size]]
             if request.query_params.get("help") == "1":
                 help_only = True
-                picks = [p for p in picks if p.get("issues")]  # the "Maintainers asked for help" chip
-            searched = picks  # what a suggested search looks through
-            if q:
-                picks = search(picks, q)
-            pages = max(1, math.ceil(len(picks) / PER_PAGE))
+                where["asked_for_help"] = True  # the "Maintainers asked for help" chip
+            if q:  # searched in memory over four fields; the page's picks are then asked for by name
+                searched = atlas.list_picks(listing, where, sort, searched_only=True)
+                found = [p["full_name"] for p in search(searched, q)]
+                matching = len(found)
+            else:
+                matching = atlas.count_picks(listing, where)
+            pages = max(1, math.ceil(matching / PER_PAGE))
             requested = request.query_params.get("page", "1")
             number = min(pages, max(1, int(requested))) if requested.isdigit() else 1
-            shown = picks[(number - 1) * PER_PAGE : number * PER_PAGE]
+            start = (number - 1) * PER_PAGE
+            if q:
+                shown = atlas.picks_named(listing, found[start : start + PER_PAGE])
+            else:
+                shown = atlas.list_picks(listing, where, sort, skip=start, limit=PER_PAGE)
         else:  # the free picks (M6: the best found this week); a list published before has no flags
-            shown = [p for p in picks if p.get("free")][:FREE_PICKS] or picks[:FREE_PICKS]
-            searched, free = picks, len(shown)
+            shown = atlas.free_picks(listing, FREE_PICKS)
+            free, matching = len(shown), total
             if q:  # how many of all the picks match, and the free ones among them
-                picks = search(picks, q)
-                matched = {p.get("full_name") for p in picks}
+                searched = atlas.list_picks(listing, searched_only=True)
+                matched = {p["full_name"] for p in search(searched, q)}
+                matching = len(matched)
                 shown = [p for p in shown if p.get("full_name") in matched]
         shown = [{**p, "checked_ago": ago(p.get("checked"), clock())} for p in shown]
 
@@ -147,10 +160,10 @@ def create_app(
         return page(
             request,
             picks=shown,
-            hidden=0 if subscribed else len(picks) - len(shown),
+            hidden=0 if subscribed else matching - len(shown),
             free=free,
             q=q,
-            suggestions=suggestions(searched) if q and not picks else [],
+            suggestions=suggestions(searched) if q and not matching else [],
             page_number=number,
             pages=pages,
             sort=sort,
@@ -159,12 +172,12 @@ def create_app(
             filtered=bool(size or help_only or q),
             active_count=int(bool(size)) + int(help_only),
             size_name=dict(SIZE_CHOICES).get(size),
-            matching=len(picks),
+            matching=matching,
             sizes=SIZE_CHOICES,
             link=link,
             total=total,
             subscribed=subscribed,
-            updated=updated,
+            updated=listing.updated,
             price=f"${PRICE_CENTS / 100:.0f}",
             test_mode=getattr(stripe, "test_mode", True),
             source_url=source_url,

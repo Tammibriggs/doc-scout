@@ -1,8 +1,9 @@
 """Search the website's picks by what the project is about (8 Nov): "AI", "payments", "Go".
 
-The picks are a short list kept in one document, so the search runs in memory over each pick's
-name, description, GitHub topics and language. Gemma's note isn't searched: it's written about
-the docs, and a search should match what the project says about itself.
+The search runs in memory over each pick's name, description, GitHub topics and language, the
+only fields the website asks Atlas for when searching (about 350 bytes a pick; hosted.atlas).
+Gemma's note isn't searched: it's written about the docs, and a search should match what the
+project says about itself.
 
 - Every word must match (``ai payments`` finds AI projects about payments).
 - Plurals match simply ("payment" finds "payments"), and a word of 5 letters or more also

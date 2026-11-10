@@ -1,7 +1,7 @@
-"""The hosted version: the last 7 days' picks, the website's paywall, Stripe Checkout and the daily job.
+"""The hosted version: the picks, publishing them to Atlas, the website's paywall, Stripe Checkout and the daily job.
 
-Atlas and Stripe are replaced by fakes (Stripe's HTTP API by httpx.MockTransport), so no
-test reaches a real service. Skipped unless the hosted extras are installed.
+Atlas is replaced by mongomock and Stripe by fakes (Stripe's HTTP API by httpx.MockTransport), so
+no test reaches a real service. Skipped unless the hosted extras and mongomock are installed.
 """
 
 import json
@@ -15,11 +15,15 @@ import pytest
 pytest.importorskip("starlette")
 pytest.importorskip("jinja2")
 pytest.importorskip("pymongo")
+mongomock = pytest.importorskip("mongomock")
 
 from starlette.testclient import TestClient  # noqa: E402
 
 from docscout.run.db import Store  # noqa: E402
 from docscout.hosted import job  # noqa: E402
+from bson import ObjectId  # noqa: E402
+
+from docscout.hosted.atlas import Atlas  # noqa: E402
 from docscout.hosted.billing import BillingError, Stripe  # noqa: E402
 from docscout.hosted.picks import FREE_PICKS, weekly_picks  # noqa: E402
 from docscout.hosted.web import COOKIE, create_app, sign_pass, valid_pass  # noqa: E402
@@ -60,19 +64,22 @@ def sample_picks(n):
              "claimed": [], "requirements": [], "local_setup": None, "issues": []} for i in range(1, n + 1)]
 
 
-class FakeAtlas:
+class FakeAtlas(Atlas):
+    """The real Atlas class, over mongomock, with these picks published (and GridFS's old file)."""
+
     def __init__(self, picks=(), state=None):
-        self.picks, self.updated, self.state, self.subscriptions = list(picks), None, state, {}
-        self.db = None  # a mongomock database, for the daily job's tests
+        super().__init__("", client=mongomock.MongoClient())
+        self.state = state
+        if picks:
+            self.publish(list(picks), None)
 
-    def current_picks(self):
-        return self.picks, self.updated
+    @property
+    def picks(self):
+        return self.current_picks()[0]
 
-    def publish(self, picks, now):
-        self.picks, self.updated = picks, now
-
-    def record_subscription(self, subscription):
-        self.subscriptions.setdefault(subscription["_id"], subscription)
+    @property
+    def subscriptions(self):
+        return {s["_id"]: s for s in self.db.subscriptions.find()}
 
     def load_state(self, path):
         if self.state is None:
@@ -156,6 +163,159 @@ def test_the_headline_is_the_biggest_gap(tmp_path, now):
         {"text": "19/19 endpoints have no response example", "examples": ["GET /a", "GET /b"], "more": 17},
     ])
     assert weekly_picks(store, now)[0]["headline"] == "19/19 endpoints have no response example"
+
+
+# ---------------------------------------------------------------------- publishing to Atlas
+
+
+def content_by_name(atlas):
+    return {d["full_name"]: d for d in atlas.db.pick_content.find()}
+
+
+def test_each_pick_is_a_small_part_per_version_and_its_content_stored_once(now):
+    atlas = FakeAtlas()
+    picks = sample_picks(4)
+    picks[3]["reported"] = "2026-11-09T04:15:00+00:00"  # the newest
+    picks[1]["issues"] = [{"title": "#3 Document the API", "url": None}]
+    picks[0] |= {"checked": "2026-11-10T04:15:00+00:00", "free": True, "new": True}
+    version = atlas.publish(picks, now)
+    small = list(atlas.db.open_picks.find({}, {"_id": 0}).sort("position"))
+    assert [d["full_name"] for d in small] == ["org/app1", "org/app2", "org/app3", "org/app4"] and {d["version"] for d in small} == {version}
+    assert [d["newest_position"] for d in small] == [1, 2, 3, 0] and [d["asked_for_help"] for d in small] == [False, True, False, False]
+    assert {k: small[0][k] for k in ("rank", "checked", "free", "new", "effort")} == {"rank": 1, "checked": "2026-11-10T04:15:00+00:00", "free": True, "new": True, "effort": "Medium job"}
+    content = content_by_name(atlas)
+    assert len(content) == 4 and {d["content"] for d in small} == {d["_id"] for d in content.values()}
+    assert not {"rank", "checked", "free", "new", "version"} & {k for d in content.values() for k in d}  # what changes from run to run isn't in it
+    assert atlas.db.picks.find_one({"_id": "published"}) | {"updated": None} == {"_id": "published", "version": version, "updated": None, "count": 4}
+    assert "version" not in picks[0] and "content" not in picks[0]  # the caller's picks are left as they were
+    listing = atlas.listing()
+    assert (listing.version, listing.count) == (version, 4)
+    assert atlas.list_picks(listing) == picks  # every pick comes back as it was published
+    assert [p["full_name"] for p in atlas.list_picks(listing, order="latest", limit=2)] == ["org/app4", "org/app1"]
+    assert atlas.list_picks(listing, {"asked_for_help": True}, searched_only=True) == [{"full_name": "org/app2", "description": None, "language": "Go"}]
+    assert [p["full_name"] for p in atlas.picks_named(listing, ["org/app3", "org/gone", "org/app1"])] == ["org/app3", "org/app1"]
+    assert {tuple(i["key"]) for i in atlas.db.open_picks.list_indexes()} >= {("version", "position"), ("version", "newest_position"), ("content",)}
+
+
+def test_a_publish_writes_only_the_content_that_changed(now):
+    atlas = FakeAtlas()
+    first = [p | {"checked": "2026-11-10T04:15:00+00:00"} for p in sample_picks(5)]
+    atlas.publish(first, now)
+    stored = {d["_id"] for d in atlas.db.pick_content.find()}
+    # The next run: every pick checked again, a new pick at the top moves every rank, and one pick's gap was measured again.
+    second = [p | {"rank": p["rank"] + 1, "checked": "2026-11-10T10:15:00+00:00"} for p in first]
+    second[2]["score"] = 99
+    second.insert(0, sample_picks(1)[0] | {"full_name": "org/new", "url": "https://github.com/org/new", "checked": "2026-11-10T10:15:00+00:00"})
+    atlas.publish(second, now)
+    added = {d["_id"]: d["full_name"] for d in atlas.db.pick_content.find() if d["_id"] not in stored}
+    assert sorted(added.values()) == ["org/app3", "org/new"]  # the other 4 picks kept their content
+    assert atlas.picks == second
+
+
+def test_a_publish_switches_versions_at_once_and_keeps_the_one_it_replaced(now):
+    atlas = FakeAtlas()
+    atlas.db.picks.insert_one({"_id": "current", "updated": None, "picks": sample_picks(2)})  # the list as one document, until 10 Nov
+    atlas.db.repos.insert_one({"_id": "org/app1", "status": "reported"})
+    first = atlas.publish(sample_picks(3), now)
+    second = atlas.publish(sample_picks(5), now)
+    assert {d["version"] for d in atlas.db.open_picks.find()} == {first, second}  # pages read during the switch still work
+    assert atlas.listing().version == second and len(atlas.picks) == 5
+    atlas.db.open_picks.insert_one({"version": str(ObjectId()), "full_name": "org/half-published"})  # a publish that failed midway
+    third = atlas.publish(sample_picks(1), now)
+    assert {d["version"] for d in atlas.db.open_picks.find()} >= {second, third} and first not in {d["version"] for d in atlas.db.open_picks.find()}
+    fourth = atlas.publish(sample_picks(1), now)
+    assert {d["version"] for d in atlas.db.open_picks.find()} == {third, fourth}  # the failed one goes once it's older
+    assert len(atlas.db.picks.find_one({"_id": "current"})["picks"]) == 2 and atlas.db.repos.count_documents({}) == 1  # nothing else touched
+
+
+def test_content_no_version_uses_is_deleted_a_publish_later(now):
+    atlas = FakeAtlas()
+    a, b, c = ([p] for p in sample_picks(3))  # three lists of one pick each, each with its own content
+    atlas.publish(a, now)
+    atlas.publish(b, now)  # a's version stays, for pages being read
+    atlas.publish(c, now)
+    assert "unused_since" in content_by_name(atlas)["org/app1"]  # no version uses it now: marked, not deleted
+    atlas.publish(c, now)
+    content = content_by_name(atlas)
+    assert "org/app1" not in content and "unused_since" in content["org/app2"]  # unused at two publishes: deleted
+    atlas.publish(b, now)  # used again before its second turn
+    content = content_by_name(atlas)
+    assert "unused_since" not in content["org/app2"] and atlas.picks == b
+    assert "unused_since" not in content["org/app3"]  # the version before still uses it
+    assert atlas.db.repos.count_documents({}) == 0 and atlas.db.subscriptions.count_documents({}) == 0
+
+
+def test_a_publish_keeps_content_a_clean_up_deletes_at_the_same_moment(now, monkeypatch):
+    atlas = FakeAtlas()
+    picks = sample_picks(2)
+    atlas.publish(picks, now)
+    key = atlas.db.open_picks.find_one({"full_name": "org/app1"})["content"]
+    atlas.db.open_picks.delete_many({})  # its version is long gone…
+    atlas.db.pick_content.update_one({"_id": key}, {"$set": {"unused_since": "000000000000000000000000"}})  # …and a clean-up marked it
+    unmark, calls = atlas.db.pick_content.update_many, []
+
+    def cleaned_up_first(query, update, **kw):  # another run's clean-up deletes it just before this publish unmarks it
+        if not calls:
+            atlas.db.pick_content.delete_one({"_id": key})
+        calls.append(query)
+        return unmark(query, update, **kw)
+
+    monkeypatch.setattr(atlas.db.pick_content, "update_many", cleaned_up_first)
+    atlas.publish(picks, now)
+    monkeypatch.undo()
+    assert atlas.picks == picks  # stored again
+    # And a clean-up deletes only content still marked: a publish that used it again unmarked it in between.
+    atlas.db.pick_content.insert_one({"_id": "gone-and-back", "full_name": "org/x", "unused_since": "000000000000000000000000"})
+    find = atlas.db.pick_content.aggregate
+
+    def used_again_meanwhile(pipeline, **kw):
+        found = list(find(pipeline, **kw))
+        atlas.db.pick_content.update_one({"_id": "gone-and-back"}, {"$unset": {"unused_since": ""}})
+        return iter(found)
+
+    monkeypatch.setattr(atlas.db.pick_content, "aggregate", used_again_meanwhile)
+    atlas.publish(picks, now)
+    monkeypatch.undo()
+    assert atlas.db.pick_content.find_one({"_id": "gone-and-back"}) is not None
+
+
+def test_the_old_single_document_is_published_per_pick_and_kept(now):
+    atlas = FakeAtlas()
+    old = sample_picks(4)
+    atlas.db.picks.insert_one({"_id": "current", "updated": now - timedelta(hours=1), "picks": old})
+    listing = atlas.listing()  # the first page view after deploying, before the job's first run with this code
+    assert listing.count == 4 and [p["full_name"] for p in atlas.picks] == [p["full_name"] for p in old]
+    assert atlas.listing().version == listing.version  # once only
+    atlas.publish(sample_picks(2), now)  # the job's next run
+    assert atlas.listing().count == 2
+    atlas.db.picks.update_one({"_id": "current"}, {"$set": {"updated": now + timedelta(hours=6), "picks": sample_picks(7)}})  # after a rollback
+    assert atlas.listing().count == 7  # the newer one is shown
+    assert atlas.db.picks.find_one({"_id": "current"})["picks"] == sample_picks(7)  # never changed or deleted
+
+
+def test_a_page_asks_atlas_only_for_what_it_shows():
+    class Counting(FakeAtlas):
+        asked = []
+
+        def list_picks(self, listing, where=None, order="best", **kw):
+            found = super().list_picks(listing, where, order, **kw)
+            self.asked.append(("searched fields" if kw.get("searched_only") else "picks", len(found)))
+            return found
+
+    picks = sample_picks(40)
+    for p in picks:
+        p["free"] = p["rank"] <= FREE_PICKS  # flagged when published (hosted.picks)
+    atlas = Counting(picks)
+    client(atlas).get("/")
+    assert atlas.asked == [("picks", FREE_PICKS)]
+    atlas.asked.clear()
+    c = client(atlas)
+    c.cookies.set(COOKIE, sign_pass("cs_test_paid0000000001", 2_000_000_000, SECRET))
+    c.get("/?page=2")
+    assert atlas.asked == [("picks", 10)]
+    atlas.asked.clear()
+    c.get("/?q=uptime")  # the search reads four fields of every pick, then asks for the page's 10 by name
+    assert atlas.asked == [("searched fields", 40)]
 
 
 # ---------------------------------------------------------------------- website
@@ -391,10 +551,7 @@ def test_the_hosted_settings_check_more_than_a_laptop_run():
 
 
 def atlas_with_db():
-    mongomock = pytest.importorskip("mongomock")
-    atlas = FakeAtlas()
-    atlas.db = mongomock.MongoClient().db
-    return atlas
+    return FakeAtlas()
 
 
 def test_the_daily_job_keeps_docscouts_memory_in_atlas_collections(now, monkeypatch):

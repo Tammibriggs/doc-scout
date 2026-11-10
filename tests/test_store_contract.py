@@ -94,6 +94,39 @@ def test_findings_wait_for_review_then_for_the_report(store, now):
     assert store.latest_finding("org/high").details["checks"] == {"claimed": []}
 
 
+def test_a_saved_review_keeps_the_details_as_given(store, now):
+    run = store.start_run(now)
+    found = finding(store, run, now, "org/app", 70, details={"gap": {"kind": "spec", "n": 38}, "watch": {"looked": "1"}, "left": {"reason": "x"}})
+    d = found.details
+    d["watch"]["looked"] = "2"  # changed in place, as a look does
+    d["claims"] = {"work_left": 12}  # added
+    del d["left"]  # removed
+    store.set_review(found.finding_id, "accepted", 71, d)
+    again = store.latest_finding("org/app")
+    assert (again.score, again.details) == (71, {"gap": {"kind": "spec", "n": 38}, "watch": {"looked": "2"}, "claims": {"work_left": 12}})
+    store.set_review(again.finding_id, "accepted", 71, again.details)  # nothing changed
+    store.set_review(again.finding_id, "rejected", 30, {})
+    assert store.latest_finding("org/app").details == {}
+
+
+def test_the_atlas_store_saves_only_the_parts_that_changed(now):
+    mongomock = pytest.importorskip("mongomock")
+    pytest.importorskip("pymongo")
+    from docscout.hosted.atlas_store import AtlasStore
+
+    db = mongomock.MongoClient().db
+    store = AtlasStore(db)
+    run = store.start_run(now)
+    found = finding(store, run, now, "org/app", 70, details={"gap": {"kind": "spec"}, "watch": {"looked": "1"}})
+    db.findings.update_one({"_id": found.finding_id}, {"$set": {"details.gap": {"kind": "marker"}}})  # changed behind the store's back
+    found.details["watch"] = {"looked": "2"}
+    store.set_review(found.finding_id, "accepted", 70, found.details)
+    assert db.findings.find_one({"_id": found.finding_id})["details"] == {"gap": {"kind": "marker"}, "watch": {"looked": "2"}}  # gap wasn't written
+    other = AtlasStore(db)  # a store that hasn't read it writes every part
+    other.set_review(found.finding_id, "accepted", 70, found.details)
+    assert db.findings.find_one({"_id": found.finding_id})["details"] == {"gap": {"kind": "spec"}, "watch": {"looked": "2"}}
+
+
 def test_only_the_latest_finding_of_each_repo_counts(store, now):
     first = store.start_run(now - timedelta(days=2))
     finding(store, first, now, "org/app", 90, review="accepted", days_ago=2)

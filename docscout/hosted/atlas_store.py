@@ -18,6 +18,7 @@ compare the same way.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -38,10 +39,24 @@ def _plain(details: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(details))
 
 
+def _fingerprints(details: dict[str, Any]) -> dict[str, bytes]:
+    """A fingerprint of each part of a finding's details (``gap``, ``claims``, ``watch``…), to
+    tell which parts a save changes."""
+    return {key: hashlib.blake2b(json.dumps(value, sort_keys=True).encode(), digest_size=16).digest() for key, value in details.items()}
+
+
+def _part_name(key: Any) -> bool:
+    """True for a part that can be saved on its own (``details.<key>``)."""
+    return isinstance(key, str) and bool(key) and "." not in key and not key.startswith("$")
+
+
 class AtlasStore:
     def __init__(self, db: Any) -> None:
         self.db = db
         self._client: Any = None
+        # Each finding's details as this store last read or saved them, part by part, so a save
+        # writes only the parts that changed (a look changes only its notes on most picks).
+        self._seen: dict[int, dict[str, bytes]] = {}
         self.db.findings.create_index([("repo_key", pymongo.ASCENDING), ("_id", pymongo.DESCENDING)])
         self.db.findings.create_index("run_id")
         self.db.repos.create_index([("status", pymongo.ASCENDING), ("last_reported", pymongo.ASCENDING)])
@@ -194,6 +209,7 @@ class AtlasStore:
 
     def update_details(self, run_id: int, full_name: str, details: dict[str, Any]) -> None:
         self.db.findings.update_many({"run_id": run_id, "repo_key": full_name.lower()}, {"$set": {"details": _plain(details)}})
+        self._seen.clear()  # findings this store doesn't know by number: their next save writes everything
 
     def _latest(self, finding: dict[str, Any], repo: dict[str, Any], limit: int | None = None) -> list[dict[str, Any]]:
         """The latest finding of each repo, when that finding matches ``finding`` and its repo
@@ -212,8 +228,9 @@ class AtlasStore:
             pipeline.append({"$limit": limit})
         return list(self.db.findings.aggregate(pipeline))
 
-    @staticmethod
-    def _finding(doc: dict[str, Any], with_id: bool = True, reported: bool = False) -> StoredFinding:
+    def _finding(self, doc: dict[str, Any], with_id: bool = True, reported: bool = False) -> StoredFinding:
+        if with_id and isinstance(doc.get("details"), dict):
+            self._seen[doc["_id"]] = _fingerprints(doc["details"])
         return StoredFinding(
             doc["repo"]["full_name"], doc["score"], doc["details"], doc["run_id"],
             doc["_id"] if with_id else None, doc["repo"].get("last_reported") if reported else None,
@@ -234,7 +251,23 @@ class AtlasStore:
         return len(self._latest(self._pending(now, min_score, max_age_days, None), {"repo.status": "new"}))
 
     def set_review(self, finding_id: int, review: str | None, score: float, details: dict[str, Any]) -> None:
-        self.db.findings.update_one({"_id": finding_id}, {"$set": {"review": review, "score": score, "details": _plain(details)}})
+        """Saves only the parts of ``details`` that changed since this store read or saved them
+        (a look's notes are about 400 bytes of a pick's 7 KB); all of them for a finding it hasn't
+        read. Either way the saved details are ``details``, as long as nothing else saved them in
+        between (one run at a time: hosted.job)."""
+        plain = _plain(details)
+        after = _fingerprints(plain)
+        before = self._seen.get(finding_id)
+        changes: dict[str, Any] = {"review": review, "score": score}
+        update: dict[str, Any] = {"$set": changes}
+        if before is not None and all(_part_name(key) for key in (*before, *after)):
+            changes.update({f"details.{key}": plain[key] for key in plain if before.get(key) != after[key]})
+            if gone := {f"details.{key}": "" for key in before if key not in plain}:
+                update["$unset"] = gone
+        else:
+            changes["details"] = plain
+        self.db.findings.update_one({"_id": finding_id}, update)
+        self._seen[finding_id] = after
 
     def latest_finding(self, full_name: str) -> StoredFinding | None:
         key = full_name.lower()

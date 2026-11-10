@@ -14,7 +14,7 @@ from test_report_pipeline import RunGitHub, fake_sources
 from docscout.run import daily, lock, notify, pipeline
 from docscout.settings.config import Config, load_defaults
 from docscout.run.db import Store
-from docscout.find.sources import Candidate, repo_search
+from docscout.find.sources import Candidate, code_search, repo_search
 
 UTC = timezone.utc
 
@@ -327,8 +327,103 @@ def test_daily_runs_use_the_cursor(cfg, store, now, monkeypatch):
 
     seen = []
     monkeypatch.setattr(repo_search, "sweep", lambda *a, **k: iter(seen.append(k["per_run"]) or []))
-    list(source_candidates("repo_search", None, cfg, None, now.date(), apitypes.enabled_types(cfg["api_types"]), cursor=store, now=now))
-    assert seen == [4]
+    monkeypatch.setattr(code_search, "sweep", lambda gh, names, bands, cursor, **k: iter(seen.append((len(names), len(bands), k["per_run"])) or []))
+    for source in ("repo_search", "code_search"):
+        list(source_candidates(source, None, cfg, None, now.date(), apitypes.enabled_types(cfg["api_types"]), cursor=store, now=now))
+    assert seen == [4, (4, 4, 8)]  # 4 file names in 4 size bands to start from, 8 bands a run
+
+
+class CodeSearchGitHub:
+    """Code search over files of known sizes, plus the batched GraphQL look-up of each page's repos."""
+
+    def __init__(self, files, gone=(), fail_batches=False):
+        self.files, self.gone, self.fail_batches = files, set(gone), fail_batches  # file name -> [(repo, size)]
+        self.searched = []
+
+    def search_code(self, query, *, page=1, per_page=100):
+        import re
+
+        name = re.search(r"filename:(\S+)", query).group(1)
+        low, high = map(int, re.search(r"size:(\d+)\.\.(\d+)$", query).groups())
+        self.searched.append((name, low, high, page))
+        repos = [repo for repo, size in self.files[name] if low <= size <= high]
+        items = repos[(page - 1) * per_page : page * per_page]
+        return len(repos), [{"repository": {"full_name": n.lstrip("~"), "fork": n.startswith("~")}} for n in items]
+
+    def graphql_batch(self, query):
+        import re
+
+        from docscout.find.github import GitHubError
+
+        if self.fail_batches:
+            raise GitHubError(502, "Bad gateway")
+        data, missing = {}, set()
+        for alias, owner, name in re.findall(r'(r\d+): repository\(owner: "([^"]+)", name: "([^"]+)"\)', query):
+            if f"{owner}/{name}" in self.gone:
+                data[alias] = None
+                missing.add(alias)
+            else:
+                data[alias] = {"stargazerCount": 42, "isArchived": False, "isFork": False, "pushedAt": "2026-11-01T00:00:00Z", "licenseInfo": {"spdxId": "MIT"}}
+        return data, missing
+
+
+def bands(store):
+    import json
+
+    return [tuple(b) for b in json.loads(store.get_state(code_search.STATE_KEY))["bands"]]
+
+
+def test_code_search_size_bands():
+    assert code_search.size_range("<5000") == (0, 4999)
+    assert code_search.size_range("5000..20000") == (5000, 20000)
+    assert code_search.size_range(">100000") == (100001, 393216)  # nothing bigger is indexed
+    assert code_search.start_bands(["a.yaml"], ["<10"])[0].query == "filename:a.yaml size:0..9"
+    start = code_search.start_bands(["a.yaml", "b.json"], ["<10", "10..20"])
+    assert [(b.filename, b.low) for b in start] == [("a.yaml", 10), ("b.json", 10), ("a.yaml", 0), ("b.json", 0)]  # largest first
+
+
+def test_code_search_works_through_its_bands_in_turn(store, now, monkeypatch):
+    monkeypatch.setattr(code_search, "PER_PAGE", 2)
+    gh = CodeSearchGitHub({"a.yaml": [("o/a1", 5), ("~o/fork", 5), ("o/a2", 5), ("o/gone", 5), ("o/a3", 5)], "b.yaml": [("o/b1", 5)]}, gone={"o/gone"})
+
+    def run(n, take):
+        stream = code_search.sweep(gh, ["a.yaml", "b.yaml"], ["<10"], store, per_run=1, now=now + timedelta(days=n))
+        return [c for _, c in zip(range(take), stream)]
+
+    first = run(0, 2)
+    assert [c.full_name for c in first] == ["o/a1", "o/a2"]  # the fork is skipped; page 2 started
+    assert first[0].meta["stargazers_count"] == 42 and first[0].meta["license"] == {"spdx_id": "MIT"}  # in REST's field names
+    assert store.slice_position("code:filename:a.yaml size:0..9")[:2] == (2, 0)
+    assert [c.full_name for c in run(1, 9)] == ["o/a2", "o/a3"]  # a band being read stays first (the gone repo is dropped)
+    assert bands(store) == [("b.yaml", 0, 9), ("a.yaml", 0, 9)] and store.slice_position("code:filename:a.yaml size:0..9")[:2] == (1, 1)
+    assert [c.full_name for c in run(2, 9)] == ["o/b1"]  # a finished band goes to the back
+    assert [c.full_name for c in run(3, 1)] == ["o/a1"]  # and starts over
+
+
+def test_a_band_with_more_results_than_a_search_returns_is_split_until_each_part_can_be_read(store, now, monkeypatch):
+    monkeypatch.setattr(code_search, "PER_PAGE", 2)
+    monkeypatch.setattr(code_search, "MAX_RESULTS", 4)
+    gh = CodeSearchGitHub({"a.yaml": [(f"o/r{size}", size) for size in range(7)]})
+
+    def run(per_run=1):
+        return [c.full_name for c in code_search.sweep(gh, ["a.yaml"], ["<8"], store, per_run=per_run, now=now)]
+
+    assert run() == ["o/r0", "o/r1", "o/r2", "o/r3"]  # 7 results in 0..7: split, and the lower half read
+    assert bands(store) == [("a.yaml", 4, 7), ("a.yaml", 0, 3)]  # the upper half waits its turn
+    assert run() == ["o/r4", "o/r5", "o/r6"]
+    gh.files["a.yaml"] += [(f"o/s{k}", 6) for k in range(4)]  # a band grows past what a search returns
+    assert run(per_run=2) == ["o/r0", "o/r1", "o/r2", "o/r3", "o/r4", "o/r5"]
+    assert bands(store)[-2:] == [("a.yaml", 0, 3), ("a.yaml", 4, 5)] and bands(store)[0] == ("a.yaml", 6, 7)
+    list(code_search.sweep(gh, ["a.yaml"], ["<16"], store, per_run=1, now=now))  # new settings start the queue again
+    assert bands(store) == [("a.yaml", 4, 7), ("a.yaml", 8, 15), ("a.yaml", 0, 3)]  # 0..15 split twice
+
+
+def test_code_search_carries_on_when_github_cant_answer_the_look_up(store, now):
+    gh = CodeSearchGitHub({"a.yaml": [("o/a1", 5), ("o/a2", 5)]}, fail_batches=True)
+    found = list(code_search.sweep(gh, ["a.yaml"], ["<10"], store, per_run=1, now=now))
+    assert [c.full_name for c in found] == ["o/a1", "o/a2"]
+    assert "stargazers_count" not in found[0].meta  # so the run fetches each repo, as before
+
 
 
 # ---------------------------------------------------------------------- systemd

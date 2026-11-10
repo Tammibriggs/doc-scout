@@ -195,6 +195,18 @@ def test_curated_repo_outside_the_star_range_costs_no_api_calls(cfg, now):
     assert gh.used == []
 
 
+def test_code_search_repos_failing_the_cheap_checks_cost_no_api_calls(cfg, now):
+    facts = {"full_name": "org/api", "description": "Bookmarks server", "stargazers_count": 300, "archived": False,
+             "fork": False, "pushed_at": iso(3), "license": {"spdx_id": "MIT"}}  # fmt: skip
+    for change, reason in [({"license": None}, "no license"), ({"stargazers_count": 4}, "fewer than 20 stars"), ({"pushed_at": iso(90)}, "no push in 60 days")]:
+        gh = FakeGitHub()
+        ev = evaluate(gh, Candidate("org/api", "code_search", facts | change), cfg, now)
+        assert ev.rejected and ev.rejected.startswith(reason) and not ev.used_api and gh.used == []
+    gh = FakeGitHub()
+    ev = evaluate(gh, Candidate("org/api", "code_search", dict(facts)), cfg, now)
+    assert gh.used[0] == "repo" and ev.used_api  # passing them, the repo is fetched in full as before
+
+
 def test_spam_visible_only_in_full_metadata_is_still_caught(cfg, now):
     class SpamGitHub(FakeGitHub):
         def get_repo(self, name):

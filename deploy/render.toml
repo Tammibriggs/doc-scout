@@ -12,6 +12,9 @@ project_sizes = ["small", "medium", "large"]
 # 11 reviews, 10 new items). These are caps: on 16 Oct, 60 repos gave 3 projects for Gemma.
 [discovery]
 daily_repo_budget = 200         # about 660 GitHub requests, well under the 5,000 an hour
+# Code search too (10 Nov): the other sources were used up by 24 Oct. Repos failing the cheap
+# checks (most of code search's) are turned away without counting toward the budget.
+sources = ["awesome_selfhosted", "repo_search", "help_requested", "code_search"]
 
 [llm]
 # Gemma 4 31B through Google's OpenAI-compatible Gemini API endpoint.

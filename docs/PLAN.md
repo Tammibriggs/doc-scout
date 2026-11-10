@@ -179,7 +179,7 @@ All three sources are above 50%, so all stay on.
 | `label:a,b` vs `label:a OR label:b` | The comma form works; the `OR` form returns 0 | Use the comma form |
 | `(openapi OR swagger) … in:title` | 73,752 junk results | One query per keyword |
 | `language:python language:go` | 205 = 112 + 93 repos; the same "any of" behaviour on issues | One search covers all your languages |
-| Code search for `filename:openapi.yaml` | Needs a token; 10 requests a minute; 1,000-result cap | Optional source |
+| Code search for `filename:openapi.yaml` | Needs a token; 10 requests a minute; 1,000-result cap. Rechecked 10 Nov: each of the 16 queries (4 file names × 4 size bands) has 6,000–42,000 results; the first pages gave 1,436 repos new to DocScout, of which 191 pass the cheap checks (672 have under 20 stars, 352 no licence, 215 no push in 60 days) | On the website since 10 Nov. Results carry no stars, so each page's repos are looked up together in one GraphQL request. No search can be paged past 1,000 results (page 11: "Cannot access beyond the first 1000 results"), there's no cursor, and GraphQL can't search code, so bands with more than 1,000 are split by file size, to the byte (`size:1000..1100`: 942 `openapi.yaml` files) |
 | Ollama `keep_alive: 0` | Unloads the model after every request | Keep it loaded for the batch, then unload once |
 | macOS `StartInterval` | Skips runs missed during sleep | Use `StartCalendarInterval` (M5) |
 | Windows Task Scheduler | Won't start on battery by default | Set the battery flags explicitly (M5) |
@@ -257,7 +257,7 @@ All three sources are above 50%, so all stay on.
    - An issue counts only if it has an outreach label or was opened by someone outside the project. Bots, dependency dashboards, bounty labels and (since 6 Nov) bounty programs such as Stellar Wave, whose issues collect applications for points, are ignored.
    - ✅ (16 Oct) It must also be about docs: a docs label, or a docs word in the title ("document", "docs", "examples", "reference"…). The comparison showed "help wanted" plus "api" finding a feature request (traceroot #2579) and a bug (mycelium #279). Docs labels are matched as words, so "docker" isn't one.
    - When a maintainer has labeled an issue "help wanted" or "good first issue", the activity check is looser (1 committer, no merged outside PRs needed).
-4. **Code search for definition files** (optional, needs a token): each API type's `definition_filenames`, sliced by file size.
+4. **Code search for definition files** (needs a token; on the website since 10 Nov): each API type's `definition_filenames`, sliced by file size, so 16 queries for REST. **Every result is reached** (10 Nov): no search can be paged past its first 1,000 results, and each of the 16 had 6,000–42,000 (about 380,000 in all), so a band with more than 1,000 is split in two by file size, and again, until each can be read to its end (`openapi.yaml` under 5 KB took 7 splits, down to 0–39 bytes with 371 results). Each split costs one search request. The bands are a queue kept in DocScout's memory (`state`), the largest files first: runs work through it in order, `code_search_per_run` (8) bands a run, a band being read stays at the front until it's finished, and a finished band goes to the back, so after the last one the search starts over; each band continues from the page it reached. Results shifting between pages (new files, deleted ones) cost at most a repeat, which is skipped for free, or a miss until the band's next turn. Changing the file names or size bands in the settings starts the queue again. Code search returns only a few repo fields, without stars, and most repos it finds are small or unlicensed, so each page's repos are looked up together, 50 to a GraphQL request (stars, licence, archived, fork, last push), and those failing the cheap checks are turned away without fetching each repo or counting toward `daily_repo_budget`. When GitHub can't answer a look-up, those repos are fetched one by one, as before.
 
 **Health gate (code only):**
 - Not archived, not a fork, has a license, within your star ranges, and pushed in the last 60 days.
@@ -507,7 +507,7 @@ hacktoberfest/
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅ claims_eval.py ✅ (M6: `docscout eval-claims`)
     hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ search.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 289 tests (256 and 12 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
+  tests/ ✅ 294 tests (261 and 12 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
 ```
 
 ## 17. Risks
@@ -627,6 +627,8 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
 In the first run, 16 of the 60 passed the health checks. Render started with an empty memory. The rehearsal had published picks from a database on this laptop without saving that database to Atlas, so Render's first run replaced the 42 rehearsal picks with its own 3.
 
 **The candidate pool ran dry by 24 Oct** (found 5 Nov). The runs of 17–23 Oct checked the full 200 repos and published 5–15 picks each, and the 7-day list grew to about 70. By 24 Oct DocScout had checked about 3,000 repos: every awesome-selfhosted app in the star range (1,115) and every page of the 24 repo-search slices, each gone through 2–4 times. A checked repo isn't checked again for 90 days (`recheck_after_days`), so since 25 Oct a run finds only the repos new to its sources: 9–152 (about 50 on average) instead of 200, and 0–3 new picks. The older picks left the 7-day list, which fell to 9 on 5 Nov. Nothing was deleted: the picks are still in Atlas. Decided 6 Nov: open picks stay listed and are kept true (M6, section 21); more sources come after it.
+
+**Code search added** (10 Nov, after only 3 picks were added on 9 Nov; section 8, source 4). Of the 3,520 repos checked by then, awesome-selfhosted gave 1,116 (44 of the 93 listed picks), repo search 1,910 (39) and help requests 494 (10). Checked live and read-only on 10 Nov: the first pages of the 16 queries gave 1,436 repos new to DocScout, and 191 passed the cheap checks, which now cost nothing. Of a random 40 of those 191, run through the full checks without Gemma: 18 have fewer than 2 committers in 90 days, 2 no merged outside PR, 4 no reportable gap, and 16 a spec with gaps, 11 of them scoring at least 25 (`min_score`). So a main run, with about 150 of its 200 repos from code search, should reach Gemma's 30-review cap; how many Gemma accepts is open, since code search also finds libraries, SDKs and clients (flask-security, an iOS app). Each full check took 5–8 s, so the main run grows by about 20 minutes. Deeper in the results fewer pass the cheap checks: 4–5% of new repos with an `openapi.yaml` under 1 KB, 8% at 2 KB and at 20 KB (200 each, 10 Nov), so the queue starts with the largest files, and a run reads about 25–35 pages, up to 4 minutes of waiting for code search's 10 requests a minute. With the splitting, all of the about 380,000 results can be reached, enough for months at about 150 full checks a run. Big projects (405 turned away for their size) stay off for now.
 
 **⏳ Still to do:**
 - ✅ Gemma 4 31B on the 58 labels: 85% precision, 90% recall (section 2);
@@ -821,4 +823,4 @@ Measured on 6 Nov on 87 spec picks, 12,315 operations.
 
 The public skill gets the same rules (6e). The comparison rounds keep the numbers measured at the time.
 
-**Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20). The language filter once listed here is covered by the search (8 Nov): "go" or "python" finds the picks in that language.
+**Not in M6:** more sources, the other answer to the dry pool (code search added 10 Nov, section 20); a way for subscribers to restore access (section 20). The language filter once listed here is covered by the search (8 Nov): "go" or "python" finds the picks in that language.

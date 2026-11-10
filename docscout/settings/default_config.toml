@@ -35,7 +35,10 @@ recheck_after_days = 90
 sources = ["awesome_selfhosted", "repo_search", "help_requested"]   # add "code_search" to enable it
 seed_max_age_days = 7
 # Search star bands come from [profile] project_sizes.
+# Code search: file-size bands to start from, in bytes. A band with more than the 1,000 results a
+# search can return is split in two by size, and again, until each can be read to its end.
 code_search_size_bands = ["<5000", "5000..20000", "20000..100000", ">100000"]
+code_search_per_run = 8          # code-search bands worked on per run, in turn; each continues where it stopped
 # help_requested: open, unassigned issues where maintainers ask for API docs help.
 issue_label_families = ['documentation,docs', '"help wanted","good first issue"']
 help_requested_keywords = ["api"]   # generic title keywords; each API type adds its own

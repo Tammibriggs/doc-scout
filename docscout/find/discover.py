@@ -35,6 +35,7 @@ log = logging.getLogger(__name__)
 
 LABELS = ("serves_api", "api_tooling", "library", "spam", "other")
 _FULL_REPO_KEYS = ("pushed_at", "license", "archived", "fork", "default_branch", "created_at")
+_CHEAP_KEYS = ("stargazers_count", "license", "archived", "fork", "pushed_at")  # what gate_metadata reads
 LANGUAGE_SHARE = 0.25  # a language counts if it's at least this share of the repo's code
 
 
@@ -105,12 +106,17 @@ def evaluate(
         return result
 
     if not all(key in meta for key in _FULL_REPO_KEYS):
-        # Sources like the curated list already know the stars: drop out-of-range repos for free.
-        if meta.get("stargazers_count") is not None:
+        # Sources that already know the cheap facts drop repos that fail them for free: the
+        # curated list knows the stars, code search all of them (one GraphQL request a page).
+        if all(key in meta for key in _CHEAP_KEYS):
+            reason = gate_metadata(meta, cfg["health"], now)
+        elif meta.get("stargazers_count") is not None:
             reason = star_range_reason(meta["stargazers_count"], cfg["health"]["star_ranges"])
-            if reason:
-                result.rejected = reason
-                return result
+        else:
+            reason = None
+        if reason:
+            result.rejected = reason
+            return result
         result.used_api = True
         try:
             meta = gh.get_repo(cand.full_name)
@@ -217,7 +223,13 @@ def source_candidates(
         rng.shuffle(found)
         yield from found
     elif name == code_search.SOURCE:
-        query_list = code_search.queries(apitypes.definition_filenames(api_types), disc["code_search_size_bands"])
+        filenames = apitypes.definition_filenames(api_types)
+        if cursor is not None:
+            yield from code_search.sweep(
+                gh, filenames, disc["code_search_size_bands"], cursor, per_run=int(disc["code_search_per_run"]), now=now or utcnow()
+            )
+            return
+        query_list = code_search.queries(filenames, disc["code_search_size_bands"])
         rng.shuffle(query_list)
         for query in query_list:
             page = list(code_search.fetch(gh, query, max_pages=1))

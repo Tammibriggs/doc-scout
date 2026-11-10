@@ -28,7 +28,7 @@ SECRET = "test-secret"
 PUBLIC = "https://docscout.test"
 
 
-def details(name, *, description="Self-hosted uptime app", html_url=None, effort_units=None, findings=None, claimed=None):
+def details(name, *, description="Self-hosted uptime app", html_url=None, effort_units=None, findings=None, claimed=None, topics=None):
     return {
         "api_type": "rest",
         "api_label": "REST",
@@ -38,7 +38,7 @@ def details(name, *, description="Self-hosted uptime app", html_url=None, effort
             "findings": findings or [{"text": "21/38 operations have no description", "examples": ["POST /checks"], "more": 20}],
             "suggestion": "Fill in the missing descriptions.", "published": ["Docs website: docs.example.dev"], "effort_units": effort_units,
         },
-        "repo": {"stars": 412, "language": "Go", "description": description},
+        "repo": {"stars": 412, "language": "Go", "description": description, "topics": topics or []},
         "review": {"model": "openai_compatible:gemma-4-31b-it", "why": "Users need the webhook payloads.", "first_steps": ["Read CONTRIBUTING.md", "Describe POST /checks"]},
         "checks": {"claimed": claimed or [], "requirements": [], "local_setup": "easy (docker-compose)", "claim_checked": True},
         "issues": [{"number": 214, "title": "Document webhook payloads", "html_url": html_url or f"https://github.com/{name}/issues/214"}],
@@ -105,7 +105,7 @@ def client(atlas, stripe=None, now=1_800_000_000.0):
 
 def test_weekly_picks_are_this_weeks_open_reports_with_only_trusted_links(tmp_path, now):
     store = Store(tmp_path / "docscout.db")
-    report(store, now, "org/best", score=80, html_url="https://evil.example/phish", description=":baby: Line one\x1b[31m\u202e hidden")
+    report(store, now, "org/best", score=80, html_url="https://evil.example/phish", description=":baby: Line one\x1b[31m\u202e hidden", topics=["llm", "self\u202ehosted"])
     report(store, now, "org/second", score=40)
     report(store, now - timedelta(days=8), "org/old")  # reported last week
     report(store, now, "org/waiting", status="new")  # not reported yet
@@ -117,6 +117,7 @@ def test_weekly_picks_are_this_weeks_open_reports_with_only_trusted_links(tmp_pa
     assert best["gap_file_url"] == "https://github.com/org/best/blob/0123456789abcdef0123456789abcdef01234567/api/openapi.yaml"
     assert best["issues"] == [{"title": "#214 Document webhook payloads", "url": None}]  # not a GitHub link: text only
     assert best["description"] == "Line one hidden"  # control and bidi characters removed
+    assert best["topics"] == ["llm", "selfhosted"]  # for the search
     assert best["findings"] == ["21/38 operations have no description (e.g. POST /checks and 20 more)"]
     assert best["model"] == "Gemma" and best["first_steps"] == ["Read CONTRIBUTING.md", "Describe POST /checks"]
     assert best["published"] == ["Docs website: docs.example.dev"]
@@ -267,6 +268,46 @@ def test_pages_keep_the_filters():
         p["effort"] = "Small job"  # the other 22 are medium
     first = subscriber(picks).get("/?size=medium").text
     assert "Page 1 of 3" in first and names(first)[0] == "org/app4" and 'href="/?page=2&amp;size=medium#picks"' in first
+
+
+def test_subscribers_can_search_and_the_search_keeps_the_other_choices():
+    picks = sample_picks(14)
+    for p in picks[:4]:
+        p["topics"] = ["llm"]
+    picks[0]["effort"] = picks[1]["effort"] = "Small job"
+    c = subscriber(picks)
+    ai = c.get("/?q=AI").text
+    assert names(ai) == ["org/app1", "org/app2", "org/app3", "org/app4"] and "4 of 14 match" in ai
+    assert 'name="q" value="AI"' in ai  # the box keeps the search
+    assert 'href="/#picks" aria-label="Remove the search: AI"' in ai and 'href="/#picks">Clear filters' in ai
+    assert 'href="/?q=AI&amp;sort=latest#picks"' in ai  # sorting keeps the search
+    small = c.get("/?q=AI&size=small&sort=latest").text
+    assert names(small) == ["org/app1", "org/app2"] and "2 of 14 match" in small
+    assert '<input type="hidden" name="sort" value="latest">' in small and '<input type="hidden" name="size" value="small">' in small  # a new search keeps them
+    assert 'href="/?q=AI&amp;sort=latest#picks" aria-label="Remove the filter: small jobs"' in small
+    none = c.get("/?q=blockchain").text
+    assert names(none) == [] and "No open picks match “blockchain” right now" in none
+    assert 'href="/?q=ai#picks">AI</a> (4)' in none  # broader words that find something
+    assert len(names(c.get("/?q=").text)) == 10  # an empty search is no search
+
+
+def test_visitors_see_how_many_picks_match_and_the_free_ones_that_do():
+    picks = sample_picks(10)  # the first 3 are the free ones
+    for p in (picks[1], picks[4], picks[5]):
+        p["topics"] = ["llm"]
+    picks[6]["description"] = "Invoices for small businesses"
+    c = client(FakeAtlas(picks))
+    ai = c.get("/?q=ai").text
+    assert names(ai) == ["org/app2"] and "3 of 10 match, 1 of them free" in ai
+    assert "2 more projects match “ai”" in ai and "The best 3 found this week are free. Subscribers see all 10." in ai
+    finance = c.get("/?q=finance").text
+    assert names(finance) == [] and "None of the free picks match “finance”, but 1 open pick does. Subscribe to see it." in finance
+    assert "1 project matches “finance”" in finance
+    nothing = c.get("/?q=rag").text
+    assert names(nothing) == [] and "No open picks match “rag” right now" in nothing and 'href="/?q=ai#picks">AI</a> (3)' in nothing
+    assert "Show every pick" not in nothing and 'class="offer"' not in nothing  # nothing hidden to subscribe for
+    hostile = c.get("/", params={"q": '<script>alert(1)</script>' + "x" * 100}).text
+    assert "<script>alert" not in hostile and "&lt;script&gt;alert(1)&lt;/script&gt;" in hostile and "x" * 41 not in hostile  # escaped, and cut at 60
 
 
 def test_unpaid_or_forged_returns_unlock_nothing():

@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Callable
+from typing import Any
 
 from docscout.analyze.elsewhere import docs_elsewhere, published_docs
 from docscout.analyze.gaps import Gap
@@ -52,7 +53,9 @@ _HIDDEN_DIR = re.compile(r"(^|/)\.[^/]+/")
 _SPEC_FOLDER = re.compile(r"(^|/)(openapi|swagger)[\w.-]*(/|$)", re.IGNORECASE)
 _YAML_OR_JSON = re.compile(r"\.(ya?ml|json)$", re.IGNORECASE)
 _API_NAMED = re.compile(r"^([\w.-]*[-_.])?api([-_.][\w.-]*)?\.(ya?ml|json)$", re.IGNORECASE)
-_NOT_A_SPEC = re.compile(r"^(package(-lock)?|composer|tsconfig[\w.-]*|\.?redocly[\w.-]*|\.?spectral[\w.-]*)\.(json|ya?ml)$", re.IGNORECASE)
+# openapitools.json is openapi-generator's settings file (seen 9 Nov at boxlite, where it took
+# one of the 4 fetches).
+_NOT_A_SPEC = re.compile(r"^(package(-lock)?|composer|tsconfig[\w.-]*|\.?redocly[\w.-]*|\.?spectral[\w.-]*|openapitools)\.(json|ya?ml)$", re.IGNORECASE)
 MAX_SPEC_FILES = 4
 MAX_DOCS_FILES = 3
 MAX_DOCS_BYTES = 512 * 1024
@@ -60,10 +63,35 @@ MAX_DOCS_BYTES = 512 * 1024
 # Generators that put their "do not edit" marker in a file beside the spec, not in it: swag
 # writes docs.go next to swagger.json and swagger.yaml (seen 16 Oct: autentico's docs/).
 _GENERATOR_FILES_BESIDE = ("docs.go",)
+# openapi-generator leaves a .openapi-generator/ folder in the code it writes. A spec inside that
+# code is the generator's copy, and a spec at the top of the package it wrote into is its input:
+# either way the spec of an API the package calls, maybe another service's. Seen 9 Nov at boxlite:
+# apps/libs/analytics-api-client/swagger.json (code in its src/), for an analytics service outside
+# the repo, and a Go client's copy at apps/libs/api-client-go/api/openapi.yaml, while boxlite's own
+# API is in openapi/box.openapi.yaml. Such a spec is measured only when the repo has no other. Not
+# at the repo's root: a repo the generator wrote whole is measured as before.
+_GENERATOR_MARK = "/.openapi-generator/"
 
 GAP_ELSEWHERE = 40  # no endpoints in the repo, but docs probably exist elsewhere
 CAP_CHECK_MANUALLY = 50
 CAP_COMPLETE_PROSE = 35
+
+
+def generated_client_dirs(tree: list[dict]) -> set[str]:
+    """Folders below the repo's root that openapi-generator wrote code into."""
+    dirs = set()
+    for entry in tree:
+        path = entry.get("path", "")
+        at = path.find(_GENERATOR_MARK)
+        if at > 0:
+            dirs.add(path[:at])
+    return dirs
+
+
+def in_generated_client(path: str, dirs: set[str]) -> bool:
+    """True for a spec inside a generated client, or at the top of the package one was written into."""
+    folder = path.rpartition("/")[0]
+    return bool(folder) and any(folder == d or folder.startswith(d + "/") or d.rpartition("/")[0] == folder for d in dirs)
 
 
 class RestApi(ApiType):
@@ -92,10 +120,11 @@ class RestApi(ApiType):
 
     # ------------------------------------------------------------------ docs analysis
 
-    def spec_files(self, tree: list[dict]) -> list[OwnedFile]:
+    def spec_files(self, tree: list[dict]) -> tuple[list[OwnedFile], list[OwnedFile]]:
         """Files that may be this repo's spec, most likely first: named openapi or swagger, then
-        any YAML or JSON in an openapi or swagger folder, then files named like api.yaml."""
-        named = self.find_definitions(tree)
+        any YAML or JSON in an openapi or swagger folder, then files named like api.yaml. Those of
+        a generated API client come apart, second (``_GENERATOR_MARK``)."""
+        named = [f for f in self.find_definitions(tree) if not _NOT_A_SPEC.search(f.path.rpartition("/")[2])]
         seen = {f.path for f in named}
         in_folder, api_named = [], []
         for f in find_owned_files(tree, _YAML_OR_JSON):
@@ -106,7 +135,9 @@ class RestApi(ApiType):
                 in_folder.append(f)
             elif _API_NAMED.search(name):
                 api_named.append(f)
-        return named + in_folder + api_named
+        clients = generated_client_dirs(tree)
+        found = named + in_folder + api_named
+        return [f for f in found if not in_generated_client(f.path, clients)], [f for f in found if in_generated_client(f.path, clients)]
 
     def analyze(self, ctx: DocsContext) -> Gap | None:
         owner_repos: list[dict] | None = None
@@ -163,9 +194,10 @@ class RestApi(ApiType):
             )
         return None
 
-    def _spec_gap(self, ctx: DocsContext) -> Gap | None:
+    def _worst_spec(self, ctx: DocsContext, files: list[OwnedFile]) -> tuple[str, Any] | None:
+        """The spec with the biggest gap among the first ``MAX_SPEC_FILES`` of ``files``."""
         best = None
-        for spec_file in self.spec_files(ctx.tree)[:MAX_SPEC_FILES]:
+        for spec_file in files[:MAX_SPEC_FILES]:
             try:
                 content = ctx.gh.get_file(ctx.full_name, spec_file.path, ref=ctx.head_sha)
             except GitHubError as exc:
@@ -174,6 +206,11 @@ class RestApi(ApiType):
             report = score_spec(content, spec_file.path) if content else None
             if report and (best is None or report.gap > best[1].gap):
                 best = (spec_file.path, report)
+        return best
+
+    def _spec_gap(self, ctx: DocsContext) -> Gap | None:
+        own, clients = self.spec_files(ctx.tree)
+        best = self._worst_spec(ctx, own) or self._worst_spec(ctx, clients)
         if best is None:
             return None
         path, report = best

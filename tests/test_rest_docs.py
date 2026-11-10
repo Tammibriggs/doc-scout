@@ -3,6 +3,7 @@ from pathlib import Path
 from docscout.analyze.elsewhere import docs_elsewhere, doc_links, published_docs, sibling_repos
 from docscout.analyze.apitypes.base import DocsContext
 from docscout.analyze.apitypes.rest import RestApi
+from docscout.analyze.tree import OwnedFile
 from docscout.analyze.apitypes.rest_prose import analyze_docs, analyze_text
 from docscout.find.github import NotFound
 
@@ -177,6 +178,33 @@ def test_spec_with_a_generator_file_beside_it_is_generated():
     assert gap.generated and gap.summary.endswith("generated") and "code annotations" in gap.suggestion
     gap = RestApi().analyze(ctx(FakeGitHub({"docs/swagger.yaml": spec}), [blob("docs/swagger.yaml"), blob("cmd/docs.go")]))
     assert not gap.generated  # a docs.go elsewhere says nothing about this spec
+
+
+def test_a_generated_clients_spec_is_measured_only_when_the_repo_has_no_other():
+    # Seen 9 Nov at boxlite: the analytics client's input spec and a Go client's copy were measured
+    # instead of boxlite's own openapi/box.openapi.yaml; openapitools.json took one of the 4 fetches.
+    bare, good = ((FIXTURES / "specs" / n).read_bytes() for n in ("bare.yaml", "good.yaml"))
+    tree = [
+        blob("apps/openapitools.json"),
+        blob("openapi/box.openapi.yaml"),
+        blob("apps/libs/analytics-api-client/swagger.json"), blob("apps/libs/analytics-api-client/src/.openapi-generator/FILES"),
+        blob("apps/libs/api-client-go/api/openapi.yaml"), blob("apps/libs/api-client-go/.openapi-generator/FILES"),
+    ]
+    files = {"openapi/box.openapi.yaml": good, "apps/libs/analytics-api-client/swagger.json": bare, "apps/libs/api-client-go/api/openapi.yaml": bare}
+    gh = FakeGitHub(files)
+    gap = RestApi().analyze(ctx(gh, tree))
+    assert gap.location == "openapi/box.openapi.yaml" and gh.fetched == ["openapi/box.openapi.yaml"]  # the worse client specs aren't even fetched
+    only = [e for e in tree if e["path"] != "openapi/box.openapi.yaml"]
+    assert RestApi().analyze(ctx(FakeGitHub(files), only)).location in files  # with no other spec, as before
+
+
+def test_a_repo_the_generator_wrote_whole_and_an_sdk_folder_beside_the_spec_change_nothing():
+    bare = (FIXTURES / "specs" / "bare.yaml").read_bytes()
+    gh = FakeGitHub({"api/openapi.yaml": bare, "openapi.yaml": bare})
+    whole = [blob("api/openapi.yaml"), blob(".openapi-generator/FILES")]  # .openapi-generator/ at the root
+    assert RestApi().analyze(ctx(gh, whole)).location == "api/openapi.yaml"
+    root_spec = [blob("openapi.yaml"), blob("api/openapi.yaml"), blob("sdk/.openapi-generator/FILES")]  # an SDK generated from the root spec
+    assert RestApi().spec_files(root_spec) == ([OwnedFile("openapi.yaml", 1000), OwnedFile("api/openapi.yaml", 1000)], [])
 
 
 def test_thin_prose_without_spec():

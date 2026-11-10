@@ -31,12 +31,14 @@ from starlette.templating import Jinja2Templates
 from docscout.hosted import atlas_database, required_secret
 from docscout.hosted.billing import PRICE_CENTS, BillingError
 from docscout.hosted.picks import EFFORT, FREE_PICKS
-from docscout.run.sanitize import is_github_url
+from docscout.hosted.search import MAX_QUERY, search, suggestions
+from docscout.run.sanitize import clean, is_github_url
 
 COOKIE = "docscout_pass"
 PER_PAGE = 10  # picks per page for subscribers
 # Subscribers' filters (8 Nov): the job's size, and only picks whose maintainers asked for help.
-# Visitors get none, since a filter would show them picks beyond the free 3.
+# Visitors get none, since a filter would show them picks beyond the free 3. Anyone can search
+# (hosted.search): subscribers see what matches, visitors how many match and the free ones that do.
 SIZES = {"small": "S", "medium": "M", "big": "L"}
 SIZE_CHOICES = [(None, "Any size"), ("small", "Small"), ("medium", "Medium"), ("big", "Big")]
 PASS_SECONDS = 31 * 24 * 3600  # a month's subscription, plus a day
@@ -69,9 +71,10 @@ def ago(iso: str | None, now: float) -> str | None:
         return f"{hours} hour{'s' if hours != 1 else ''} ago"
     return f"{hours // 24} days ago"
 
-def picks_link(*, page: int = 1, sort: str = "best", size: str | None = None, help_only: bool = False) -> str:
+def picks_link(*, page: int = 1, sort: str = "best", size: str | None = None, help_only: bool = False, q: str | None = None) -> str:
     """The list's address with these choices: only the ones that differ from the defaults."""
-    params = [("page", str(page))] if page > 1 else []
+    params = [("q", q)] if q else []
+    params += [("page", str(page))] if page > 1 else []
     params += [("sort", "latest")] if sort == "latest" else []
     params += [("size", size)] if size in SIZES else []
     params += [("help", "1")] if help_only else []
@@ -110,6 +113,8 @@ def create_app(
         total = len(picks)
         subscribed = valid_pass(request.cookies.get(COOKIE), secret, clock())
         pages, number, sort, size, help_only = 1, 1, "best", None, False
+        q = clean(request.query_params.get("q", "")[:MAX_QUERY], MAX_QUERY) or None  # cut, not shortened with "…"
+        free = total
         if subscribed:  # pages of PER_PAGE; visitors see only the free picks, so they need no pages, sorting or filters
             if request.query_params.get("sort") == "latest":  # newest first, then best first within a day
                 sort = "latest"
@@ -120,27 +125,38 @@ def create_app(
             if request.query_params.get("help") == "1":
                 help_only = True
                 picks = [p for p in picks if p.get("issues")]  # the "Maintainers asked for help" chip
+            searched = picks  # what a suggested search looks through
+            if q:
+                picks = search(picks, q)
             pages = max(1, math.ceil(len(picks) / PER_PAGE))
             requested = request.query_params.get("page", "1")
             number = min(pages, max(1, int(requested))) if requested.isdigit() else 1
             shown = picks[(number - 1) * PER_PAGE : number * PER_PAGE]
         else:  # the free picks (M6: the best found this week); a list published before has no flags
             shown = [p for p in picks if p.get("free")][:FREE_PICKS] or picks[:FREE_PICKS]
+            searched, free = picks, len(shown)
+            if q:  # how many of all the picks match, and the free ones among them
+                picks = search(picks, q)
+                matched = {p.get("full_name") for p in picks}
+                shown = [p for p in shown if p.get("full_name") in matched]
         shown = [{**p, "checked_ago": ago(p.get("checked"), clock())} for p in shown]
 
         def link(**changes: Any) -> str:  # the current choices, with some changed; a change starts again at page 1
-            return picks_link(**{"sort": sort, "size": size, "help_only": help_only, **changes})
+            return picks_link(**{"sort": sort, "size": size, "help_only": help_only, "q": q, **changes})
 
         return page(
             request,
             picks=shown,
-            hidden=0 if subscribed else total - len(shown),
+            hidden=0 if subscribed else len(picks) - len(shown),
+            free=free,
+            q=q,
+            suggestions=suggestions(searched) if q and not picks else [],
             page_number=number,
             pages=pages,
             sort=sort,
             size=size,
             help_only=help_only,
-            filtered=bool(size or help_only),
+            filtered=bool(size or help_only or q),
             active_count=int(bool(size)) + int(help_only),
             size_name=dict(SIZE_CHOICES).get(size),
             matching=len(picks),

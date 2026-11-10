@@ -59,6 +59,7 @@ def pick(finding: StoredFinding, rank: int, now: datetime | None = None) -> dict
         "stars": repo.get("stars"),
         "language": clean(repo.get("language") or "", 40) or None,
         "description": clean(_EMOJI_CODE.sub("", str(repo.get("description") or "")), 300) or None,
+        "topics": [clean(t, 50) for t in (repo.get("topics") or [])[:15]],  # searched, not shown (hosted.search)
         "gap_heading": clean(kind_label(gap.kind, d.get("api_label", "API")), 80),
         "gap_summary": clean(gap.summary, 200),
         "gap_file": clean(gap.location, 200) if gap.location else None,

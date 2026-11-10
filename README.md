@@ -24,6 +24,7 @@ Use it on the [website](https://docscout-web.onrender.com/), run it yourself [on
   A renamed repo keeps its pick under the new name.
 - **Each card** says when the pick was found and last checked, what needs doing, and whether anyone is already on part of it ("Partly claimed", with the work that's left).
 - **Free:** the best 3 found this week. **Subscribers ($2 a month):** every open pick, best first or newest first, with filters for the size of the job and for projects whose maintainers asked for help.
+- **Search** by what a project is about: "ai", "payments", "go". It looks through each pick's name, description, GitHub topics and language. A word for a kind of project also finds the words those projects use, so "ai" finds projects tagged `llm` or `rag`. Every word must match. Visitors see how many picks match and the free ones among them; subscribers see them all.
 
 Before you start on a pick, comment on the issue, or open one, so the next writer, and DocScout, can see you're on it.
 
@@ -150,7 +151,7 @@ Reports go to `~/Documents/DocScout/reports/` (set `[report] dir` to change it):
   - for an OpenAPI spec: the operations with no description, with parameters that have no description, with no request example (of those that take a request body), with no example of a successful response (of those that return something), with no success schema, or whose error responses don't describe their body; and the fields a reader sends or gets back that have no description. Examples count only where they show the call, on a request body or a successful response: one example on a shared error response doesn't make every operation documented;
   - for prose docs: the endpoints with no description, request or response example, status codes or auth.
 
-  Specs are found by name (`openapi.yaml`, `swagger.json`), by folder (`docs/openapi/…`), and as files named like `api.yaml`;
+  Specs are found by name (`openapi.yaml`, `swagger.json`), by folder (`docs/openapi/…`), and as files named like `api.yaml`. A spec inside a client that openapi-generator wrote (a folder holding `.openapi-generator/`), or at the top of that client's package, describes an API the client calls, often another service's, so it's measured only when the repo has no other spec;
 - **"Docs published":** where the docs can be read as pages without installing the project: a docs site built from the repo (MkDocs, Sphinx, Docusaurus, Mintlify…), a docs website, a separate docs repo, or Markdown API docs on GitHub. These projects rank higher (`[scoring] published_docs_bonus`), because you can see the gap in a browser and the fix is Markdown;
 - **the project's health:** stars, last push, and how many outside pull requests it merged recently and how fast;
 - **"Maintainers asked for help"** with links, when maintainers have an open issue asking for the work DocScout found. Gemma reads each request next to the gap and quotes the line its answer rests on, and code checks the quote is really in the issue. A request for other API-docs work is listed as related, and one that isn't about API docs isn't shown. Only a request for this work raises the score;

@@ -84,6 +84,15 @@
   .active { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: -4px 0 18px; color: var(--muted); font-size: .9rem; }
   .remove { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--blue-soft); color: var(--blue);
             font-weight: 600; text-decoration: none; }
+  /* Search: a plain GET form, so no JavaScript */
+  .search { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 4px 4px 4px 12px; background: var(--surface);
+            border: 1px solid var(--line); border-radius: 12px; }
+  .search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  .search svg { flex: none; width: 18px; height: 18px; color: var(--muted); }
+  .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: .95rem; padding: 6px 0; outline: none; }
+  .search input::placeholder { color: var(--muted); }
+  .search button { width: auto; margin: 0; padding: 7px 14px; border-radius: 9px; font-size: .9rem; }
+  .empty .try { display: block; margin-top: 8px; }
   @media (max-width: 420px) { .sort a, .sort strong { padding: 6px 9px; } .panel { padding: 4px 12px 14px; } .panel .sort a, .panel .sort strong { padding: 6px 8px; } }
 
   /* Pick cards */
@@ -194,7 +203,7 @@
   <main>
     <div class="section-head" id="picks">
       <h2>Open picks</h2>
-      {% if hidden > 0 %}<span class="note">The best {{ picks | length }} found this week are free. Subscribers see all {{ total }}.</span>
+      {% if not subscribed and total > free %}<span class="note">The best {{ free }} found this week are free. Subscribers see all {{ total }}.</span>
       {% elif subscribed and total > 1 %}
       <div class="tools">
         <nav class="sort" aria-label="Order">
@@ -220,17 +229,34 @@
       {% endif %}
     </div>
 
-    {% if subscribed and (filtered or pages > 1) %}
+    {% if total > 1 %}
+    <form class="search" role="search" method="get" action="/#picks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" value="{{ q or '' }}" maxlength="60" placeholder="Search by what it's about: AI, payments, Go…" aria-label="Search the picks by what the project is about" enterkeyhint="search">
+      {% if sort == "latest" %}<input type="hidden" name="sort" value="latest">{% endif %}
+      {% if size %}<input type="hidden" name="size" value="{{ size }}">{% endif %}
+      {% if help_only %}<input type="hidden" name="help" value="1">{% endif %}
+      <button type="submit">Search</button>
+    </form>
+    {% endif %}
+
+    {% if (subscribed and (filtered or pages > 1)) or q %}
     <div class="active">
+      {% if q %}<a class="remove" href="{{ link(q=None) }}" aria-label="Remove the search: {{ q }}">“{{ q }}” <span aria-hidden="true">✕</span></a>{% endif %}
       {% if size %}<a class="remove" href="{{ link(size=None) }}" aria-label="Remove the filter: {{ size_name | lower }} jobs">{{ size_name }} job <span aria-hidden="true">✕</span></a>{% endif %}
       {% if help_only %}<a class="remove" href="{{ link(help_only=False) }}" aria-label="Remove the filter: maintainers asked for help">Maintainers asked for help <span aria-hidden="true">✕</span></a>{% endif %}
-      {% if filtered %}<span>{{ matching }} of {{ total }} match</span><a href="{{ link(size=None, help_only=False) }}">Clear filters</a>{% endif %}
+      {% if filtered %}<span>{{ matching }} of {{ total }} match{% if not subscribed and matching %}, {{ picks | length }} of them free{% endif %}</span>{% endif %}
+      {% if subscribed and filtered %}<a href="{{ link(size=None, help_only=False, q=None) }}">Clear filters</a>{% endif %}
       {% if pages > 1 %}<span>Page {{ page_number }} of {{ pages }}</span>{% endif %}
     </div>
     {% endif %}
 
-    {% if not picks and filtered %}
-    <p class="empty">No open picks match these filters right now. <a href="{{ link(size=None, help_only=False) }}">Show every pick</a></p>
+    {% if not picks and q and matching %}
+    <p class="empty">None of the free picks match “{{ q }}”, but {{ matching }} open pick{{ " does" if matching == 1 else "s do" }}. Subscribe to see {{ "it" if matching == 1 else "them" }}.</p>
+    {% elif not picks and filtered %}
+    <p class="empty">No open picks match {% if q %}“{{ q }}”{% if size or help_only %} with these filters{% endif %}{% else %}these filters{% endif %} right now.
+      {% if suggestions %}<span class="try">Try a broader word: {% for label, query, count in suggestions %}<a href="{{ link(q=query) }}">{{ label }}</a> ({{ count }}){{ ", " if not loop.last }}{% endfor %}.</span>{% endif %}
+      {% if subscribed %}<span class="try"><a href="{{ link(size=None, help_only=False, q=None) }}">Show every pick</a></span>{% endif %}</p>
     {% elif not picks %}
     <p class="empty">The first picks are on their way. DocScout checks projects every day, so come back tomorrow.</p>
     {% endif %}
@@ -309,12 +335,12 @@
     {% if hidden > 0 %}
     <section class="offer" aria-labelledby="offer-title">
       <div>
-        <h2 id="offer-title">{{ hidden }} more project{{ "" if hidden == 1 else "s" }} to choose from</h2>
+        <h2 id="offer-title">{% if q %}{{ hidden }}{% if picks %} more{% endif %} project{{ " matches" if hidden == 1 else "s match" }} “{{ q }}”{% else %}{{ hidden }} more project{{ "" if hidden == 1 else "s" }} to choose from{% endif %}</h2>
         <p class="desc">Subscribe to see every pick DocScout and Gemma find.</p>
         <ul>
           <li>Every open pick, checked every 6 hours for anyone already on it</li>
           <li>Newest first, to see what was just found</li>
-          <li>Filters for the size of the job and for projects whose maintainers asked for help</li>
+          <li>Search by what the project is about, and filters for the size of the job and for projects whose maintainers asked for help</li>
           <li>Gemma's first steps for each project</li>
           <li>Nothing to install, and cancel anytime</li>
         </ul>

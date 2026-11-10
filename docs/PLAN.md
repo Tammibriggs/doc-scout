@@ -300,6 +300,7 @@ health = 0.35·min(1, outsider_merged_180d/5) + 0.20·outsider_merge_rate + 0.15
   - Each finding carries a stable key (`response_example`, `fields`, …) that claims are matched on.
   - `$ref` is resolved only within the file.
   - **Finding the spec** ✅ (16 Oct): files named `openapi*`/`swagger*` first, then any YAML or JSON in an `openapi`/`swagger` folder, then files named like `api.yaml` or `public-api.yaml`, at most 4 fetched. The parser drops files that aren't specs. Matching by name alone missed 4 specs in the comparison (dagu, jupyter_server, traceroot, ChurchCRM). The classifier's "owns a spec" evidence still uses names only, so the measured label numbers stay valid.
+  - **Specs of a generated API client come last** ✅ (9 Nov): a spec inside the code openapi-generator wrote (a folder below the root that holds `.openapi-generator/`), or at the top of the package it wrote into, is measured only when the repo has no other spec; `openapitools.json`, the generator's settings, is no longer fetched as a candidate. At boxlite, DocScout had measured `apps/libs/analytics-api-client/swagger.json`, the input of a client for an analytics service outside the repo (8 operations), and before that a Go client's copy of the cloud API (`apps/libs/api-client-go/api/openapi.yaml`), not boxlite's own `openapi/box.openapi.yaml` (54 operations). On the 93 listed picks of 9 Nov the rule changes only boxlite, the one with a `.openapi-generator/` folder. ⏳ It still doesn't reach box.openapi.yaml: the worst spec among those fetched is measured, which is now the runner's internal API (swag-generated, 11 operations); whether to measure a repo's main spec instead is open. Checked 9 Nov: 28 of the 93 picks have 2 or more specs among the 4 fetched, and in 13 the worst isn't the biggest. "Biggest" isn't a safe rule either: openfoodnetwork's newer v1 has 7 operations against v0's 49, and pydio's v2 has 24 against v1's 120; several others are copies of one spec (fastcrw, daikoku).
   - **Generated specs** (a `DO NOT EDIT` header, or CI that regenerates the file) keep their score, but the suggestion becomes "edit the code annotations".
 - **C. Docs only in prose.** Each endpoint in the README or docs is checked for: a description (25), a request example (20), a response example (25), status or error codes (15) and auth (15). If the docs are at least 80% complete, the gap is set to 35 and the suggestion becomes "turn them into an OpenAPI spec".
 - **D. No docs found.** ✅ **No longer reported** (decided 16 Oct). It rested only on not finding docs, never on reading them. In the comparison, the one such pick (VoucherVault) had its API docs in a GitHub wiki, and the author wouldn't act on it. Before that it scored 60, and only with type confidence of at least 0.8.
@@ -504,9 +505,9 @@ hacktoberfest/
     run/      pipeline.py ✅ daily.py ✅ db.py ✅ lock.py ✅ notify.py ✅ report.py ✅ sanitize.py ✅ watch.py ✅ keep_open.py ✅ (M6)
               scheduler/ __init__.py ✅ linux.py ✅ · macos.py · windows.py (M5)
     measure/  evaluate.py ✅ reclassify.py ✅ llm_eval.py ✅ bench.py ✅ claims_eval.py ✅ (M6: `docscout eval-claims`)
-    hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ job.py ✅ templates/index.html ✅ (section 20)
+    hosted/   picks.py ✅ atlas.py ✅ atlas_store.py ✅ billing.py ✅ web.py ✅ search.py ✅ job.py ✅ templates/index.html ✅ (section 20)
     (M4: find/safe_fetch.py)
-  tests/ ✅ 277 tests (246 and 12 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
+  tests/ ✅ 289 tests (256 and 12 skipped without the `hosted` extras and mongomock) · test_store_contract.py runs every store behavior against SQLite and Atlas · fixtures/specs, fixtures/readmes, fixtures/labeled_repos.csv ✅ · fixtures/m6/ (M6's test set) ✅
 ```
 
 ## 17. Risks
@@ -585,6 +586,11 @@ For writers who'd rather not run anything: no terminal, and no 6 GB of free memo
   - the top 3 free (5 until 17 Oct; since M6, the best 3 found in the last 7 days, topped up with older picks), the rest after a Stripe Checkout subscription;
   - subscribers can switch to newest first (17 Oct): the day it was found, then best score. Every card says when it was found, and a "New" label marks the last 24 hours;
   - subscribers can filter the list (8 Nov): by the size of the job (small, medium or big, the card's effort label) and to picks whose maintainers asked for help. They sit behind a filter icon that opens a small panel (a `<details>` element, so no JavaScript), and the active ones show under the heading as chips that remove them, with the match count; the first version, a row of controls, looked cluttered. Sorting and pages keep the filters. Visitors get no filters, since a filter would show them picks beyond the free 3. On the 93 open picks of 8 Nov: 14 small jobs, and 2 big jobs with a help request;
+  - anyone can search by what a project is about (8 Nov; [hosted/search.py](../docscout/hosted/search.py)): a plain form under the heading, so still no JavaScript. Subscribers get the matching picks, with sorting, filters and pages kept; visitors get how many match and the free picks among them ("25 of 92 match, 1 of them free"), a nudge to subscribe that gives nothing away. A search that finds nothing suggests the kinds of project with the most picks. The rules:
+    - it looks through each pick's name, description, GitHub topics (published with each pick since 8 Nov, so they're searchable after the first run with this code) and language; not Gemma's note, which is about the docs;
+    - every word must match; plurals match simply; a word of 5 letters or more also matches longer words that start with it ("photo" finds "photography"; "java" doesn't find "javascript"); words every pick shares ("api", "rest") are ignored;
+    - a word naming a kind of project expands to the words its projects use: "ai" also finds `llm`, `rag` and `machine-learning`; 19 kinds, from AI and blockchain to healthcare. Words a project uses rather than is about stay out of the lists, tried on the 92 picks of 8 Nov: "docker", database engines, "dashboard", "raspberry pi", bare "streaming" (an AI gateway's streamed answers matched "media") and "orchestration" (AI agents matched "devops"). On those picks: AI 25, media 13, storage 10, DevOps 9, monitoring 9, blockchain 1;
+    - in memory, not Atlas Search (decided 8 Nov): about 90 short records live in one document, so Atlas Search would mean storing each pick as its own document, moving paging, sorting and the paywall into the query, and tests that mongomock can't run, for typo tolerance and relevance ranking the list doesn't need yet. Worth revisiting once the list is in the thousands; only `search()` would change;
   - the paywall is enforced on the server, so the page holds only what the visitor may see;
   - subscribers page through the list, 10 picks a page (server-side pages: infinite scrolling would need JavaScript);
   - picks someone may already be on go below the rest (17 Oct), because every pick is checked for claims again each day (section 10). Since M6, only when the unclaimed work is under 5 operations or endpoints; otherwise the card says "Partly claimed" with the work left;
@@ -776,7 +782,7 @@ Each step can ship on its own.
 | A run cut off midway | Each check saves as it goes; the look's answers are saved only after they've been acted on |
 | Two runs at once | A run still going makes the next one stop at once |
 | More writers see the same pick | "Comment before you start"; claims checked every 6 hours |
-| The list grows long | The look for changes and caps; pages of 10; filters for the size of the job and help requests (8 Nov); a language filter later |
+| The list grows long | The look for changes and caps; pages of 10; filters for the size of the job and help requests, and a search by what the project is about or its language (8 Nov) |
 
 ### Decisions (confirmed 6 Nov)
 
@@ -815,4 +821,4 @@ Measured on 6 Nov on 87 spec picks, 12,315 operations.
 
 The public skill gets the same rules (6e). The comparison rounds keep the numbers measured at the time.
 
-**Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20); a language filter on the website (the size and help-request filters were added on 8 Nov).
+**Not in M6:** more sources, the other answer to the dry pool (next); a way for subscribers to restore access (section 20). The language filter once listed here is covered by the search (8 Nov): "go" or "python" finds the picks in that language.
